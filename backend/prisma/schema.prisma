@@ -1,0 +1,201 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Model
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String
+  role      Role       @default(STUDENT)
+  schoolId  String?
+  classId   String?
+  sectionId String?
+  school    School?    @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  class     Class?     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
+  section   Section?   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([email])
+  @@index([role])
+  @@index([schoolId, role])
+  @@index([classId])
+  @@index([sectionId])
+}
+
+// School Model
+model School {
+  id         String        @id @default(cuid())
+  schoolName String
+  schoolCode String        @unique
+  address    String
+  city       String
+  state      String
+  phone      String
+  email      String
+  status     SchoolStatus  @default(ACTIVE)
+  users      User[]
+  classes    Class[]
+  sections   Section[]
+  subjects   Subject[]
+  teachers   Teacher[]
+  teacherAssignments TeacherAssignment[]
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([schoolName])
+  @@index([city, state])
+}
+
+model Class {
+  id            String         @id @default(cuid())
+  className     String
+  classOrder    Int
+  schoolId      String
+  school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sections      Section[]
+  users         User[]         @relation("ClassUsers")
+  classSubjects ClassSubject[]
+  teacherAssignments TeacherAssignment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([schoolId, className])
+  @@unique([schoolId, classOrder])
+  @@index([schoolId, classOrder])
+}
+
+model Section {
+  id              String           @id @default(cuid())
+  sectionName     String
+  sectionOrder    Int
+  classId         String
+  schoolId        String
+  class           Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  users           User[]           @relation("SectionUsers")
+  sectionSubjects SectionSubject[]
+  teacherAssignments TeacherAssignment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([classId, sectionName])
+  @@unique([classId, sectionOrder])
+  @@index([classId, sectionOrder])
+  @@index([schoolId])
+}
+
+model Subject {
+  id              String           @id @default(cuid())
+  subjectName     String
+  subjectCode     String
+  schoolId        String
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classSubjects   ClassSubject[]
+  sectionSubjects SectionSubject[]
+  teacherAssignments TeacherAssignment[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([schoolId, subjectName])
+  @@unique([schoolId, subjectCode])
+  @@index([schoolId])
+}
+
+model ClassSubject {
+  id        String   @id @default(cuid())
+  classId   String
+  subjectId String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([classId, subjectId])
+  @@index([classId])
+  @@index([subjectId])
+}
+
+model SectionSubject {
+  id        String   @id @default(cuid())
+  sectionId String
+  subjectId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([sectionId, subjectId])
+  @@index([sectionId])
+  @@index([subjectId])
+}
+
+model Teacher {
+  id                String              @id @default(cuid())
+  teacherName       String
+  email             String
+  phone             String
+  employeeId        String
+  qualification     String
+  specialization    String
+  subjectsHandled   String[]
+  schoolId          String
+  school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacherAssignments TeacherAssignment[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@unique([schoolId, email])
+  @@unique([schoolId, employeeId])
+  @@index([schoolId, teacherName])
+  @@index([schoolId, specialization])
+}
+
+model TeacherAssignment {
+  id           String    @id @default(cuid())
+  teacherId    String
+  subjectId    String
+  classId      String
+  sectionId    String
+  schoolId     String
+  isTemporary  Boolean   @default(false)
+  effectiveFrom DateTime @default(now())
+  effectiveTo  DateTime?
+  createdAt    DateTime  @default(now())
+
+  teacher      Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject      Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class        Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section      Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, sectionId, subjectId])
+  @@index([teacherId])
+  @@index([schoolId, sectionId])
+  @@index([schoolId, subjectId])
+  @@index([schoolId, classId, sectionId])
+}
+
+// Enums
+enum Role {
+  PLATFORM_OWNER
+  SCHOOL_OWNER
+  ADMIN
+  TEACHER
+  PARENT
+  STUDENT
+  STAFF
+}
+
+enum SchoolStatus {
+  ACTIVE
+  INACTIVE
+}
