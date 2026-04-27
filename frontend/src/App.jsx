@@ -12,6 +12,7 @@ const ParentDashboard = lazy(() => import('./pages/dashboards/ParentDashboard'))
 const StudentDashboard = lazy(() => import('./pages/dashboards/StudentDashboard'));
 const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard'));
 const SchoolManagementPage = lazy(() => import('./pages/platform/SchoolManagementPage'));
+const SchoolSettingsPage = lazy(() => import('./pages/platform/SchoolSettingsPage'));
 const ClassManagementPage = lazy(() => import('./pages/admin/ClassManagementPage'));
 const SectionManagementPage = lazy(() => import('./pages/admin/SectionManagementPage'));
 const SubjectManagementPage = lazy(() => import('./pages/admin/SubjectManagementPage'));
@@ -19,6 +20,12 @@ const SubjectAssignmentPage = lazy(() => import('./pages/admin/SubjectAssignment
 const TeacherManagementPage = lazy(() => import('./pages/admin/TeacherManagementPage'));
 const TeacherAssignmentPage = lazy(() => import('./pages/admin/TeacherAssignmentPage'));
 const TeacherAssignmentSummaryPage = lazy(() => import('./pages/admin/TeacherAssignmentSummaryPage'));
+const WeeklySlotManagementPage = lazy(() => import('./pages/admin/WeeklySlotManagementPage'));
+const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPage'));
+const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
+const GalleryStudioPage = lazy(() => import('./pages/admin/GalleryStudioPage'));
+const GalleryPage = lazy(() => import('./pages/GalleryPage'));
+const SchoolProfilePage = lazy(() => import('./pages/school/SchoolProfilePage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -54,11 +61,29 @@ export default function App() {
           }
         />
 
+        <Route
+          path="/dashboard/platform/school-settings"
+          element={
+            <ProtectedRoute allowedRoles={['PLATFORM_OWNER']}>
+              <SchoolSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+
           <Route
             path="/dashboard/school"
             element={
               <ProtectedRoute allowedRoles={['SCHOOL_OWNER']}>
                 <SchoolOwnerDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/school/profile"
+            element={
+              <ProtectedRoute allowedRoles={['SCHOOL_OWNER']}>
+                <SchoolProfilePage />
               </ProtectedRoute>
             }
           />
@@ -131,6 +156,51 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
                 <TeacherAssignmentSummaryPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/weekly-slots"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <WeeklySlotManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/timetable-builder"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <TimetableBuilderPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/timetable-reconciliation"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <TimetableReconciliationPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/gallery"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <GalleryStudioPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/gallery"
+            element={
+              <ProtectedRoute allowedRoles={['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']}>
+                <GalleryPage />
               </ProtectedRoute>
             }
           />

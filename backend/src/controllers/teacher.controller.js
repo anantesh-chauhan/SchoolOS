@@ -288,11 +288,34 @@ export const listTeacherAssignmentsForSection = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Section not found in class for this school' });
     }
 
-    const sectionSubjects = await prisma.sectionSubject.findMany({
+    let sectionSubjects = await prisma.sectionSubject.findMany({
       where: { sectionId },
       include: { subject: true },
       orderBy: { createdAt: 'asc' },
     });
+
+    if (sectionSubjects.length === 0) {
+      const classSubjects = await prisma.classSubject.findMany({
+        where: { classId },
+        select: { subjectId: true },
+      });
+
+      if (classSubjects.length > 0) {
+        await prisma.sectionSubject.createMany({
+          data: classSubjects.map((row) => ({
+            sectionId,
+            subjectId: row.subjectId,
+          })),
+          skipDuplicates: true,
+        });
+
+        sectionSubjects = await prisma.sectionSubject.findMany({
+          where: { sectionId },
+          include: { subject: true },
+          orderBy: { createdAt: 'asc' },
+        });
+      }
+    }
 
     const assignments = await prisma.teacherAssignment.findMany({
       where: { schoolId, classId, sectionId },
@@ -364,10 +387,29 @@ export const bulkUpsertTeacherAssignments = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Section not found in class for this school' });
     }
 
-    const sectionSubjects = await prisma.sectionSubject.findMany({
+    let sectionSubjects = await prisma.sectionSubject.findMany({
       where: { sectionId },
       select: { subjectId: true },
     });
+
+    if (sectionSubjects.length === 0) {
+      const classSubjects = await prisma.classSubject.findMany({
+        where: { classId },
+        select: { subjectId: true },
+      });
+
+      if (classSubjects.length > 0) {
+        await prisma.sectionSubject.createMany({
+          data: classSubjects.map((row) => ({ sectionId, subjectId: row.subjectId })),
+          skipDuplicates: true,
+        });
+
+        sectionSubjects = await prisma.sectionSubject.findMany({
+          where: { sectionId },
+          select: { subjectId: true },
+        });
+      }
+    }
 
     const sectionSubjectIds = new Set(sectionSubjects.map((item) => item.subjectId));
     if (sectionSubjectIds.size === 0) {

@@ -14,8 +14,9 @@ import {
   Users,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
+import { schoolSettingsService } from '../services/schoolSettingsService';
 
 const demoAccountsByRole = [
   {
@@ -54,12 +55,14 @@ const demoAccountsByRole = [
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [rememberMe, setRememberMe] = useState(Boolean(localStorage.getItem('schoolosRemember')));
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [instantLoginEmail, setInstantLoginEmail] = useState('');
   const [errors, setErrors] = useState({});
+  const [branding, setBranding] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -87,6 +90,31 @@ export default function LoginPage() {
       mounted = false;
     };
   }, [navigate]);
+
+  useEffect(() => {
+    const schoolId = searchParams.get('schoolId');
+    if (!schoolId) {
+      return;
+    }
+
+    let mounted = true;
+    schoolSettingsService
+      .getPublicBranding(schoolId)
+      .then((response) => {
+        if (mounted) {
+          setBranding(response.data || null);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setBranding(null);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [searchParams]);
 
   const featureList = useMemo(
     () => [
@@ -183,14 +211,21 @@ export default function LoginPage() {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
-          className="relative overflow-hidden bg-gradient-to-br from-cyan-700 via-blue-700 to-indigo-800 p-8 md:p-12 text-white"
+          className="relative overflow-hidden p-8 md:p-12 text-white"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${branding?.primaryColor || '#0e7490'} 0%, ${branding?.secondaryColor || '#1d4ed8'} 100%)`,
+          }}
         >
           <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #ffffff 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
           <div className="relative z-10 max-w-2xl">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur">
-              <Sparkles size={22} />
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur overflow-hidden">
+              {branding?.logoUrl ? (
+                <img src={branding.logoUrl} alt="School logo" className="h-full w-full object-cover" />
+              ) : (
+                <Sparkles size={22} />
+              )}
             </div>
-            <h1 className="mt-6 text-4xl md:text-5xl font-black tracking-tight">SchoolOS</h1>
+            <h1 className="mt-6 text-4xl md:text-5xl font-black tracking-tight">{branding?.schoolName || 'SchoolOS'}</h1>
             <p className="mt-3 text-white/90 text-lg leading-relaxed">
               A modern school operating system for Indian institutions to run academics, people, and outcomes on one platform.
             </p>

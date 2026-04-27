@@ -13,6 +13,14 @@ export const schoolService = {
     const response = await apiClient.delete(`/schools/${id}`);
     return response.data;
   },
+  getMySchool: async () => {
+    const response = await apiClient.get('/schools/my-school');
+    return response.data;
+  },
+  updateMySchoolBasic: async (payload) => {
+    const response = await apiClient.patch('/schools/my-school/basic', payload);
+    return response.data;
+  },
 };
 
 export const classService = {
@@ -131,6 +139,54 @@ export const teacherService = {
   },
   summary: async (params = {}) => {
     const response = await apiClient.get('/teachers/assignments/summary', { params });
+    return response.data;
+  },
+};
+
+export const timetableService = {
+  list: async (params = {}) => {
+    const response = await apiClient.get('/timetables', { params });
+    return response.data;
+  },
+  create: async (payload) => {
+    const response = await apiClient.post('/timetables', payload);
+    return response.data;
+  },
+  getBody: async (id) => {
+    const response = await apiClient.get(`/timetables/${id}`);
+    return response.data;
+  },
+  validate: async (id) => {
+    const response = await apiClient.get(`/timetables/${id}/validate`);
+    return response.data;
+  },
+  assignSlot: async (slotId, payload) => {
+    const response = await apiClient.post(`/timetables/slots/${slotId}/assign`, payload);
+    return response.data;
+  },
+  resetSlot: async (slotId, payload = {}) => {
+    const response = await apiClient.post(`/timetables/slots/${slotId}/reset`, payload);
+    return response.data;
+  },
+  listWeeklyRequirements: async ({ classId, sectionId } = {}) => {
+    const response = await apiClient.get('/timetables/weekly-requirements', {
+      params: {
+        classId,
+        ...(sectionId ? { sectionId } : {}),
+      },
+    });
+    return response.data;
+  },
+  saveWeeklyRequirements: async (payload) => {
+    const response = await apiClient.put('/timetables/weekly-requirements', payload);
+    return response.data;
+  },
+  propagateWeeklyRequirements: async (payload) => {
+    const response = await apiClient.post('/timetables/weekly-requirements/propagate', payload);
+    return response.data;
+  },
+  reconciliationReport: async (params = {}) => {
+    const response = await apiClient.get('/timetables/reconciliation/report', { params });
     return response.data;
   },
 };

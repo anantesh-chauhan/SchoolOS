@@ -50,13 +50,32 @@ export const createNextSection = async (req, res) => {
     const nextOrder = lastOrder + 1;
     const nextName = indexToSectionName(nextOrder - 1);
 
-    const created = await prisma.section.create({
-      data: {
-        sectionName: nextName,
-        sectionOrder: nextOrder,
-        classId,
-        schoolId,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const section = await tx.section.create({
+        data: {
+          sectionName: nextName,
+          sectionOrder: nextOrder,
+          classId,
+          schoolId,
+        },
+      });
+
+      const classSubjects = await tx.classSubject.findMany({
+        where: { classId },
+        select: { subjectId: true },
+      });
+
+      if (classSubjects.length > 0) {
+        await tx.sectionSubject.createMany({
+          data: classSubjects.map((row) => ({
+            sectionId: section.id,
+            subjectId: row.subjectId,
+          })),
+          skipDuplicates: true,
+        });
+      }
+
+      return section;
     });
 
     return res.status(201).json({

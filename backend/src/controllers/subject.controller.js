@@ -5,7 +5,13 @@ const prisma = new PrismaClient();
 
 export const createSubject = async (req, res) => {
   try {
-    const { subjectName, subjectCode } = req.body;
+    const {
+      subjectName,
+      subjectCode,
+      category,
+      stream,
+      isCustom,
+    } = req.body;
     const schoolId = getScopedSchoolId(req.user, req.body.schoolId);
 
     if (!subjectName || !subjectCode) {
@@ -19,6 +25,9 @@ export const createSubject = async (req, res) => {
       data: {
         subjectName: subjectName.trim(),
         subjectCode: subjectCode.trim().toUpperCase(),
+        category: category || null,
+        stream: stream || null,
+        isCustom: Boolean(isCustom),
         schoolId,
       },
     });
@@ -82,7 +91,9 @@ export const deleteSubject = async (req, res) => {
 
     const assignmentCount = await prisma.classSubject.count({ where: { subjectId: id } })
       + await prisma.sectionSubject.count({ where: { subjectId: id } })
-      + await prisma.teacherAssignment.count({ where: { subjectId: id } });
+      + await prisma.teacherAssignment.count({ where: { subjectId: id } })
+      + await prisma.subjectWeeklyRequirement.count({ where: { subjectId: id } })
+      + await prisma.timetableSlot.count({ where: { subjectId: id } });
 
     if (assignmentCount > 0) {
       return res.status(409).json({
@@ -125,6 +136,21 @@ export const assignSubjectToClass = async (req, res) => {
       data: { classId, subjectId },
     });
 
+    const sections = await prisma.section.findMany({
+      where: { classId, schoolId },
+      select: { id: true },
+    });
+
+    if (sections.length > 0) {
+      await prisma.sectionSubject.createMany({
+        data: sections.map((section) => ({
+          sectionId: section.id,
+          subjectId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     return res.status(201).json({ success: true, data: assignment });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -164,13 +190,40 @@ export const bulkAssignSubjectsToClass = async (req, res) => {
     const validSubjectIds = new Set(validSubjects.map((item) => item.id));
     const filtered = [...new Set(subjectIds)].filter((id) => validSubjectIds.has(id));
 
-    await prisma.classSubject.deleteMany({ where: { classId } });
+    const sections = await prisma.section.findMany({
+      where: { classId, schoolId },
+      select: { id: true },
+    });
 
-    if (filtered.length > 0) {
-      await prisma.classSubject.createMany({
-        data: filtered.map((subjectId) => ({ classId, subjectId })),
-      });
-    }
+    await prisma.$transaction(async (tx) => {
+      await tx.classSubject.deleteMany({ where: { classId } });
+
+      if (filtered.length > 0) {
+        await tx.classSubject.createMany({
+          data: filtered.map((subjectId) => ({ classId, subjectId })),
+          skipDuplicates: true,
+        });
+      }
+
+      if (sections.length > 0) {
+        await tx.sectionSubject.deleteMany({
+          where: {
+            sectionId: { in: sections.map((section) => section.id) },
+          },
+        });
+
+        const sectionRows = [];
+        for (const section of sections) {
+          for (const subjectId of filtered) {
+            sectionRows.push({ sectionId: section.id, subjectId });
+          }
+        }
+
+        if (sectionRows.length > 0) {
+          await tx.sectionSubject.createMany({ data: sectionRows, skipDuplicates: true });
+        }
+      }
+    });
 
     const rows = await prisma.classSubject.findMany({
       where: { classId },
@@ -323,7 +376,13 @@ export const listSubjectMappings = async (req, res) => {
 export const updateSubject = async (req, res) => {
   try {
     const { id } = req.params;
-    const { subjectName, subjectCode } = req.body;
+    const {
+      subjectName,
+      subjectCode,
+      category,
+      stream,
+      isCustom,
+    } = req.body;
     const schoolId = getScopedSchoolId(req.user, req.body.schoolId);
 
     if (!subjectName || !subjectCode) {
@@ -343,6 +402,9 @@ export const updateSubject = async (req, res) => {
       data: {
         subjectName: subjectName.trim(),
         subjectCode: subjectCode.trim().toUpperCase(),
+        category: category || null,
+        stream: stream || null,
+        isCustom: Boolean(isCustom),
       },
     });
 
@@ -377,7 +439,24 @@ export const removeSubjectFromClass = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    await prisma.classSubject.deleteMany({ where: { classId, subjectId } });
+    const sections = await prisma.section.findMany({
+      where: { classId, schoolId },
+      select: { id: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.classSubject.deleteMany({ where: { classId, subjectId } });
+
+      if (sections.length > 0) {
+        await tx.sectionSubject.deleteMany({
+          where: {
+            sectionId: { in: sections.map((section) => section.id) },
+            subjectId,
+          },
+        });
+      }
+    });
+
     return res.json({ success: true, message: 'Subject removed from class' });
   } catch (error) {
     return res.status(500).json({

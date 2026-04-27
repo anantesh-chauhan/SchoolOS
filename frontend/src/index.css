@@ -5,6 +5,11 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --school-primary: #0f766e;
+    --school-secondary: #0f172a;
+  }
+
   * {
     margin: 0;
     padding: 0;
@@ -111,5 +116,17 @@
 
   .surface-muted {
     @apply bg-slate-50 dark:bg-slate-950;
+  }
+
+  .brand-bg-primary {
+    background-color: var(--school-primary);
+  }
+
+  .brand-bg-secondary {
+    background-color: var(--school-secondary);
+  }
+
+  .brand-text-primary {
+    color: var(--school-primary);
   }
 }

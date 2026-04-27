@@ -9,6 +9,11 @@ import classRoutes from './src/routes/classes.js';
 import sectionRoutes from './src/routes/sections.js';
 import subjectRoutes from './src/routes/subjects.js';
 import teacherRoutes from './src/routes/teachers.js';
+import timetableRoutes from './src/routes/timetables.js';
+import galleryRoutes from './src/routes/gallery.js';
+import schoolSettingsRoutes from './src/routes/schoolSettings.js';
+import uploadRoutes from './src/routes/uploads.js';
+import academicStructureRoutes from './src/routes/academicStructure.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -73,6 +78,11 @@ app.use('/api/classes', classRoutes);
 app.use('/api/sections', sectionRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/teachers', teacherRoutes);
+app.use('/api/timetables', timetableRoutes);
+app.use('/api/gallery', galleryRoutes);
+app.use('/api/school-settings', schoolSettingsRoutes);
+app.use('/api/uploads', uploadRoutes);
+app.use('/api/academic-structure', academicStructureRoutes);
 
 
 // 404 Handler

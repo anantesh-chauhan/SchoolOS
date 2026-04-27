@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bell,
   BookOpen,
@@ -13,6 +12,7 @@ import {
   Search,
   Settings,
   Shapes,
+  Image,
   UserRound,
   Users,
   UsersRound,
@@ -21,6 +21,7 @@ import {
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
+import { useBranding } from '../contexts/BrandingContext';
 
 const DashboardLayout = ({ children, role }) => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ const DashboardLayout = ({ children, role }) => {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const user = authService.getCurrentUser();
+  const { branding } = useBranding();
 
   const roleMenuConfig = {
     PLATFORM_OWNER: [
@@ -37,7 +39,12 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/platform' },
           { label: 'School Management', icon: School, href: '/dashboard/platform/schools' },
+          { label: 'School Settings', icon: Settings, href: '/dashboard/platform/school-settings' },
         ],
+      },
+      {
+        group: 'Experience',
+        items: [{ label: 'Gallery', icon: Image, href: '/dashboard/gallery' }],
       },
     ],
     SCHOOL_OWNER: [
@@ -50,6 +57,9 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
           { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
           { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
+          { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
+          { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
+          { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
         ],
       },
       {
@@ -63,7 +73,11 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'System',
-        items: [{ label: 'Settings', icon: Settings, href: '/dashboard/school' }],
+        items: [
+          { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'School Profile', icon: Settings, href: '/dashboard/school/profile' },
+        ],
       },
     ],
     ADMIN: [
@@ -76,6 +90,9 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
           { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
           { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
+          { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
+          { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
+          { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
         ],
       },
       {
@@ -89,31 +106,47 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'System',
-        items: [{ label: 'Settings', icon: Settings, href: '/dashboard/admin' }],
+        items: [
+          { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Settings', icon: Settings, href: '/dashboard/admin' },
+        ],
       },
     ],
     TEACHER: [
       {
         group: 'System',
-        items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/teacher' }],
+        items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/teacher' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+        ],
       },
     ],
     PARENT: [
       {
         group: 'System',
-        items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/parent' }],
+        items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+        ],
       },
     ],
     STUDENT: [
       {
         group: 'System',
-        items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/student' }],
+        items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/student' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+        ],
       },
     ],
     STAFF: [
       {
         group: 'System',
-        items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/staff' }],
+        items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+        ],
       },
     ],
   };
@@ -155,21 +188,19 @@ const DashboardLayout = ({ children, role }) => {
   const sidePanelClasses = desktopCollapsed ? 'w-20' : 'w-72';
 
   const Sidebar = () => (
-    <motion.aside
-      initial={{ x: -280 }}
-      animate={{ x: 0 }}
-      exit={{ x: -280 }}
-      transition={{ duration: 0.2 }}
-      className={`${sidePanelClasses} border-r border-slate-200 bg-white flex flex-col`}
-    >
+    <aside className={`${sidePanelClasses} border-r border-slate-200 bg-white flex flex-col`}>
       <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2 overflow-hidden">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white font-bold flex items-center justify-center">
-            S
+          <div className="h-10 w-10 rounded-xl overflow-hidden bg-slate-100 text-white font-bold flex items-center justify-center">
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt="School logo" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center brand-bg-primary">S</div>
+            )}
           </div>
           {!desktopCollapsed && (
             <div>
-              <p className="font-semibold text-slate-900">SchoolOS</p>
+              <p className="font-semibold text-slate-900">{branding?.schoolName || 'SchoolOS'}</p>
               <p className="text-xs text-slate-500">School Management SaaS</p>
             </div>
           )}
@@ -223,25 +254,23 @@ const DashboardLayout = ({ children, role }) => {
           {!desktopCollapsed && <span>Logout</span>}
         </button>
       </div>
-    </motion.aside>
+    </aside>
   );
 
   return (
     <div className="flex h-screen bg-slate-50">
-      <AnimatePresence>
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/30"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="absolute left-0 top-0 h-full w-72 shadow-xl">
-              <Sidebar />
-            </div>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-72 shadow-xl">
+            <Sidebar />
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
       <div className="hidden lg:block">
         <Sidebar />
@@ -315,12 +344,7 @@ const DashboardLayout = ({ children, role }) => {
           </div>
         </header>
 
-        <motion.main
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-          className="flex-1 overflow-auto p-4 sm:p-6"
-        >
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
           <div className="mb-4 sm:hidden">
             <p className="text-xs text-slate-500">{breadcrumb.join(' / ')}</p>
             <div className="mt-2 relative">
@@ -333,7 +357,7 @@ const DashboardLayout = ({ children, role }) => {
           </div>
 
           {children}
-        </motion.main>
+        </main>
       </div>
     </div>
   );

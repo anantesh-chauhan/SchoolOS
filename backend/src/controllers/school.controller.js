@@ -133,3 +133,124 @@ export const deleteSchool = async (req, res) => {
     });
   }
 };
+
+export const getMySchool = async (req, res) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not mapped to a school',
+      });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      include: {
+        settings: true,
+      },
+    });
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: 'School not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: school,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch school profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+export const updateMySchoolBasicDetails = async (req, res) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User is not mapped to a school',
+      });
+    }
+
+    const payload = {
+      schoolName: req.body.schoolName,
+      address: req.body.address,
+      city: req.body.city,
+      state: req.body.state,
+      phone: req.body.phone,
+      email: req.body.email,
+    };
+
+    const updates = Object.fromEntries(
+      Object.entries(payload)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])
+    );
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No fields provided for update',
+      });
+    }
+
+    const school = await prisma.school.findUnique({ where: { id: schoolId } });
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: 'School not found',
+      });
+    }
+
+    const [updatedSchool] = await prisma.$transaction([
+      prisma.school.update({
+        where: { id: schoolId },
+        data: updates,
+      }),
+      prisma.schoolSettings.upsert({
+        where: { schoolId },
+        create: {
+          schoolId,
+          schoolName: updates.schoolName || school.schoolName,
+          email: updates.email || school.email,
+          phone: updates.phone || school.phone,
+          addressLine1: updates.address || school.address,
+          city: updates.city || school.city,
+          state: updates.state || school.state,
+          country: 'India',
+          primaryColor: '#0f766e',
+          secondaryColor: '#0f172a',
+        },
+        update: {
+          ...(updates.schoolName ? { schoolName: updates.schoolName } : {}),
+          ...(updates.email ? { email: updates.email } : {}),
+          ...(updates.phone ? { phone: updates.phone } : {}),
+          ...(updates.address ? { addressLine1: updates.address } : {}),
+          ...(updates.city ? { city: updates.city } : {}),
+          ...(updates.state ? { state: updates.state } : {}),
+        },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      message: 'School basic details updated successfully',
+      data: updatedSchool,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update school profile',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};

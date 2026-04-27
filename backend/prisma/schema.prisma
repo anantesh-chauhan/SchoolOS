@@ -23,6 +23,7 @@ model User {
   school    School?    @relation(fields: [schoolId], references: [id], onDelete: SetNull)
   class     Class?     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
   section   Section?   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
+  activityEnrollments ActivityEnrollment[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -48,8 +49,25 @@ model School {
   classes    Class[]
   sections   Section[]
   subjects   Subject[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teachers   Teacher[]
   teacherAssignments TeacherAssignment[]
+  timetables Timetable[]
+  timetableSlots TimetableSlot[]
+  galleryGroups GalleryGroup[]
+  galleryPhotos GalleryPhoto[]
+  settings   SchoolSettings?
+  academicLevels AcademicLevel[]
+  streams    Stream[]
+  streamSubjects StreamSubject[]
+  classStreams ClassStream[]
+  subjectComponents SubjectComponent[]
+  activities Activity[]
+  activityEnrollments ActivityEnrollment[]
+  periodDefinitions PeriodDefinition[]
+  teacherSubjects TeacherSubject[]
+  labRooms LabRoom[]
+  labSubjectRules LabSubjectRule[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -57,22 +75,92 @@ model School {
   @@index([city, state])
 }
 
+model GalleryGroup {
+  id            String        @id @default(uuid())
+  schoolId      String
+  title         String
+  description   String?
+  coverImageUrl String?
+  isVisible     Boolean       @default(true)
+  displayOrder  Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  photos        GalleryPhoto[]
+
+  @@index([schoolId, isVisible, displayOrder])
+  @@index([schoolId, createdAt])
+  @@unique([schoolId, title])
+}
+
+model GalleryPhoto {
+  id           String       @id @default(uuid())
+  schoolId     String
+  groupId      String
+  imageUrl     String
+  caption      String?
+  isVisible    Boolean      @default(true)
+  displayOrder Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  group        GalleryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, groupId, isVisible, displayOrder])
+  @@index([groupId, displayOrder])
+}
+
+model SchoolSettings {
+  id             String   @id @default(uuid())
+  schoolId       String   @unique
+  schoolName     String
+  logoUrl        String?
+  email          String?
+  phone          String?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  state          String?
+  country        String?
+  postalCode     String?
+  website        String?
+  supportEmail   String?
+  primaryColor   String   @default("#0f766e")
+  secondaryColor String   @default("#0f172a")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
 model Class {
   id            String         @id @default(cuid())
   className     String
   classOrder    Int
   schoolId      String
+  academicLevelId String?
   school        School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicLevel AcademicLevel? @relation(fields: [academicLevelId], references: [id], onDelete: SetNull)
   sections      Section[]
   users         User[]         @relation("ClassUsers")
   classSubjects ClassSubject[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teacherAssignments TeacherAssignment[]
+  timetables Timetable[]
+  timetableSlots TimetableSlot[]
+  classStreams ClassStream[]
+  teacherSubjects TeacherSubject[]
+  deletedAt     DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@unique([schoolId, className])
   @@unique([schoolId, classOrder])
   @@index([schoolId, classOrder])
+  @@index([academicLevelId])
 }
 
 model Section {
@@ -81,11 +169,19 @@ model Section {
   sectionOrder    Int
   classId         String
   schoolId        String
+  streamId        String?
   class           Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
   school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  stream          Stream?          @relation(fields: [streamId], references: [id], onDelete: SetNull)
   users           User[]           @relation("SectionUsers")
   sectionSubjects SectionSubject[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teacherAssignments TeacherAssignment[]
+  timetables Timetable[]
+  timetableSlots TimetableSlot[]
+  classStreams ClassStream[]
+  teacherSubjects TeacherSubject[]
+  deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -93,29 +189,50 @@ model Section {
   @@unique([classId, sectionOrder])
   @@index([classId, sectionOrder])
   @@index([schoolId])
+  @@index([streamId])
 }
 
 model Subject {
   id              String           @id @default(cuid())
   subjectName     String
   subjectCode     String
+  parentSubjectId String?
+  subjectType     SubjectType      @default(CORE)
+  isLab           Boolean          @default(false)
+  isOptional      Boolean          @default(false)
+  displayOrder    Int              @default(0)
+  category        SubjectCategory?
+  stream          StreamType?
+  isCustom        Boolean          @default(false)
   schoolId        String
   school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parentSubject   Subject?         @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id], onDelete: SetNull)
+  childSubjects   Subject[]        @relation("SubjectHierarchy")
   classSubjects   ClassSubject[]
   sectionSubjects SectionSubject[]
+  subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teacherAssignments TeacherAssignment[]
+  timetableSlots   TimetableSlot[]
+  subjectComponents SubjectComponent[]
+  streamSubjects   StreamSubject[]
+  teacherSubjects  TeacherSubject[]
+  labRules         LabSubjectRule[]
+  deletedAt       DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
   @@unique([schoolId, subjectName])
   @@unique([schoolId, subjectCode])
   @@index([schoolId])
+  @@index([parentSubjectId])
 }
 
 model ClassSubject {
   id        String   @id @default(cuid())
   classId   String
   subjectId String
+  periodsPerWeek Int?
+  isOptional Boolean @default(false)
   class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
@@ -150,6 +267,9 @@ model Teacher {
   schoolId          String
   school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherAssignments TeacherAssignment[]
+  teacherSubjects   TeacherSubject[]
+  timetableSlots    TimetableSlot[]
+  deletedAt         DateTime?
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
@@ -184,6 +304,316 @@ model TeacherAssignment {
   @@index([schoolId, classId, sectionId])
 }
 
+model SubjectWeeklyRequirement {
+  id             String   @id @default(cuid())
+  classId        String
+  sectionId      String?
+  subjectId      String
+  periodsPerWeek Int
+  isMandatory    Boolean  @default(true)
+  isOptional     Boolean  @default(false)
+  schoolId       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section        Section? @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject        Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, classId, sectionId])
+  @@index([schoolId, subjectId])
+}
+
+model Timetable {
+  id           String          @id @default(cuid())
+  classId      String
+  sectionId    String
+  schoolId     String
+  academicYear String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  class        Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section      Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  school       School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  slots        TimetableSlot[]
+
+  @@unique([schoolId, classId, sectionId, academicYear])
+  @@index([schoolId, classId])
+  @@index([schoolId, sectionId])
+}
+
+model TimetableSlot {
+  id            String    @id @default(cuid())
+  timetableId   String
+  dayOfWeek     DayOfWeek
+  periodNumber  Int?
+  sequenceOrder Int
+  slotType      SlotType  @default(PERIOD)
+  slotLabel     String?
+  startTime     String
+  endTime       String
+  subjectId     String?
+  subjectComponentId String?
+  teacherId     String?
+  activityId    String?
+  labRoomId     String?
+  isActivityPeriod Boolean @default(false)
+  classId       String
+  sectionId     String
+  schoolId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  timetable     Timetable @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  subject       Subject?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  subjectComponent SubjectComponent? @relation(fields: [subjectComponentId], references: [id], onDelete: SetNull)
+  teacher       Teacher?  @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  activity      Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+  labRoom       LabRoom? @relation(fields: [labRoomId], references: [id], onDelete: SetNull)
+  class         Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section       Section   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([timetableId, dayOfWeek, sequenceOrder])
+  @@index([timetableId, dayOfWeek])
+  @@index([schoolId, teacherId, dayOfWeek, startTime, endTime])
+  @@index([schoolId, classId, sectionId])
+  @@index([subjectComponentId])
+  @@index([activityId])
+  @@index([labRoomId])
+}
+
+model AcademicLevel {
+  id             String    @id @default(uuid())
+  schoolId       String?
+  code           String
+  name           String
+  minClassOrder  Int
+  maxClassOrder  Int
+  displayOrder   Int       @default(0)
+  isDefaultTemplate Boolean @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classes        Class[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, displayOrder])
+}
+
+model SubjectComponent {
+  id             String    @id @default(uuid())
+  schoolId       String
+  subjectId      String
+  name           String
+  code           String
+  periodsPerWeek Int
+  isLab          Boolean   @default(false)
+  isOptional     Boolean   @default(false)
+  displayOrder   Int       @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  streamSubjects StreamSubject[]
+  teacherSubjects TeacherSubject[]
+  timetableSlots TimetableSlot[]
+
+  @@unique([schoolId, subjectId, code])
+  @@index([schoolId, subjectId, displayOrder])
+}
+
+model Stream {
+  id             String    @id @default(uuid())
+  schoolId       String
+  code           String
+  name           String
+  classFrom      Int       @default(11)
+  classTo        Int       @default(12)
+  displayOrder   Int       @default(0)
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  sections       Section[]
+  streamSubjects StreamSubject[]
+  classStreams   ClassStream[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, displayOrder])
+}
+
+model ClassStream {
+  id           String    @id @default(uuid())
+  schoolId     String
+  classId      String
+  sectionId    String?
+  streamId     String
+  academicYear String?
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class        Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section      Section?  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  stream       Stream    @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, classId, sectionId])
+  @@index([schoolId, streamId, academicYear])
+}
+
+model StreamSubject {
+  id                String    @id @default(uuid())
+  schoolId          String
+  streamId          String
+  subjectId         String
+  subjectComponentId String?
+  periodsPerWeek    Int
+  isMandatory       Boolean   @default(true)
+  isOptional        Boolean   @default(false)
+  displayOrder      Int       @default(0)
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  school            School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  stream            Stream    @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  subject           Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectComponent  SubjectComponent? @relation(fields: [subjectComponentId], references: [id], onDelete: SetNull)
+
+  @@unique([streamId, subjectId, subjectComponentId])
+  @@index([schoolId, streamId, displayOrder])
+}
+
+model TeacherSubject {
+  id                String    @id @default(uuid())
+  schoolId          String
+  teacherId         String
+  classId           String?
+  sectionId         String?
+  subjectId         String
+  subjectComponentId String?
+  periodsPerWeek    Int
+  effectiveFrom     DateTime  @default(now())
+  effectiveTo       DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  school            School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher           Teacher   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  class             Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  section           Section?  @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  subject           Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subjectComponent  SubjectComponent? @relation(fields: [subjectComponentId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, teacherId])
+  @@index([schoolId, subjectId])
+  @@index([schoolId, classId, sectionId])
+}
+
+model Activity {
+  id             String    @id @default(uuid())
+  schoolId       String
+  name           String
+  code           String
+  capacity       Int       @default(40)
+  isActive       Boolean   @default(true)
+  displayOrder   Int       @default(0)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  timetableSlots TimetableSlot[]
+  enrollments    ActivityEnrollment[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, displayOrder])
+}
+
+model ActivityEnrollment {
+  id           String   @id @default(uuid())
+  schoolId     String
+  activityId   String
+  userId       String
+  enrolledAt   DateTime @default(now())
+  deletedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  activity     Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, activityId, userId])
+  @@index([schoolId, userId])
+}
+
+model PeriodDefinition {
+  id               String    @id @default(uuid())
+  schoolId         String
+  dayOfWeek        DayOfWeek
+  periodNumber     Int
+  startTime        String
+  endTime          String
+  isActivityPeriod Boolean   @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  school           School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, dayOfWeek, periodNumber])
+  @@index([schoolId, dayOfWeek])
+}
+
+model LabRoom {
+  id             String    @id @default(uuid())
+  schoolId       String
+  roomName       String
+  roomCode       String
+  capacity       Int       @default(40)
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  timetableSlots TimetableSlot[]
+
+  @@unique([schoolId, roomCode])
+  @@index([schoolId])
+}
+
+model LabSubjectRule {
+  id                     String    @id @default(uuid())
+  schoolId               String
+  subjectId              String
+  requiresLabRoom        Boolean   @default(true)
+  minConsecutivePeriods  Int       @default(2)
+  deletedAt              DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  school                 School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subject                Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, subjectId])
+  @@index([schoolId])
+}
+
 // Enums
 enum Role {
   PLATFORM_OWNER
@@ -198,4 +628,39 @@ enum Role {
 enum SchoolStatus {
   ACTIVE
   INACTIVE
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+enum SlotType {
+  FIXED
+  PERIOD
+}
+
+enum SubjectCategory {
+  PRIMARY
+  MIDDLE
+  SECONDARY
+  SENIOR_SECONDARY
+}
+
+enum StreamType {
+  GENERAL
+  SCIENCE
+  COMMERCE
+  ARTS
+}
+
+enum SubjectType {
+  CORE
+  OPTIONAL
+  LAB
+  ACTIVITY
 }

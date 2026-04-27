@@ -3,6 +3,34 @@ import { getScopedSchoolId } from '../utils/tenant.util.js';
 
 const prisma = new PrismaClient();
 
+const getDefaultIndianSubjectsForClass = (className) => {
+  const normalized = String(className || '').trim();
+  const classMatch = normalized.match(/class\s*(\d+)/i);
+  const classNo = classMatch ? Number(classMatch[1]) : null;
+
+  if (['Nursery', 'LKG', 'UKG'].includes(normalized)) {
+    return ['English', 'Hindi', 'Mathematics', 'Environmental Studies', 'Art & Craft', 'Rhymes', 'Physical Education'];
+  }
+
+  if (classNo >= 1 && classNo <= 5) {
+    return ['English', 'Hindi', 'Mathematics', 'Environmental Studies', 'General Knowledge', 'Art & Craft', 'Computer', 'Physical Education'];
+  }
+
+  if (classNo >= 6 && classNo <= 8) {
+    return ['English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit', 'Computer', 'Physical Education', 'Moral Science'];
+  }
+
+  if (classNo === 9 || classNo === 10) {
+    return ['English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Computer', 'Physical Education', 'Sanskrit'];
+  }
+
+  if (classNo === 11 || classNo === 12) {
+    return ['English', 'Physical Education'];
+  }
+
+  return [];
+};
+
 export const createClass = async (req, res) => {
   try {
     const { className, classOrder } = req.body;
@@ -17,12 +45,37 @@ export const createClass = async (req, res) => {
       });
     }
 
-    const created = await prisma.class.create({
-      data: {
-        className: normalizedName,
-        classOrder: numericOrder,
-        schoolId,
-      },
+    const created = await prisma.$transaction(async (tx) => {
+      const classRow = await tx.class.create({
+        data: {
+          className: normalizedName,
+          classOrder: numericOrder,
+          schoolId,
+        },
+      });
+
+      const defaultSubjects = getDefaultIndianSubjectsForClass(normalizedName);
+      if (defaultSubjects.length > 0) {
+        const subjectRows = await tx.subject.findMany({
+          where: {
+            schoolId,
+            subjectName: { in: defaultSubjects },
+          },
+          select: { id: true },
+        });
+
+        if (subjectRows.length > 0) {
+          await tx.classSubject.createMany({
+            data: subjectRows.map((row) => ({
+              classId: classRow.id,
+              subjectId: row.id,
+            })),
+            skipDuplicates: true,
+          });
+        }
+      }
+
+      return classRow;
     });
 
     return res.status(201).json({

@@ -57,25 +57,40 @@ export default function TeacherAssignmentPage() {
     [sections, selectedSectionId]
   );
 
+  const isTeacherCompatible = (teacher, subjectName, subjectCode) => {
+    const specialization = String(teacher.specialization || '').toLowerCase();
+    const handledSubjects = (teacher.subjectsHandled || []).map((item) => String(item).toLowerCase());
+    return specialization.includes(subjectName.toLowerCase())
+      || specialization.includes(subjectCode.toLowerCase())
+      || handledSubjects.some(
+        (item) => item.includes(subjectName.toLowerCase()) || item.includes(subjectCode.toLowerCase())
+      );
+  };
+
   const getFilteredTeachers = (subjectName, subjectCode) => {
     const query = teacherSearch.trim().toLowerCase();
 
-    return teachers.filter((teacher) => {
+    const compatible = [];
+    const others = [];
+
+    teachers.forEach((teacher) => {
       const matchesQuery = !query
         || teacher.teacherName.toLowerCase().includes(query)
         || teacher.employeeId.toLowerCase().includes(query)
         || teacher.email.toLowerCase().includes(query);
 
-      const specialization = String(teacher.specialization || '').toLowerCase();
-      const handledSubjects = (teacher.subjectsHandled || []).map((item) => String(item).toLowerCase());
-      const matchingSpecialization = specialization.includes(subjectName.toLowerCase())
-        || specialization.includes(subjectCode.toLowerCase())
-        || handledSubjects.some(
-          (item) => item.includes(subjectName.toLowerCase()) || item.includes(subjectCode.toLowerCase())
-        );
+      if (!matchesQuery) {
+        return;
+      }
 
-      return matchesQuery && matchingSpecialization;
+      if (isTeacherCompatible(teacher, subjectName, subjectCode)) {
+        compatible.push(teacher);
+      } else {
+        others.push(teacher);
+      }
     });
+
+    return [...compatible, ...others];
   };
 
   const resolvedTeacherBySubject = useMemo(() => {
@@ -253,6 +268,11 @@ export default function TeacherAssignmentPage() {
                                 <p className="text-slate-700 text-xs">
                                   {selectedTeacher.workload?.assignedSectionCount || 0} sections
                                 </p>
+                                {isTeacherCompatible(selectedTeacher, row.subjectName, row.subjectCode) ? (
+                                  <p className="text-xs text-emerald-700 font-semibold">Subject match</p>
+                                ) : (
+                                  <p className="text-xs text-slate-500 font-semibold">Cross-subject assignment</p>
+                                )}
                                 {(selectedTeacher.workload?.isOverloaded) ? (
                                   <p className="text-xs font-semibold text-amber-700">Overload warning</p>
                                 ) : (
