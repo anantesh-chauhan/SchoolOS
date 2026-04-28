@@ -24,6 +24,14 @@ model User {
   class     Class?     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
   section   Section?   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
   activityEnrollments ActivityEnrollment[]
+  widgetPreferences UserWidgetPreference[]
+  widgetTodos UserWidgetTodo[]
+  widgetNotes UserWidgetNote[]
+  widgetBookmarks UserWidgetBookmark[]
+  widgetNotifications UserWidgetNotification[]
+  widgetActivities UserWidgetActivity[]
+  loginStreaks UserLoginStreak[]
+  createdSystemContents SystemContent[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -68,6 +76,14 @@ model School {
   teacherSubjects TeacherSubject[]
   labRooms LabRoom[]
   labSubjectRules LabSubjectRule[]
+  widgetPreferences UserWidgetPreference[]
+  widgetTodos UserWidgetTodo[]
+  widgetNotes UserWidgetNote[]
+  widgetBookmarks UserWidgetBookmark[]
+  widgetNotifications UserWidgetNotification[]
+  widgetActivities UserWidgetActivity[]
+  loginStreaks UserLoginStreak[]
+  systemContents SystemContent[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -614,6 +630,157 @@ model LabSubjectRule {
   @@index([schoolId])
 }
 
+model UserWidgetPreference {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  widgetKey   String
+  isVisible   Boolean  @default(true)
+  orderIndex  Int      @default(0)
+  size        String   @default("MD")
+  pinned      Boolean  @default(false)
+  settings    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, widgetKey])
+  @@index([schoolId, userId])
+  @@index([schoolId, widgetKey])
+}
+
+model UserWidgetTodo {
+  id           String         @id @default(uuid())
+  schoolId     String
+  userId       String
+  title        String
+  description  String?
+  dueDate      DateTime?
+  priority     WidgetPriority @default(MEDIUM)
+  isCompleted  Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  school       School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, isCompleted])
+  @@index([schoolId, dueDate])
+}
+
+model UserWidgetNote {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  title       String
+  content     String
+  color       String?
+  pinned      Boolean  @default(false)
+  orderIndex  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, orderIndex])
+}
+
+model UserWidgetBookmark {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  title       String
+  url         String
+  icon        String?
+  tag         String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, isActive])
+}
+
+model UserWidgetNotification {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  title       String
+  body        String
+  type        String   @default("INFO")
+  link        String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, isRead])
+  @@index([schoolId, createdAt])
+}
+
+model UserWidgetActivity {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  activityKey String
+  title       String
+  summary     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, userId, createdAt])
+  @@index([schoolId, activityKey])
+}
+
+model UserLoginStreak {
+  id             String   @id @default(uuid())
+  schoolId       String
+  userId         String   @unique
+  currentStreak  Int      @default(0)
+  bestStreak     Int      @default(0)
+  lastLoginAt    DateTime?
+  streakStartedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, currentStreak])
+}
+
+model SystemContent {
+  id            String   @id @default(uuid())
+  schoolId      String
+  contentKey    String
+  title         String
+  body          String
+  metadata      Json?
+  isPublished   Boolean  @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  createdBy     User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, contentKey])
+  @@index([schoolId, isPublished])
+}
+
 // Enums
 enum Role {
   PLATFORM_OWNER
@@ -642,6 +809,12 @@ enum DayOfWeek {
 enum SlotType {
   FIXED
   PERIOD
+}
+
+enum WidgetPriority {
+  LOW
+  MEDIUM
+  HIGH
 }
 
 enum SubjectCategory {

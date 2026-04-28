@@ -26,6 +26,7 @@ const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableRe
 const GalleryStudioPage = lazy(() => import('./pages/admin/GalleryStudioPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const SchoolProfilePage = lazy(() => import('./pages/school/SchoolProfilePage'));
+const WidgetHubPage = lazy(() => import('./pages/widgets/WidgetHubPage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -201,6 +202,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']}>
                 <GalleryPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/widgets"
+            element={
+              <ProtectedRoute allowedRoles={['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']}>
+                <WidgetHubPage />
               </ProtectedRoute>
             }
           />

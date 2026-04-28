@@ -14,6 +14,7 @@ import galleryRoutes from './src/routes/gallery.js';
 import schoolSettingsRoutes from './src/routes/schoolSettings.js';
 import uploadRoutes from './src/routes/uploads.js';
 import academicStructureRoutes from './src/routes/academicStructure.js';
+import widgetRoutes from './src/routes/widgets.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -83,6 +84,7 @@ app.use('/api/gallery', galleryRoutes);
 app.use('/api/school-settings', schoolSettingsRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/academic-structure', academicStructureRoutes);
+app.use('/api/widgets', widgetRoutes);
 
 
 // 404 Handler

@@ -924,6 +924,193 @@ const createGalleryData = async (schoolId) => {
   }
 };
 
+const createWidgetSeedData = async (school, schoolInput) => {
+  const adminUser = await prisma.user.findFirst({
+    where: {
+      schoolId: school.id,
+      role: 'ADMIN',
+    },
+  });
+
+  if (!adminUser) {
+    return;
+  }
+
+  await prisma.userWidgetPreference.createMany({
+    data: [
+      { schoolId: school.id, userId: adminUser.id, widgetKey: 'school-kpis', isVisible: true, orderIndex: 1, size: 'LG', pinned: true },
+      { schoolId: school.id, userId: adminUser.id, widgetKey: 'curriculum-health', isVisible: true, orderIndex: 2, size: 'LG', pinned: true },
+      { schoolId: school.id, userId: adminUser.id, widgetKey: 'pending-todos', isVisible: true, orderIndex: 3, size: 'MD' },
+      { schoolId: school.id, userId: adminUser.id, widgetKey: 'notes', isVisible: true, orderIndex: 4, size: 'MD' },
+      { schoolId: school.id, userId: adminUser.id, widgetKey: 'bookmarks', isVisible: true, orderIndex: 5, size: 'MD' },
+    ],
+    skipDuplicates: true,
+  });
+
+  await prisma.userWidgetTodo.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: `Review ${schoolInput.schoolCode} timetable audit`,
+        description: 'Check timetable reconciliation warnings and repair missing assignments.',
+        dueDate: new Date(Date.now() + 86400000),
+        priority: 'HIGH',
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Confirm gallery cover images',
+        description: 'Refresh the latest gallery album covers on the public page.',
+        dueDate: new Date(Date.now() + 2 * 86400000),
+        priority: 'MEDIUM',
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Publish weekly notice',
+        description: 'Send the weekly school bulletin to staff and parents.',
+        dueDate: new Date(Date.now() + 3 * 86400000),
+        priority: 'LOW',
+      },
+    ],
+  });
+
+  await prisma.userWidgetNote.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Open widget idea',
+        content: 'Add a short-term admissions tracker once the enquiry module ships.',
+        color: '#dbeafe',
+        pinned: true,
+        orderIndex: 1,
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Staff sync',
+        content: 'Remind department heads to verify teacher load after timetable changes.',
+        color: '#fce7f3',
+        pinned: false,
+        orderIndex: 2,
+      },
+    ],
+  });
+
+  await prisma.userWidgetBookmark.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'School Settings',
+        url: '/dashboard/platform/school-settings',
+        tag: 'Branding',
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Timetable Builder',
+        url: '/dashboard/admin/timetable-builder',
+        tag: 'Operations',
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Gallery Studio',
+        url: '/dashboard/admin/gallery',
+        tag: 'Media',
+      },
+    ],
+  });
+
+  await prisma.userWidgetNotification.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Widget system live',
+        body: 'The universal widget hub is ready for the school dashboard.',
+        type: 'SYSTEM',
+        link: '/dashboard/widgets',
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        title: 'Gallery updated',
+        body: 'Fresh annual function photos have been published.',
+        type: 'INFO',
+        link: '/dashboard/gallery',
+      },
+    ],
+  });
+
+  await prisma.userWidgetActivity.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        activityKey: 'seed_widget_system',
+        title: 'Widget hub seeded',
+        summary: 'Demo widget records created for the admin dashboard.',
+        metadata: { schoolCode: school.schoolCode },
+      },
+      {
+        schoolId: school.id,
+        userId: adminUser.id,
+        activityKey: 'seed_system_content',
+        title: 'System content published',
+        summary: 'Homepage and notice blocks are available in the hub.',
+        metadata: { schoolCode: school.schoolCode },
+      },
+    ],
+  });
+
+  await prisma.userLoginStreak.upsert({
+    where: { userId: adminUser.id },
+    create: {
+      schoolId: school.id,
+      userId: adminUser.id,
+      currentStreak: 7,
+      bestStreak: 11,
+      lastLoginAt: new Date(),
+      streakStartedAt: new Date(Date.now() - 6 * 86400000),
+    },
+    update: {
+      schoolId: school.id,
+      currentStreak: 7,
+      bestStreak: 11,
+      lastLoginAt: new Date(),
+      streakStartedAt: new Date(Date.now() - 6 * 86400000),
+    },
+  });
+
+  await prisma.systemContent.createMany({
+    data: [
+      {
+        schoolId: school.id,
+        contentKey: 'widget-hub-welcome',
+        title: 'Welcome to the Widget Hub',
+        body: 'Track the school pulse, personal tasks, and operational shortcuts from one unified screen.',
+        metadata: { audience: 'all' },
+        isPublished: true,
+        createdById: adminUser.id,
+      },
+      {
+        schoolId: school.id,
+        contentKey: 'weekly-bulletin',
+        title: 'Weekly Bulletin',
+        body: 'Review the timetable audit, publish the weekly notice, and confirm gallery highlights.',
+        metadata: { audience: 'staff' },
+        isPublished: true,
+        createdById: adminUser.id,
+      },
+    ],
+    skipDuplicates: true,
+  });
+};
+
 async function main() {
   console.log('Seeding SchoolOS database...');
 
@@ -1057,6 +1244,9 @@ async function main() {
 
     await createGalleryData(school.id);
     console.log(`  Created gallery groups: ${galleryBlueprints.length}`);
+
+    await createWidgetSeedData(school, schoolInput);
+    console.log('  Created widget hub seed data');
 
     await createTeacherSubjectLoadSplits(school.id);
     console.log('  Created multi-teacher component load rows for Science');

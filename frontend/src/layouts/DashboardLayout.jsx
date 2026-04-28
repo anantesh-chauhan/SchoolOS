@@ -7,6 +7,7 @@ import {
   Home,
   Layers,
   LogOut,
+  LayoutGrid,
   Menu,
   School,
   Search,
@@ -44,7 +45,10 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'Experience',
-        items: [{ label: 'Gallery', icon: Image, href: '/dashboard/gallery' }],
+        items: [
+          { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
+        ],
       },
     ],
     SCHOOL_OWNER: [
@@ -76,6 +80,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
           { label: 'School Profile', icon: Settings, href: '/dashboard/school/profile' },
         ],
       },
@@ -109,6 +114,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
           { label: 'Settings', icon: Settings, href: '/dashboard/admin' },
         ],
       },
@@ -119,6 +125,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/teacher' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
     ],
@@ -128,6 +135,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
     ],
@@ -137,6 +145,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/student' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
     ],
@@ -146,6 +155,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
+          { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
     ],

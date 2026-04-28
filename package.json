@@ -1,4 +1,12 @@
 {
+  "name": "schoolos-workspace",
+  "private": true,
+  "scripts": {
+    "seed": "npm --prefix backend run seed",
+    "migrate": "npm --prefix backend run prisma:migrate",
+    "studio": "npm --prefix backend run prisma:studio",
+    "build:frontend": "npm --prefix frontend run build"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",
     "dotenv": "^17.4.2",
