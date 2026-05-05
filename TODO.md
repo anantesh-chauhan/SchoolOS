@@ -1,0 +1,1 @@
+# Task: Wire Frontend to /api/users/create-teacher, /api/users/create-staff, /api/school/profile\n\n## Plan Steps:\n1. [x] Update frontend/src/services/managementService.js: Change schoolService.getMySchool to use '/school/profile'.\n2. [x] Verify no breaking changes (search complete).\n3. [x] Test functionality.\n4. [x] Complete task.

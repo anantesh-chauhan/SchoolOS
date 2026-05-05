@@ -29,7 +29,7 @@ export const login = async (req, res) => {
         schoolId: true,
         classId: true,
         sectionId: true,
-        contactEmail: true,
+        // contactEmail: true,
         employeeId: true,
         joiningYear: true,
         mustChangePassword: true,

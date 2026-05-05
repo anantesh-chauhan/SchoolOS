@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #8b0000;
+  --color-secondary: #ffd700;
+  --color-accent: #000000;
+  --color-ink: #171415;
+  --color-paper: #f8f4ef;
+  --color-muted: #6d6460;
+  --shadow-soft: 0 12px 40px rgba(23, 20, 21, 0.08);
+  --radius-lg: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: 'Manrope', sans-serif;
+  color: var(--color-ink);
+  background:
+    radial-gradient(circle at 15% 20%, rgba(139, 0, 0, 0.1), transparent 28%),
+    radial-gradient(circle at 90% 10%, rgba(255, 215, 0, 0.2), transparent 30%),
+    var(--color-paper);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Lora', serif;
+  letter-spacing: -0.01em;
+}
+
+.section-shell {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: var(--shadow-soft);
+  border-radius: var(--radius-lg);
+}
+
+.brand-button {
+  @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition duration-300;
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.brand-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(139, 0, 0, 0.26);
+}
+
+.brand-outline {
+  @apply inline-flex items-center justify-center rounded-full px-6 py-3 font-semibold transition duration-300;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  color: #ffffff;
+}
+
+.brand-outline:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.content-prose p {
+  margin-top: 0.6rem;
+}
+
+.admin-surface {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 26px rgba(17, 17, 17, 0.05);
+}
+
+.admin-section-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.admin-input {
+  width: 100%;
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: #fff;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.6rem 0.4rem;
+}

@@ -14,7 +14,7 @@ export const schoolService = {
     return response.data;
   },
   getMySchool: async () => {
-    const response = await apiClient.get('/schools/my-school');
+    const response = await apiClient.get('/school/profile');
     return response.data;
   },
   updateMySchoolBasic: async (payload) => {

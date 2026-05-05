@@ -40,7 +40,7 @@ const DashboardLayout = ({ children, role }) => {
   const setDesktopCollapsedState = (updater) => {
     setDesktopCollapsed((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-          { label: 'User Accounts', icon: UsersRound, href: '/dashboard/admin/users' },
+         
       try {
         localStorage.setItem('sidebarCollapsed', next ? 'true' : 'false');
       } catch (e) {
@@ -52,8 +52,7 @@ const DashboardLayout = ({ children, role }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const user = authService.getCurrentUser();
   const { branding } = useBranding();
-          { label: 'User Accounts', icon: UsersRound, href: '/dashboard/school/users' },
-
+          
   const roleMenuConfig = {
     PLATFORM_OWNER: [
       {
