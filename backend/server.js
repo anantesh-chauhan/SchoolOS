@@ -15,6 +15,8 @@ import schoolSettingsRoutes from './src/routes/schoolSettings.js';
 import uploadRoutes from './src/routes/uploads.js';
 import academicStructureRoutes from './src/routes/academicStructure.js';
 import widgetRoutes from './src/routes/widgets.js';
+import studentRoutes from './src/routes/students.js';
+import usersRoutes from './src/routes/users.js';
 
 const prisma = new PrismaClient();
 const app = express();
@@ -74,6 +76,7 @@ app.get('/api/health', async (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/school', schoolRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/sections', sectionRoutes);
@@ -85,6 +88,8 @@ app.use('/api/school-settings', schoolSettingsRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/academic-structure', academicStructureRoutes);
 app.use('/api/widgets', widgetRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/users', usersRoutes);
 
 
 // 404 Handler

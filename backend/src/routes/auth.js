@@ -1,11 +1,13 @@
 import express from 'express';
-import { login, getMe, logout, refreshSession } from '../controllers/auth.controller.js';
+import { login, loginStudent, loginParent, getMe, logout, refreshSession } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
 // Public routes
 router.post('/login', login);
+router.post('/login-student', loginStudent);
+router.post('/login-parent', loginParent);
 router.post('/refresh', refreshSession);
 
 // Protected routes

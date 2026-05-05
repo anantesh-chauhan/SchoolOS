@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const StudentLoginPage = lazy(() => import('./pages/StudentLoginPage'));
 const PlatformOwnerDashboard = lazy(() => import('./pages/dashboards/PlatformOwnerDashboard'));
 const SchoolOwnerDashboard = lazy(() => import('./pages/dashboards/SchoolOwnerDashboard'));
 const AdminDashboard = lazy(() => import('./pages/dashboards/AdminDashboard'));
@@ -24,8 +25,16 @@ const WeeklySlotManagementPage = lazy(() => import('./pages/admin/WeeklySlotMana
 const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPage'));
 const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
 const GalleryStudioPage = lazy(() => import('./pages/admin/GalleryStudioPage'));
+const AddStudentPage = lazy(() => import('./pages/admin/AddStudentPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
-const SchoolProfilePage = lazy(() => import('./pages/school/SchoolProfilePage'));
+const PlatformOwnerProfilePage = lazy(() => import('./pages/profile/PlatformOwnerProfilePage'));
+const SchoolOwnerProfilePage = lazy(() => import('./pages/profile/SchoolOwnerProfilePage'));
+const AdminProfilePage = lazy(() => import('./pages/profile/AdminProfilePage'));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
+const TeacherProfilePage = lazy(() => import('./pages/profile/TeacherProfilePage'));
+const ParentProfilePage = lazy(() => import('./pages/profile/ParentProfilePage'));
+const StudentProfilePage = lazy(() => import('./pages/profile/StudentProfilePage'));
+const StaffProfilePage = lazy(() => import('./pages/profile/StaffProfilePage'));
 const WidgetHubPage = lazy(() => import('./pages/widgets/WidgetHubPage'));
 
 const AppFallback = () => (
@@ -42,8 +51,28 @@ export default function App() {
         <Routes>
           {/* Login Route */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/student-login" element={<StudentLoginPage />} />
+          <Route path="/parent-login" element={<StudentLoginPage />} />
 
         {/* Dashboard Routes */}
+
+        <Route
+          path="/dashboard/admin/students/add"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "SCHOOL_OWNER"]}>
+              <AddStudentPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/students/add"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "SCHOOL_OWNER"]}>
+              <AddStudentPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard/platform"
           element={
@@ -84,7 +113,79 @@ export default function App() {
             path="/dashboard/school/profile"
             element={
               <ProtectedRoute allowedRoles={['SCHOOL_OWNER']}>
-                <SchoolProfilePage />
+                <SchoolOwnerProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/platform/profile"
+            element={
+              <ProtectedRoute allowedRoles={['PLATFORM_OWNER']}>
+                <PlatformOwnerProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/profile"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <AdminProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/users"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <UserManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/school/users"
+            element={
+              <ProtectedRoute allowedRoles={['SCHOOL_OWNER']}>
+                <UserManagementPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/teacher/profile"
+            element={
+              <ProtectedRoute allowedRoles={['TEACHER']}>
+                <TeacherProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/parent/profile"
+            element={
+              <ProtectedRoute allowedRoles={['PARENT']}>
+                <ParentProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/student/profile"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <StudentProfilePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/staff/profile"
+            element={
+              <ProtectedRoute allowedRoles={['STAFF']}>
+                <StaffProfilePage />
               </ProtectedRoute>
             }
           />

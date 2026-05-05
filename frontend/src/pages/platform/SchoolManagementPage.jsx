@@ -13,6 +13,7 @@ import { Badge } from '../../components/ui/badge';
 const initialSchool = {
   schoolName: '',
   schoolCode: '',
+  logoUrl: '',
   address: '',
   city: '',
   state: '',
@@ -65,12 +66,12 @@ export default function SchoolManagementPage() {
 
   return (
     <DashboardLayout role="PLATFORM_OWNER">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-        <Card>
-          <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <Card className="border-none shadow-2xl shadow-slate-200/60 rounded-[2.5rem] overflow-hidden">
+          <CardHeader className="p-8 pb-4 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between border-b border-slate-50">
             <div>
-              <CardTitle>School Management</CardTitle>
-              <p className="text-sm text-slate-600">Add, search, paginate, and manage tenant schools.</p>
+              <CardTitle className="text-3xl font-black tracking-tight text-slate-900">Institutions</CardTitle>
+              <p className="text-sm text-slate-500 font-medium mt-1">Global management of platform tenant schools.</p>
             </div>
             <div className="flex w-full gap-3 sm:w-auto">
               <Input
@@ -79,53 +80,53 @@ export default function SchoolManagementPage() {
                   setPage(1);
                   setSearch(event.target.value);
                 }}
-                placeholder="Search by name, code, city, state"
-                className="sm:w-72"
+                placeholder="Filter institutions..."
+                className="sm:w-72 h-12 rounded-xl bg-slate-50/50 border-slate-100 focus:bg-white transition-all"
               />
-              <Button onClick={() => setOpen(true)}>Add School</Button>
+              <Button onClick={() => setOpen(true)} className="h-12 px-6 rounded-xl font-bold bg-slate-900 shadow-lg shadow-slate-900/20">Add School</Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-100 text-slate-700">
+                <thead className="bg-slate-50/50 text-slate-400">
                   <tr>
-                    <th className="px-4 py-3 font-semibold">School Name</th>
-                    <th className="px-4 py-3 font-semibold">School Code</th>
-                    <th className="px-4 py-3 font-semibold">City</th>
-                    <th className="px-4 py-3 font-semibold">State</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Actions</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">School Name</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Code</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">City</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">State</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Status</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-50">
                   {isLoading && (
                     <tr>
-                      <td className="px-4 py-6 text-slate-500" colSpan={6}>
+                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={6}>
                         Loading schools...
                       </td>
                     </tr>
                   )}
                   {!isLoading && !hasData && (
                     <tr>
-                      <td className="px-4 py-6 text-slate-500" colSpan={6}>
+                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={6}>
                         No schools found.
                       </td>
                     </tr>
                   )}
                   {rows.map((school) => (
-                    <tr key={school.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="px-4 py-3 font-medium text-slate-900">{school.schoolName}</td>
-                      <td className="px-4 py-3">{school.schoolCode}</td>
-                      <td className="px-4 py-3">{school.city}</td>
-                      <td className="px-4 py-3">{school.state}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={school.status === 'ACTIVE' ? 'success' : 'muted'}>{school.status}</Badge>
+                    <tr key={school.id} className="group hover:bg-slate-50/50 transition-colors">
+                      <td className="px-8 py-5 font-bold text-slate-900">{school.schoolName}</td>
+                      <td className="px-8 py-5 text-slate-500 font-medium">{school.schoolCode}</td>
+                      <td className="px-8 py-5 text-slate-500">{school.city}</td>
+                      <td className="px-8 py-5 text-slate-500">{school.state}</td>
+                      <td className="px-8 py-5">
+                        <Badge variant={school.status === 'ACTIVE' ? 'success' : 'muted'} className="rounded-md px-2 py-0.5 text-[10px]">{school.status}</Badge>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-8 py-5">
                         <Button
                           variant="danger"
-                          className="h-8 px-3"
+                          className="h-9 px-4 rounded-lg font-bold opacity-0 group-hover:opacity-100 transition-all"
                           onClick={() => deleteMutation.mutate(school.id)}
                         >
                           Delete
@@ -166,6 +167,11 @@ export default function SchoolManagementPage() {
               placeholder="School Name"
               value={form.schoolName}
               onChange={(event) => setForm({ ...form, schoolName: event.target.value })}
+            />
+            <Input
+              placeholder="Logo URL"
+              value={form.logoUrl}
+              onChange={(event) => setForm({ ...form, logoUrl: event.target.value })}
             />
             <Input
               required

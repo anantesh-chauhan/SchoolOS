@@ -32,6 +32,7 @@ export const createSchool = async (req, res) => {
         schoolName: schoolName.trim(),
         schoolCode: schoolCode.trim().toUpperCase(),
         address: address.trim(),
+        logoUrl: req.body.logoUrl?.trim() || null,
         city: city.trim(),
         state: state.trim(),
         phone: phone.trim(),
@@ -183,6 +184,7 @@ export const updateMySchoolBasicDetails = async (req, res) => {
 
     const payload = {
       schoolName: req.body.schoolName,
+      logoUrl: req.body.logoUrl,
       address: req.body.address,
       city: req.body.city,
       state: req.body.state,
@@ -221,6 +223,7 @@ export const updateMySchoolBasicDetails = async (req, res) => {
         create: {
           schoolId,
           schoolName: updates.schoolName || school.schoolName,
+          logoUrl: updates.logoUrl || school.logoUrl || null,
           email: updates.email || school.email,
           phone: updates.phone || school.phone,
           addressLine1: updates.address || school.address,
@@ -232,6 +235,7 @@ export const updateMySchoolBasicDetails = async (req, res) => {
         },
         update: {
           ...(updates.schoolName ? { schoolName: updates.schoolName } : {}),
+          ...(updates.logoUrl !== undefined ? { logoUrl: updates.logoUrl } : {}),
           ...(updates.email ? { email: updates.email } : {}),
           ...(updates.phone ? { phone: updates.phone } : {}),
           ...(updates.address ? { addressLine1: updates.address } : {}),
@@ -247,10 +251,18 @@ export const updateMySchoolBasicDetails = async (req, res) => {
       data: updatedSchool,
     });
   } catch (error) {
-    return res.status(500).json({
+        return res.status(500).json({
       success: false,
       message: 'Failed to update school profile',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
+};
+
+export const getSchoolProfile = async (req, res) => {
+  return getMySchool(req, res);
+};
+
+export const updateSchoolProfile = async (req, res) => {
+  return updateMySchoolBasicDetails(req, res);
 };

@@ -143,6 +143,17 @@ export const teacherService = {
   },
 };
 
+export const userService = {
+  createTeacher: async (payload) => {
+    const response = await apiClient.post('/users/create-teacher', payload);
+    return response.data;
+  },
+  createStaff: async (payload) => {
+    const response = await apiClient.post('/users/create-staff', payload);
+    return response.data;
+  },
+};
+
 export const timetableService = {
   list: async (params = {}) => {
     const response = await apiClient.get('/timetables', { params });

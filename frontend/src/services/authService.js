@@ -33,6 +33,44 @@ export const authService = {
     }
   },
 
+  loginStudent: async (studentUserId, password) => {
+    try {
+      const response = await apiClient.post('/auth/login-student', { 
+        email: studentUserId, 
+        password 
+      });
+      const { token, accessToken, refreshToken, user } = response.data.data;
+      
+      // Store token and user in localStorage
+      localStorage.setItem('authToken', accessToken || token);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { token: accessToken || token, refreshToken, user };
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  loginParent: async (parentUserId, password) => {
+    try {
+      const response = await apiClient.post('/auth/login-parent', { 
+        email: parentUserId, 
+        password 
+      });
+      const { token, accessToken, refreshToken, user } = response.data.data;
+      
+      // Store token and user in localStorage
+      localStorage.setItem('authToken', accessToken || token);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      return { token: accessToken || token, refreshToken, user };
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
   logout: async () => {
     try {
       await apiClient.post('/auth/logout');

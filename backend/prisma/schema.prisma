@@ -16,10 +16,13 @@ model User {
   email     String     @unique
   password  String
   name      String
+  contactEmail String?
   role      Role       @default(STUDENT)
   schoolId  String?
   classId   String?
   sectionId String?
+  employeeId String?
+  joiningYear Int?
   school    School?    @relation(fields: [schoolId], references: [id], onDelete: SetNull)
   class     Class?     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
   section   Section?   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
@@ -35,11 +38,18 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
+  // Optional profile fields (backwards-compatible additions)
+  profileImage   String?
+  alternateMobile String?
+  isActive       Boolean  @default(true)
+  mustChangePassword Boolean @default(false)
+
   @@index([email])
   @@index([role])
   @@index([schoolId, role])
   @@index([classId])
   @@index([sectionId])
+  @@unique([schoolId, employeeId])
 }
 
 // School Model
@@ -48,6 +58,7 @@ model School {
   schoolName String
   schoolCode String        @unique
   address    String
+  logoUrl    String?
   city       String
   state      String
   phone      String
@@ -84,6 +95,7 @@ model School {
   widgetActivities UserWidgetActivity[]
   loginStreaks UserLoginStreak[]
   systemContents SystemContent[]
+  students   Student[]
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -277,9 +289,10 @@ model Teacher {
   email             String
   phone             String
   employeeId        String
-  qualification     String
-  specialization    String
-  subjectsHandled   String[]
+  joiningYear       Int?
+  qualification     String?
+  specialization    String?
+  subjectsHandled   String[]            @default([])
   schoolId          String
   school            School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherAssignments TeacherAssignment[]
@@ -779,6 +792,85 @@ model SystemContent {
 
   @@unique([schoolId, contentKey])
   @@index([schoolId, isPublished])
+}
+
+model Student {
+  id                   String    @id @default(uuid())
+  schoolId             String
+  admissionNo          String?   @unique
+
+  // Student Information
+  studentFirstName     String
+  studentLastName      String?
+  dob                  DateTime
+  gender               String
+  bloodGroup           String?
+  category             String?
+  religion             String?
+  mobile               String?
+  email                String?
+  address              String?
+  city                 String?
+  state                String?
+  pincode              String?
+  className            String
+  section              String?
+  rollNumber           String?
+  admissionDate        DateTime?
+
+  // Parent Information
+  fatherName           String
+  motherName           String?
+  parentMobile         String
+  alternateMobile      String?
+  parentEmail          String?
+  occupation           String?
+
+  // Academic Info
+  session              String
+
+  // System Fields
+  serialNo             Int?
+  studentUserId        String?
+  parentUserId         String?
+
+  // Password Fields
+  studentPasswordHash  String?
+  parentPasswordHash   String?
+  passwordGenerated    Boolean   @default(false)
+  lastPasswordGeneratedAt DateTime?
+
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  school               School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicHistory      StudentAcademicHistory[]
+
+  @@unique([studentUserId])
+  @@unique([parentUserId])
+  @@index([schoolId])
+  @@index([schoolId, session])
+  @@index([schoolId, className])
+  @@index([mobile])
+  @@index([email])
+  @@index([session])
+  @@index([isActive])
+}
+
+model StudentAcademicHistory {
+  id         String   @id @default(uuid())
+  studentId  String
+  className  String
+  section    String?
+  session    String
+  rollNumber String?
+  promotedOn DateTime @default(now())
+
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, session])
+  @@index([session])
 }
 
 // Enums

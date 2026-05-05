@@ -9,6 +9,7 @@ import { Button } from '../../components/ui/button';
 
 const emptyForm = {
   schoolName: '',
+  logoUrl: '',
   address: '',
   city: '',
   state: '',
@@ -30,6 +31,7 @@ export default function SchoolProfilePage() {
       const school = mySchoolQuery.data.data;
       setForm({
         schoolName: school.schoolName || '',
+        logoUrl: school.logoUrl || '',
         address: school.address || '',
         city: school.city || '',
         state: school.state || '',
@@ -67,6 +69,10 @@ export default function SchoolProfilePage() {
               <div className="sm:col-span-2">
                 <label className="text-sm text-slate-700">School Name</label>
                 <Input value={form.schoolName} onChange={(event) => setForm((prev) => ({ ...prev, schoolName: event.target.value }))} required />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-sm text-slate-700">Logo URL</label>
+                <Input value={form.logoUrl} onChange={(event) => setForm((prev) => ({ ...prev, logoUrl: event.target.value }))} placeholder="https://..." />
               </div>
               <div className="sm:col-span-2">
                 <label className="text-sm text-slate-700">Address</label>

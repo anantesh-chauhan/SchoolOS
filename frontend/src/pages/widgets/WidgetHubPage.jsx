@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BellRing, Building2, Check, Clock3, Flame, LayoutGrid, Plus, RefreshCw, Save, Trash2, UsersRound } from 'lucide-react';
+import { BellRing, Building2, Check, Clock3, Flame, LayoutGrid, Plus, RefreshCw, Save, Sparkles, Trash2, UsersRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import WidgetRenderer from '../../components/widgets/WidgetRenderer';
@@ -13,12 +13,12 @@ const initialBookmark = { title: '', url: '', tag: '' };
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
 };
 
 export default function WidgetHubPage() {
@@ -167,28 +167,32 @@ export default function WidgetHubPage() {
 
   return (
     <DashboardLayout role={user.role || 'ADMIN'}>
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
-        <motion.div variants={itemVariants} className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-sky-900 p-6 text-white shadow-xl">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8 pb-12">
+        {/* Premium Command Center Header */}
+        <motion.div variants={itemVariants} className="relative overflow-hidden rounded-[2.5rem] border border-slate-800 bg-slate-950 p-8 text-white shadow-2xl">
+          <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-sky-500/10 blur-[100px]" />
+          <div className="absolute -left-24 -bottom-24 h-96 w-96 rounded-full bg-indigo-500/10 blur-[100px]" />
+          
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-white/80">
-                <LayoutGrid size={14} />
-                Universal Widget System
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-sky-400">
+                <Sparkles size={12} />
+                Mission Control
               </div>
-              <h1 className="mt-4 text-3xl font-semibold">Widget Hub</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-200">
-                Curated widgets for your role, plus personal tools for tasks, notes, bookmarks, and login streak tracking.
+              <h1 className="mt-4 text-4xl font-extrabold tracking-tight">Widget Hub</h1>
+              <p className="mt-2 max-w-2xl text-base text-slate-400 font-light">
+                Synchronized intelligence and productivity tools for your institution's daily operations.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
               {user.role === 'PLATFORM_OWNER' ? (
-                <label className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white">
-                  <span className="mb-1 block text-xs uppercase tracking-[0.2em] text-white/60">School</span>
+                <label className="group flex flex-col rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-5 py-2.5 transition-all hover:border-white/20 focus-within:ring-2 focus-within:ring-sky-500/40">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 group-hover:text-slate-300 transition-colors">Context School</span>
                   <select
                     value={selectedSchoolId}
                     onChange={(event) => setSelectedSchoolId(event.target.value)}
-                    className="min-w-[240px] bg-transparent text-sm text-white outline-none"
+                    className="min-w-[200px] bg-transparent text-sm font-medium text-white outline-none pt-0.5"
                   >
                     <option value="">Select a school</option>
                     {schools.map((school) => (
@@ -203,179 +207,202 @@ export default function WidgetHubPage() {
               <button
                 type="button"
                 onClick={refresh}
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/15"
+                className="inline-flex h-14 items-center gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl px-6 text-sm font-bold text-white transition-all hover:bg-white/10 active:scale-95"
               >
-                <RefreshCw size={16} />
-                Refresh
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                Sync Data
               </button>
             </div>
           </div>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {/* High-Contrast Analytics Row */}
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-5">
           <StatPill icon={<Building2 size={16} />} label="Students" value={metrics.students || 0} />
           <StatPill icon={<UsersRound size={16} />} label="Teachers" value={metrics.teachers || 0} />
           <StatPill icon={<Clock3 size={16} />} label="Timetables" value={metrics.timetables || 0} />
-          <StatPill icon={<Check size={16} />} label="Todos" value={todos.filter((todo) => !todo.isCompleted).length} />
-          <StatPill icon={<Flame size={16} />} label="Streak" value={streak?.currentStreak || 0} />
+          <StatPill icon={<Check size={16} />} label="Pending Tasks" value={todos.filter((todo) => !todo.isCompleted).length} />
+          <StatPill icon={<Flame size={16} className="text-orange-500" />} label="Login Streak" value={streak?.currentStreak || 0} />
         </motion.div>
 
-        {loading ? (
-          <motion.div variants={itemVariants} className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
-            Loading widgets...
-          </motion.div>
-        ) : null}
-
-        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-5 xl:grid-cols-2 2xl:grid-cols-3">
+        {/* Dynamic Widget Grid */}
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-3">
           {visibleWidgets.map((widget) => (
             <WidgetRenderer key={widget.key} widget={widget} />
           ))}
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        {/* Personal Productivity Suite */}
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <section className="group rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-200/40">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Todos</h2>
-                <p className="text-sm text-slate-500">Track small tasks from the hub.</p>
+                <h2 className="text-xl font-black text-slate-900">Daily Tasks</h2>
+                <p className="text-sm text-slate-500 font-medium">Capture immediate actions.</p>
               </div>
-              <Plus size={18} className="text-slate-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-sky-50 group-hover:text-sky-500 transition-colors">
+                <Check size={20} />
+              </div>
             </div>
 
-            <form onSubmit={saveTodo} className="space-y-3">
-              <input value={todoForm.title} onChange={(event) => setTodoForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Task title" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <textarea value={todoForm.description} onChange={(event) => setTodoForm((prev) => ({ ...prev, description: event.target.value }))} placeholder="Optional details" rows="3" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <div className="grid grid-cols-2 gap-3">
-                <input type="date" value={todoForm.dueDate} onChange={(event) => setTodoForm((prev) => ({ ...prev, dueDate: event.target.value }))} className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-                <select value={todoForm.priority} onChange={(event) => setTodoForm((prev) => ({ ...prev, priority: event.target.value }))} className="rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500">
+            <form onSubmit={saveTodo} className="space-y-4">
+              <input value={todoForm.title} onChange={(event) => setTodoForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="What needs to be done?" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm transition-all focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/5 outline-none" />
+              <textarea value={todoForm.description} onChange={(event) => setTodoForm((prev) => ({ ...prev, description: event.target.value }))} placeholder="Context (optional)" rows="2" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm transition-all focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/5 outline-none resize-none" />
+              <div className="grid grid-cols-2 gap-4">
+                <input type="date" value={todoForm.dueDate} onChange={(event) => setTodoForm((prev) => ({ ...prev, dueDate: event.target.value }))} className="rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-3 text-sm outline-none focus:border-sky-500 focus:bg-white transition-all" />
+                <select value={todoForm.priority} onChange={(event) => setTodoForm((prev) => ({ ...prev, priority: event.target.value }))} className="rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-3 text-sm outline-none focus:border-sky-500 focus:bg-white transition-all">
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
                 </select>
               </div>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-                <Save size={16} /> Save Todo
+              <button type="submit" className="w-full inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-slate-950 text-sm font-bold text-white transition-all hover:bg-slate-800 active:scale-[0.98]">
+                <Plus size={18} /> Add Task
               </button>
             </form>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-8 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {todos.map((todo) => (
-                <div key={todo.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <div key={todo.id} className="group/item rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:border-sky-100 hover:bg-sky-50/30">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className={`font-medium ${todo.isCompleted ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{todo.title}</p>
+                      <p className={`text-sm font-bold ${todo.isCompleted ? 'text-slate-400 line-through font-normal' : 'text-slate-900'}`}>{todo.title}</p>
                       {todo.description ? <p className="mt-1 text-sm text-slate-500">{todo.description}</p> : null}
-                      <p className="mt-2 text-xs uppercase tracking-wide text-slate-400">
+                      <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
                         {todo.priority} {todo.dueDate ? `• ${new Date(todo.dueDate).toLocaleDateString()}` : ''}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => toggleTodo(todo)} className="rounded-lg border border-slate-200 px-2 py-1 text-xs hover:bg-white">
-                        {todo.isCompleted ? 'Reopen' : 'Done'}
+                    <div className="flex items-center gap-1.5">
+                      <button type="button" onClick={() => toggleTodo(todo)} className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-black uppercase transition-all hover:border-sky-500 hover:text-sky-600">
+                        {todo.isCompleted ? 'Undo' : 'Done'}
                       </button>
-                      <button type="button" onClick={() => removeTodo(todo)} className="rounded-lg border border-rose-200 px-2 py-1 text-xs text-rose-700 hover:bg-rose-50">
+                      <button type="button" onClick={() => removeTodo(todo)} className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-rose-100 text-rose-500 transition-all hover:bg-rose-500 hover:text-white opacity-0 group-hover/item:opacity-100">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
                 </div>
               ))}
+              {todos.length === 0 && <p className="py-8 text-center text-sm text-slate-400 italic">Clear schedule for now.</p>}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Notes</h2>
-              <p className="text-sm text-slate-500">Capture ideas and reminders.</p>
+          <section className="group rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-200/40">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Brain Dump</h2>
+                <p className="text-sm text-slate-500 font-medium">Archive your thoughts.</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-amber-50 group-hover:text-amber-500 transition-colors">
+                <Plus size={20} />
+              </div>
             </div>
 
-            <form onSubmit={saveNote} className="space-y-3">
-              <input value={noteForm.title} onChange={(event) => setNoteForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Note title" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <textarea value={noteForm.content} onChange={(event) => setNoteForm((prev) => ({ ...prev, content: event.target.value }))} placeholder="Write your note" rows="5" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <input type="color" value={noteForm.color} onChange={(event) => setNoteForm((prev) => ({ ...prev, color: event.target.value }))} className="h-12 w-full rounded-xl border border-slate-200 bg-white p-2" />
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-                <Save size={16} /> Save Note
-              </button>
+            <form onSubmit={saveNote} className="space-y-4">
+              <input value={noteForm.title} onChange={(event) => setNoteForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Title" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm transition-all focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/5 outline-none" />
+              <textarea value={noteForm.content} onChange={(event) => setNoteForm((prev) => ({ ...prev, content: event.target.value }))} placeholder="Content..." rows="4" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm transition-all focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-500/5 outline-none resize-none" />
+              <div className="flex items-center gap-3">
+                <input type="color" value={noteForm.color} onChange={(event) => setNoteForm((prev) => ({ ...prev, color: event.target.value }))} className="h-12 w-14 shrink-0 rounded-xl border-none bg-transparent cursor-pointer" />
+                <button type="submit" className="w-full inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 text-sm font-bold text-white transition-all hover:bg-slate-800">
+                  <Plus size={18} /> Create Note
+                </button>
+              </div>
             </form>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-8 grid grid-cols-1 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {notes.map((note) => (
-                <div key={note.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3" style={{ borderLeftWidth: '6px', borderLeftColor: note.color || '#38bdf8' }}>
-                  <p className="font-medium text-slate-900">{note.title}</p>
-                  <p className="mt-1 text-sm text-slate-500 line-clamp-4">{note.content}</p>
+                <div key={note.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-all hover:shadow-md" style={{ borderLeftWidth: '5px', borderLeftColor: note.color || '#38bdf8' }}>
+                  <p className="text-sm font-bold text-slate-900">{note.title}</p>
+                  <p className="mt-2 text-sm text-slate-500 leading-relaxed line-clamp-3">{note.content}</p>
                 </div>
               ))}
+              {notes.length === 0 && <p className="py-8 text-center text-sm text-slate-400 italic">No notes created.</p>}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Bookmarks</h2>
-              <p className="text-sm text-slate-500">Save important links and tools.</p>
+          <section className="group rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-200/40">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Knowledge Hub</h2>
+                <p className="text-sm text-slate-500 font-medium">Quick access shortcuts.</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-500 transition-colors">
+                <Plus size={20} />
+              </div>
             </div>
 
-            <form onSubmit={saveBookmark} className="space-y-3">
-              <input value={bookmarkForm.title} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Bookmark title" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <input value={bookmarkForm.url} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, url: event.target.value }))} placeholder="https://..." className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <input value={bookmarkForm.tag} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, tag: event.target.value }))} placeholder="Tag" className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sky-500" />
-              <button type="submit" className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-                <Save size={16} /> Save Bookmark
+            <form onSubmit={saveBookmark} className="space-y-4">
+              <input value={bookmarkForm.title} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, title: event.target.value }))} placeholder="Shortcut Name" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm outline-none focus:border-emerald-500 focus:bg-white transition-all" />
+              <input value={bookmarkForm.url} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, url: event.target.value }))} placeholder="https://resource-link.com" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm outline-none focus:border-emerald-500 focus:bg-white transition-all" />
+              <input value={bookmarkForm.tag} onChange={(event) => setBookmarkForm((prev) => ({ ...prev, tag: event.target.value }))} placeholder="Category (e.g. Tools)" className="w-full rounded-2xl border border-slate-100 bg-slate-50/50 px-5 py-4 text-sm outline-none focus:border-emerald-500 focus:bg-white transition-all" />
+              <button type="submit" className="w-full inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-slate-950 text-sm font-bold text-white transition-all hover:bg-slate-800">
+                <Plus size={18} /> Pin Bookmark
               </button>
             </form>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-8 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
               {bookmarks.map((bookmark) => (
-                <a key={bookmark.id} href={bookmark.url} target="_blank" rel="noreferrer" className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:border-sky-200 hover:bg-sky-50">
-                  <p className="font-medium text-slate-900">{bookmark.title}</p>
-                  <p className="mt-1 text-sm text-slate-500">{bookmark.tag || 'Bookmark'}</p>
+                <a key={bookmark.id} href={bookmark.url} target="_blank" rel="noreferrer" className="block rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:border-emerald-500 hover:bg-emerald-50/30 hover:-translate-y-0.5">
+                  <p className="text-sm font-bold text-slate-900">{bookmark.title}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-400 uppercase tracking-widest">{bookmark.tag || 'Bookmark'}</p>
                 </a>
               ))}
+              {bookmarks.length === 0 && <p className="py-8 text-center text-sm text-slate-400 italic">No bookmarks saved.</p>}
             </div>
           </section>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        {/* Activity & Notifications */}
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Notifications</h2>
-                <p className="text-sm text-slate-500">Unread and recent alerts.</p>
+                <h2 className="text-2xl font-black text-slate-900">Notifications</h2>
+                <p className="text-sm text-slate-500 font-medium">Recent security and academic alerts.</p>
               </div>
-              <BellRing size={18} className="text-slate-400" />
+              <div className="relative">
+                <BellRing size={24} className="text-slate-300" />
+                <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-sky-500 ring-2 ring-white" />
+              </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="mt-8 space-y-4">
               {notifications.map((notification) => (
-                <div key={notification.id} className={`rounded-2xl border px-4 py-3 ${notification.isRead ? 'border-slate-200 bg-slate-50' : 'border-sky-200 bg-sky-50'}`}>
+                <div key={notification.id} className={`group rounded-3xl border p-5 transition-all ${notification.isRead ? 'border-slate-100 bg-slate-50/50 opacity-60' : 'border-sky-100 bg-sky-50/30'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-slate-900">{notification.title}</p>
-                      <p className="mt-1 text-sm text-slate-500">{notification.body}</p>
+                      <p className="text-sm font-bold text-slate-900">{notification.title}</p>
+                      <p className="mt-1 text-sm text-slate-500 leading-relaxed">{notification.body}</p>
                     </div>
                     {!notification.isRead ? (
-                      <button type="button" onClick={() => markNotificationRead(notification)} className="rounded-lg border border-sky-200 px-2 py-1 text-xs text-sky-700 hover:bg-white">
+                      <button type="button" onClick={() => markNotificationRead(notification)} className="rounded-xl border border-sky-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-sky-600 transition-all hover:bg-sky-600 hover:text-white">
                         Mark read
                       </button>
                     ) : null}
                   </div>
                 </div>
               ))}
+              {notifications.length === 0 && <p className="py-12 text-center text-sm text-slate-400 font-medium">No new notifications.</p>}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
-              <p className="text-sm text-slate-500">Events captured by the widget system.</p>
+          <section className="rounded-[2.5rem] border border-slate-200 bg-white p-10 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">System Pulse</h2>
+                <p className="text-sm text-slate-500 font-medium">Live audit trail of platform events.</p>
+              </div>
+              <RefreshCw size={24} className="text-slate-300" />
             </div>
 
-            <div className="space-y-3">
+            <div className="mt-8 space-y-6">
               {activities.map((activity) => (
-                <div key={activity.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <p className="font-medium text-slate-900">{activity.title}</p>
-                  <p className="mt-1 text-sm text-slate-500">{activity.summary || activity.activityKey}</p>
+                <div key={activity.id} className="relative pl-6 before:absolute before:left-0 before:top-2 before:h-2 before:w-2 before:rounded-full before:bg-slate-300">
+                  <p className="text-sm font-bold text-slate-900">{activity.title}</p>
+                  <p className="mt-1 text-sm text-slate-500 leading-relaxed">{activity.summary || activity.activityKey}</p>
                 </div>
               ))}
+              {activities.length === 0 && <p className="py-12 text-center text-sm text-slate-400 font-medium">System idle.</p>}
             </div>
           </section>
         </motion.div>
@@ -386,15 +413,14 @@ export default function WidgetHubPage() {
 
 function StatPill({ icon, label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="group rounded-3xl border border-slate-100 bg-white p-6 shadow-sm transition-all hover:border-sky-200 hover:shadow-xl hover:shadow-sky-500/5">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">{icon}</div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all group-hover:bg-sky-500 group-hover:text-white group-hover:scale-110">{icon}</div>
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
-          <p className="text-xl font-semibold text-slate-900">{value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</p>
+          <p className="text-2xl font-black text-slate-900">{value}</p>
         </div>
       </div>
     </div>
   );
 }
-

@@ -19,25 +19,48 @@ import {
   UsersRound,
   X,
 } from 'lucide-react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
 import { useBranding } from '../contexts/BrandingContext';
+import Sidebar from '../components/Sidebar/Sidebar';
 
 const DashboardLayout = ({ children, role }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebarCollapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const setDesktopCollapsedState = (updater) => {
+    setDesktopCollapsed((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+          { label: 'User Accounts', icon: UsersRound, href: '/dashboard/admin/users' },
+      try {
+        localStorage.setItem('sidebarCollapsed', next ? 'true' : 'false');
+      } catch (e) {
+        // ignore
+      }
+      return next;
+    });
+  };
   const [profileOpen, setProfileOpen] = useState(false);
   const user = authService.getCurrentUser();
   const { branding } = useBranding();
+          { label: 'User Accounts', icon: UsersRound, href: '/dashboard/school/users' },
 
   const roleMenuConfig = {
     PLATFORM_OWNER: [
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/platform/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/platform' },
           { label: 'School Management', icon: School, href: '/dashboard/platform/schools' },
           { label: 'School Settings', icon: Settings, href: '/dashboard/platform/school-settings' },
@@ -45,6 +68,7 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'Experience',
+        icon: Image,
         items: [
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -54,6 +78,7 @@ const DashboardLayout = ({ children, role }) => {
     SCHOOL_OWNER: [
       {
         group: 'Academic Setup',
+        icon: BookOpen,
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/school' },
           { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
@@ -68,8 +93,10 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'School Management',
+        icon: Users,
         items: [
           { label: 'Students', icon: Users, href: '/dashboard/school' },
+          { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
           { label: 'Parents', icon: UserRound, href: '/dashboard/school' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
@@ -77,7 +104,9 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/school/profile' },
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -88,6 +117,7 @@ const DashboardLayout = ({ children, role }) => {
     ADMIN: [
       {
         group: 'Academic Setup',
+        icon: BookOpen,
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
           { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
@@ -102,8 +132,10 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'School Management',
+        icon: Users,
         items: [
           { label: 'Students', icon: Users, href: '/dashboard/admin' },
+          { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
           { label: 'Parents', icon: UserRound, href: '/dashboard/admin' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
@@ -111,7 +143,9 @@ const DashboardLayout = ({ children, role }) => {
       },
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/admin/profile' },
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -122,7 +156,9 @@ const DashboardLayout = ({ children, role }) => {
     TEACHER: [
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/teacher/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/teacher' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -132,7 +168,9 @@ const DashboardLayout = ({ children, role }) => {
     PARENT: [
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/parent/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -142,7 +180,9 @@ const DashboardLayout = ({ children, role }) => {
     STUDENT: [
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/student/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/student' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -152,7 +192,9 @@ const DashboardLayout = ({ children, role }) => {
     STAFF: [
       {
         group: 'System',
+        icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/staff/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -162,6 +204,15 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   const groupedItems = roleMenuConfig[role] || [];
+  const profileRouteByRole = {
+    PLATFORM_OWNER: '/dashboard/platform/profile',
+    SCHOOL_OWNER: '/dashboard/school/profile',
+    ADMIN: '/dashboard/admin/profile',
+    TEACHER: '/dashboard/teacher/profile',
+    PARENT: '/dashboard/parent/profile',
+    STUDENT: '/dashboard/student/profile',
+    STAFF: '/dashboard/staff/profile',
+  };
 
   const breadcrumb = useMemo(() => {
     const tokens = location.pathname.split('/').filter(Boolean);
@@ -195,77 +246,7 @@ const DashboardLayout = ({ children, role }) => {
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
 
-  const sidePanelClasses = desktopCollapsed ? 'w-20' : 'w-72';
-
-  const Sidebar = () => (
-    <aside className={`${sidePanelClasses} border-r border-slate-200 bg-white flex flex-col`}>
-      <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <div className="h-10 w-10 rounded-xl overflow-hidden bg-slate-100 text-white font-bold flex items-center justify-center">
-            {branding?.logoUrl ? (
-              <img src={branding.logoUrl} alt="School logo" className="h-full w-full object-cover" />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center brand-bg-primary">S</div>
-            )}
-          </div>
-          {!desktopCollapsed && (
-            <div>
-              <p className="font-semibold text-slate-900">{branding?.schoolName || 'SchoolOS'}</p>
-              <p className="text-xs text-slate-500">School Management SaaS</p>
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => setDesktopCollapsed((prev) => !prev)}
-          className="hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600"
-        >
-          {desktopCollapsed ? <Menu size={16} /> : <X size={16} />}
-        </button>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto p-3 space-y-5">
-        {groupedItems.map((group) => (
-          <div key={group.group} className="space-y-2">
-            {!desktopCollapsed && (
-              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{group.group}</p>
-            )}
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.href + item.label}
-                  to={item.href}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ${
-                      isActive
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`
-                  }
-                  title={item.label}
-                >
-                  <Icon size={18} />
-                  {!desktopCollapsed && <span className="truncate">{item.label}</span>}
-                </NavLink>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div className="p-3 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-700 hover:bg-red-50"
-        >
-          <LogOut size={18} />
-          {!desktopCollapsed && <span>Logout</span>}
-        </button>
-      </div>
-    </aside>
-  );
+  const sidePanelClasses = desktopCollapsed ? 'w-20' : 'w-[260px]';
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -276,14 +257,29 @@ const DashboardLayout = ({ children, role }) => {
             className="absolute inset-0 bg-black/30"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="absolute left-0 top-0 h-full w-72 shadow-xl">
-            <Sidebar />
-          </div>
+              <div className="absolute left-0 top-0 h-full w-72 shadow-xl">
+                <Sidebar
+                  groupedItems={groupedItems}
+                  desktopCollapsed={desktopCollapsed}
+                  setDesktopCollapsed={setDesktopCollapsedState}
+                  user={user}
+                  branding={branding}
+                  handleLogout={handleLogout}
+                  mobile
+                />
+              </div>
         </div>
       )}
 
       <div className="hidden lg:block">
-        <Sidebar />
+        <Sidebar
+          groupedItems={groupedItems}
+          desktopCollapsed={desktopCollapsed}
+          setDesktopCollapsed={setDesktopCollapsedState}
+          user={user}
+          branding={branding}
+          handleLogout={handleLogout}
+        />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -341,6 +337,16 @@ const DashboardLayout = ({ children, role }) => {
 
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-52 rounded-lg border border-slate-200 bg-white shadow-lg p-2 z-20">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileOpen(false);
+                      navigate(profileRouteByRole[role] || '/dashboard');
+                    }}
+                    className="w-full text-left rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    My Profile
+                  </button>
                   <button
                     type="button"
                     onClick={handleLogout}
