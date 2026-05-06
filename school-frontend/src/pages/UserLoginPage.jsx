@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import apiClient from '../utils/apiClient.js';
 import useAuthStore from '../context/authStore.js';
 import { getSchoolConfig } from '../config/schoolConfig.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 const school = getSchoolConfig();
 
@@ -12,6 +14,7 @@ export const UserLoginPage = () => {
   const location = useLocation();
   const setTokens = useAuthStore((state) => state.setTokens);
   const setUser = useAuthStore((state) => state.setUser);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   const [form, setForm] = React.useState({
     email: 'parent@ddpublicschool.com',
@@ -19,7 +22,7 @@ export const UserLoginPage = () => {
   });
   const [loading, setLoading] = React.useState(false);
 
-  const destination = location.state?.from?.pathname || '/';
+  const destination = location.state?.from?.pathname || schoolPath('/', schoolSlug);
 
   const login = async (event) => {
     event.preventDefault();
@@ -72,9 +75,9 @@ export const UserLoginPage = () => {
         </button>
 
         <div className="text-xs text-[var(--color-muted)]">
-          New user? <Link className="text-[var(--color-primary)] font-semibold" to="/signup">Create account</Link>
+          New user? <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/signup', schoolSlug)}>Create account</Link>
           {' | '}
-          Admin user? <Link className="text-[var(--color-primary)] font-semibold" to="/admin/login">Go to admin login</Link>
+          Admin user? <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/admin/login', schoolSlug)}>Go to admin login</Link>
         </div>
       </form>
     </div>

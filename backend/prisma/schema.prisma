@@ -57,6 +57,7 @@ model School {
   id         String        @id @default(cuid())
   schoolName String
   schoolCode String        @unique
+  slug       String        @unique
   address    String
   logoUrl    String?
   city       String
@@ -64,6 +65,8 @@ model School {
   phone      String
   email      String
   status     SchoolStatus  @default(ACTIVE)
+  theme      Json?
+  config     Json?
   users      User[]
   classes    Class[]
   sections   Section[]

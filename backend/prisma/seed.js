@@ -12,6 +12,7 @@ import {
   WEEK_DAYS,
   ACADEMIC_LEVELS,
 } from '../src/constants/academicTemplate.js';
+import { buildDefaultSchoolConfig, buildSchoolTheme, deriveSchoolSlug } from '../src/utils/publicSchool.util.js';
 
 const prisma = new PrismaClient();
 const SEED_LOCK_ID = 9234501;
@@ -1164,12 +1165,33 @@ async function main() {
       data: {
         schoolName: schoolInput.schoolName,
         schoolCode: schoolInput.schoolCode,
+        slug: deriveSchoolSlug({ schoolCode: schoolInput.schoolCode }),
         address: schoolInput.address,
         city: schoolInput.city,
         state: schoolInput.state,
         phone: schoolInput.phone,
         email: schoolInput.email,
         status: 'ACTIVE',
+        theme: buildSchoolTheme({
+          schoolCode: schoolInput.schoolCode,
+          theme: {
+            primaryColor: schoolInput.branding.primaryColor,
+            secondaryColor: schoolInput.branding.secondaryColor,
+          },
+        }),
+        config: buildDefaultSchoolConfig({
+          schoolName: schoolInput.schoolName,
+          schoolCode: schoolInput.schoolCode,
+          address: schoolInput.address,
+          city: schoolInput.city,
+          state: schoolInput.state,
+          phone: schoolInput.phone,
+          email: schoolInput.email,
+          theme: {
+            primaryColor: schoolInput.branding.primaryColor,
+            secondaryColor: schoolInput.branding.secondaryColor,
+          },
+        }),
       },
     });
 

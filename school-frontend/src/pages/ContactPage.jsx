@@ -7,12 +7,15 @@ import PageHero from '../components/PageHero.jsx';
 import { getSchoolConfig } from '../config/schoolConfig.js';
 import apiClient from '../utils/apiClient.js';
 import { Link } from 'react-router-dom';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 const school = getSchoolConfig();
 
 export const ContactPage = () => {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', subject: '', message: '', acceptedPolicies: false });
   const [loading, setLoading] = useState(false);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -66,7 +69,7 @@ export const ContactPage = () => {
             <textarea required rows="5" placeholder="Message" value={formData.message} onChange={(e) => setFormData((p) => ({ ...p, message: e.target.value }))} className="w-full border rounded-lg px-4 py-2.5" />
             <label className="flex items-start gap-2 text-sm text-[var(--color-muted)]">
               <input type="checkbox" checked={Boolean(formData.acceptedPolicies)} onChange={(e) => setFormData((p) => ({ ...p, acceptedPolicies: e.target.checked }))} className="mt-1" />
-              <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to="/terms">Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to="/privacy">Privacy Policy</Link>.</span>
+              <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/terms', schoolSlug)}>Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/privacy', schoolSlug)}>Privacy Policy</Link>.</span>
             </label>
             <button className="brand-button" type="submit" disabled={loading}>{loading ? 'Sending...' : 'Submit'}</button>
           </form>

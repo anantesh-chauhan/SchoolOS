@@ -9,7 +9,7 @@ export const TestimonialsPage = () => {
   const [items, setItems] = React.useState([]);
 
   React.useEffect(() => {
-    apiClient.get('/testimonials').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
+    apiClient.get('/public/testimonials').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
   }, []);
 
   return (

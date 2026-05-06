@@ -10,7 +10,7 @@ export const NoticesPage = () => {
   const [items, setItems] = React.useState([]);
 
   React.useEffect(() => {
-    apiClient.get('/notices').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
+    apiClient.get('/public/notices').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
   }, []);
 
   return (

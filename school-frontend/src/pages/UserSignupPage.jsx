@@ -4,12 +4,15 @@ import toast from 'react-hot-toast';
 import { FiUserPlus } from 'react-icons/fi';
 import apiClient from '../utils/apiClient.js';
 import { getSchoolConfig } from '../config/schoolConfig.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 const school = getSchoolConfig();
 
 export const UserSignupPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(false);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
   const [form, setForm] = React.useState({
     firstName: '',
     lastName: '',
@@ -32,7 +35,7 @@ export const UserSignupPage = () => {
         role: 'content_editor',
       });
       toast.success('Account created. Please sign in.');
-      navigate('/login');
+      navigate(schoolPath('/login', schoolSlug));
     } catch (error) {
       toast.error(error.response?.data?.message || 'Sign up failed');
     } finally {
@@ -84,7 +87,7 @@ export const UserSignupPage = () => {
 
         <label className="flex items-start gap-2 text-sm text-[var(--color-muted)]">
           <input type="checkbox" checked={Boolean(form.acceptedPolicies)} onChange={(e) => setForm((p) => ({ ...p, acceptedPolicies: e.target.checked }))} className="mt-1" />
-          <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to="/terms">Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to="/privacy">Privacy Policy</Link>.</span>
+          <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/terms', schoolSlug)}>Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/privacy', schoolSlug)}>Privacy Policy</Link>.</span>
         </label>
 
         <button className="w-full bg-[var(--color-primary)] text-white rounded-lg py-2.5" disabled={loading}>
@@ -92,7 +95,7 @@ export const UserSignupPage = () => {
         </button>
 
         <div className="text-sm text-[var(--color-muted)]">
-          Already registered? <Link className="text-[var(--color-primary)] font-semibold" to="/login">User Sign In</Link>
+          Already registered? <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/login', schoolSlug)}>User Sign In</Link>
         </div>
       </form>
     </div>

@@ -6,50 +6,28 @@ import { Footer } from '../components/Footer.jsx';
 import { HeroBanner } from '../components/HeroBanner.jsx';
 import Seo from '../components/Seo.jsx';
 import { getSchoolConfig } from '../config/schoolConfig.js';
-import apiClient from '../utils/apiClient.js';
-import useThemeStore from '../context/themeStore.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
+import SectionRenderer from '../components/SectionRenderer.jsx';
 
 const fallbackSchool = getSchoolConfig();
 
 export const HomePage = () => {
-  const school = useThemeStore((state) => state.schoolConfig) || fallbackSchool;
-  const [sections, setSections] = React.useState([]);
-  const [events, setEvents] = React.useState([]);
-  const [testimonials, setTestimonials] = React.useState(school.homepage?.testimonials || fallbackSchool.homepage.testimonials || []);
+  const school = useSchoolStore((state) => ({
+    name: state.name || fallbackSchool.name,
+    description: state.config?.homepage?.subtitle || fallbackSchool.description,
+    contact: state.config?.contact || fallbackSchool.contact || {},
+    homepage: state.config?.homepage || fallbackSchool.homepage,
+    config: state.config || fallbackSchool.config || {},
+    slug: state.schoolSlug || fallbackSchool.slug,
+    seo: state.config?.seo || fallbackSchool.seo,
+  }));
 
-  React.useEffect(() => {
-    apiClient
-      .get('/homepage-sections')
-      .then((res) => setSections(res.data.data || []))
-      .catch(() => setSections([]));
-
-    apiClient
-      .get('/events')
-      .then((res) => setEvents((res.data.data || []).slice(0, 3)))
-      .catch(() => setEvents([]));
-
-    apiClient
-      .get('/testimonials')
-      .then((res) => {
-        const items = res.data.data || [];
-        if (items.length > 0) {
-          setTestimonials(items.map((item) => ({ quote: item.quote, name: item.name })));
-        }
-      })
-      .catch(() => null);
-  }, []);
-
-  const sectionMap = React.useMemo(() => {
-    return sections.reduce((acc, section) => {
-      acc[section.sectionType] = section.content || {};
-      return acc;
-    }, {});
-  }, [sections]);
+  const testimonials = school.homepage?.testimonials || fallbackSchool.homepage.testimonials || [];
 
   const hero = {
     ...(fallbackSchool.homepage?.hero || {}),
     ...(school.homepage?.hero || {}),
-    ...(sectionMap.hero_banner || sectionMap.hero || {}),
   };
 
   const heroSlides = hero.slides || school.homepage?.heroSlides || fallbackSchool.homepage.heroSlides || [];
@@ -62,6 +40,16 @@ export const HomePage = () => {
         keywords={school.seo?.pages?.home?.keywords}
       />
       <Navbar />
+
+      {(school.config?.sections || []).length > 0 ? (
+        <section className="py-8">
+          <div className="section-shell grid gap-5">
+            {(school.config?.sections || []).map((section, index) => (
+              <SectionRenderer key={`${section.type}-${index}`} section={section} school={school} schoolSlug={school.slug} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <HeroBanner
         title={hero.title}
@@ -145,15 +133,21 @@ export const HomePage = () => {
             <p className="text-[var(--color-muted)] mt-2">Upcoming milestones and celebrations.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-5">
-            {events.map((event) => (
+            {(school.config?.sections || [])
+              .filter((section) => section.type === 'event')
+              .slice(0, 3)
+              .map((section, index) => {
+                const event = section.data || {};
+                return (
               <article key={event._id} className="glass-panel p-6">
-                <h3 className="text-xl">{event.title}</h3>
-                <p className="text-sm text-[var(--color-muted)] mt-2">{event.description}</p>
-                <a href={`/events/${event.slug}`} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
+                <h3 className="text-xl">{event.title || `Event ${index + 1}`}</h3>
+                <p className="text-sm text-[var(--color-muted)] mt-2">{event.description || 'Latest school event update.'}</p>
+                <a href={schoolPath(event.href || '/events', school.slug)} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
                   View Event
                 </a>
               </article>
-            ))}
+                );
+              })}
           </div>
         </div>
       </section>
@@ -191,7 +185,7 @@ export const HomePage = () => {
             <p className="mt-3 text-white/85 max-w-2xl">
               Enroll your child in a future-focused environment where academic achievement and character development move together.
             </p>
-            <a href="/admissions" className="brand-outline mt-6">Begin Application</a>
+            <a href={schoolPath('/admissions', school.slug)} className="brand-outline mt-6">Begin Application</a>
           </div>
         </div>
       </section>
@@ -222,7 +216,7 @@ export const HomePage = () => {
             <h2 className="text-3xl">Contact Section</h2>
             <p className="text-[var(--color-muted)] mt-2">{school.contact.address}, {school.contact.city} | {school.contact.phone} | {school.contact.email}</p>
             <p className="text-[var(--color-muted)] mt-2">Campus visits, classroom observation requests, scholarship counselling, and admissions consultations are available on weekdays and selected Saturdays.</p>
-            <a href="/contact" className="brand-button mt-5">Contact Admissions Office</a>
+            <a href={schoolPath('/contact', school.slug)} className="brand-button mt-5">Contact Admissions Office</a>
           </div>
         </div>
       </section>

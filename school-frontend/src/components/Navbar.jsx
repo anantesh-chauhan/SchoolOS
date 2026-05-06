@@ -2,30 +2,22 @@ import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getSchoolConfig } from '../config/schoolConfig.js';
-import useThemeStore from '../context/themeStore.js';
-import apiClient from '../utils/apiClient.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 const fallbackSchool = getSchoolConfig();
 
 export const Navbar = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [openDropdown, setOpenDropdown] = React.useState(null);
-  const [menuLinks, setMenuLinks] = React.useState([]);
-  const school = useThemeStore((state) => state.schoolConfig) || fallbackSchool;
+  const school = useSchoolStore((state) => ({
+    name: state.name || fallbackSchool.name,
+    tagline: state.config?.homepage?.subtitle || fallbackSchool.tagline,
+    navigation: state.config?.navigation || fallbackSchool.navigation,
+    slug: state.schoolSlug || fallbackSchool.slug,
+  }));
 
-  React.useEffect(() => {
-    apiClient
-      .get('/menus')
-      .then((res) => {
-        const items = res.data?.data?.find?.((entry) => entry.key === 'header')?.items || [];
-        if (items.length > 0) {
-          setMenuLinks(items.map((entry) => ({ label: entry.label, href: entry.href }))); 
-        }
-      })
-      .catch(() => null);
-  }, []);
-
-  const links = menuLinks.length > 0 ? menuLinks : (school.navigation?.links || []);
+  const links = school.navigation?.links || [];
   const featuredOrder = ['Home', 'About', 'Academics', 'Faculty', 'Admissions', 'Events', 'Gallery', 'News', 'Careers', 'Contact'];
   const featuredLinks = featuredOrder
     .map((name) => links.find((entry) => entry.label === name))
@@ -35,7 +27,7 @@ export const Navbar = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-black/10 bg-white/92 backdrop-blur-xl shadow-[0_8px_24px_rgba(17,17,17,0.06)]">
       <div className="section-shell h-20 flex items-center justify-between gap-4">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to={schoolPath('/', school.slug)} className="flex items-center gap-3">
           <span className="h-11 w-11 rounded-xl bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 grid place-items-center text-[var(--color-primary)] font-bold shadow-sm">
             {school.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}
           </span>
@@ -53,7 +45,7 @@ export const Navbar = () => {
               onMouseEnter={() => setOpenDropdown(item.label)}
               onMouseLeave={() => setOpenDropdown(null)}
             >
-              <NavItem to={item.href} label={item.label} hasChildren={Boolean(item.children?.length)} />
+              <NavItem to={schoolPath(item.href, school.slug)} label={item.label} hasChildren={Boolean(item.children?.length)} />
               {item.children?.length ? (
                 <AnimatePresence>
                   {openDropdown === item.label ? (
@@ -66,7 +58,7 @@ export const Navbar = () => {
                       {item.children.map((child) => (
                         <Link
                           key={child.label}
-                          to={child.href}
+                          to={schoolPath(child.href, school.slug)}
                           className="block rounded-lg px-3 py-2 text-sm text-[var(--color-ink)] hover:bg-black/5"
                         >
                           {child.label}
@@ -101,13 +93,13 @@ export const Navbar = () => {
                   >
                     {remainingLinks.map((item) => (
                       <div key={item.label} className="mb-1 last:mb-0">
-                        <Link to={item.href} className="block rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-black/5">
+                        <Link to={schoolPath(item.href, school.slug)} className="block rounded-lg px-3 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-black/5">
                           {item.label}
                         </Link>
                         {item.children?.map((child) => (
                           <Link
                             key={child.label}
-                            to={child.href}
+                            to={schoolPath(child.href, school.slug)}
                             className="block rounded-lg px-6 py-1.5 text-xs text-[var(--color-muted)] hover:bg-black/5"
                           >
                             {child.label}
@@ -123,7 +115,7 @@ export const Navbar = () => {
         </nav>
 
         <div className="hidden lg:flex items-center gap-3">
-          <Link to="/admissions" className="brand-button text-sm px-5 py-2.5">
+          <Link to={schoolPath('/admissions', school.slug)} className="brand-button text-sm px-5 py-2.5">
             Admissions Open
           </Link>
         </div>
@@ -146,14 +138,14 @@ export const Navbar = () => {
             className="lg:hidden border-t border-black/5 bg-white"
           >
             <div className="section-shell py-4 flex flex-col gap-2">
-              <MobileItem to="/" label="Home" onClick={() => setMobileOpen(false)} />
+              <MobileItem to={schoolPath('/', school.slug)} label="Home" onClick={() => setMobileOpen(false)} />
               {featuredLinks.map((item) => (
                 <React.Fragment key={item.label}>
-                  <MobileItem to={item.href} label={item.label} onClick={() => setMobileOpen(false)} />
+                  <MobileItem to={schoolPath(item.href, school.slug)} label={item.label} onClick={() => setMobileOpen(false)} />
                   {item.children?.map((child) => (
                     <MobileItem
                       key={child.label}
-                      to={child.href}
+                      to={schoolPath(child.href, school.slug)}
                       label={`- ${child.label}`}
                       onClick={() => setMobileOpen(false)}
                       className="pl-6"
@@ -164,11 +156,11 @@ export const Navbar = () => {
 
               {remainingLinks.map((item) => (
                 <React.Fragment key={item.label}>
-                  <MobileItem to={item.href} label={item.label} onClick={() => setMobileOpen(false)} />
+                  <MobileItem to={schoolPath(item.href, school.slug)} label={item.label} onClick={() => setMobileOpen(false)} />
                   {item.children?.map((child) => (
                     <MobileItem
                       key={child.label}
-                      to={child.href}
+                      to={schoolPath(child.href, school.slug)}
                       label={`- ${child.label}`}
                       onClick={() => setMobileOpen(false)}
                       className="pl-6"
@@ -177,7 +169,7 @@ export const Navbar = () => {
                 </React.Fragment>
               ))}
 
-              <Link to="/admissions" onClick={() => setMobileOpen(false)} className="brand-button text-sm mt-1">
+              <Link to={schoolPath('/admissions', school.slug)} onClick={() => setMobileOpen(false)} className="brand-button text-sm mt-1">
                 Admissions Open
               </Link>
             </div>

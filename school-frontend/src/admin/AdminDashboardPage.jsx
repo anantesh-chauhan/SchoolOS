@@ -2,6 +2,8 @@ import React from 'react';
 import apiClient from '../utils/apiClient.js';
 import { FiCalendar, FiClipboard, FiImage, FiMail, FiTarget, FiUsers } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 const cards = [
   { key: 'visitors', label: 'Total Visitors', endpoint: '/events', icon: FiTarget },
@@ -15,6 +17,7 @@ const cards = [
 export const AdminDashboardPage = () => {
   const [stats, setStats] = React.useState({});
   const [loading, setLoading] = React.useState(true);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   React.useEffect(() => {
     setLoading(true);
@@ -42,11 +45,11 @@ export const AdminDashboardPage = () => {
       <div className="admin-surface p-5 mb-4">
         <h3 className="text-lg">Quick Actions</h3>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link to="/admin/pages" className="px-3 py-2 rounded-lg border border-black/10 text-sm">Pages</Link>
-          <Link to="/admin/faculty" className="px-3 py-2 rounded-lg border border-black/10 text-sm">Faculty</Link>
-          <Link to="/admin/events" className="px-3 py-2 rounded-lg border border-black/10 text-sm">Events</Link>
-          <Link to="/admin/gallery" className="px-3 py-2 rounded-lg border border-black/10 text-sm">Gallery</Link>
-          <Link to="/admin/media" className="px-3 py-2 rounded-lg border border-black/10 text-sm">Media</Link>
+          <Link to={schoolPath('/admin/pages', schoolSlug)} className="px-3 py-2 rounded-lg border border-black/10 text-sm">Pages</Link>
+          <Link to={schoolPath('/admin/faculty', schoolSlug)} className="px-3 py-2 rounded-lg border border-black/10 text-sm">Faculty</Link>
+          <Link to={schoolPath('/admin/events', schoolSlug)} className="px-3 py-2 rounded-lg border border-black/10 text-sm">Events</Link>
+          <Link to={schoolPath('/admin/gallery', schoolSlug)} className="px-3 py-2 rounded-lg border border-black/10 text-sm">Gallery</Link>
+          <Link to={schoolPath('/admin/media', schoolSlug)} className="px-3 py-2 rounded-lg border border-black/10 text-sm">Media</Link>
         </div>
       </div>
 

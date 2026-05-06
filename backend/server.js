@@ -11,6 +11,7 @@ import subjectRoutes from './src/routes/subjects.js';
 import teacherRoutes from './src/routes/teachers.js';
 import timetableRoutes from './src/routes/timetables.js';
 import galleryRoutes from './src/routes/gallery.js';
+import publicRoutes from './src/routes/public.js';
 import schoolSettingsRoutes from './src/routes/schoolSettings.js';
 import uploadRoutes from './src/routes/uploads.js';
 import academicStructureRoutes from './src/routes/academicStructure.js';
@@ -76,6 +77,7 @@ app.get('/api/health', async (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/school', schoolRoutes);
 app.use('/api/schools', schoolRoutes);
 app.use('/api/classes', classRoutes);

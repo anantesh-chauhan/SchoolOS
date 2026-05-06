@@ -1,6 +1,8 @@
 import React from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 import { Navbar } from '../components/Navbar.jsx';
 import { Footer } from '../components/Footer.jsx';
 import Seo from '../components/Seo.jsx';
@@ -16,6 +18,7 @@ const sections = {
 
 export const AdmissionsPage = () => {
   const [loading, setLoading] = React.useState(false);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
   const [form, setForm] = React.useState({
     studentName: '',
     parentName: '',
@@ -122,7 +125,7 @@ export const AdmissionsPage = () => {
             <label className="flex items-start gap-2 text-sm text-[var(--color-muted)]">
               <input type="checkbox" checked={Boolean(form.acceptedPolicies)} onChange={(e) => setForm((prev) => ({ ...prev, acceptedPolicies: e.target.checked }))} className="mt-1" />
               <span>
-                I agree to the <Link className="text-[var(--color-primary)] font-semibold" to="/terms">Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to="/privacy">Privacy Policy</Link>.
+                I agree to the <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/terms', schoolSlug)}>Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/privacy', schoolSlug)}>Privacy Policy</Link>.
               </span>
             </label>
 

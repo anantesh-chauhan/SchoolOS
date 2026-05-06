@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { buildDefaultSchoolConfig, buildSchoolTheme, deriveSchoolSlug, normalizeSchoolPayload } from '../utils/publicSchool.util.js';
 
 const prisma = new PrismaClient();
 
@@ -12,6 +13,7 @@ export const createSchool = async (req, res) => {
     const {
       schoolName,
       schoolCode,
+      slug,
       address,
       city,
       state,
@@ -27,10 +29,13 @@ export const createSchool = async (req, res) => {
       });
     }
 
+    const resolvedSlug = deriveSchoolSlug({ slug, schoolCode, schoolName });
+
     const school = await prisma.school.create({
       data: {
         schoolName: schoolName.trim(),
         schoolCode: schoolCode.trim().toUpperCase(),
+        slug: resolvedSlug,
         address: address.trim(),
         logoUrl: req.body.logoUrl?.trim() || null,
         city: city.trim(),
@@ -38,12 +43,23 @@ export const createSchool = async (req, res) => {
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         status: status || 'ACTIVE',
+        theme: buildSchoolTheme({ slug: resolvedSlug, schoolCode, schoolName }),
+        config: buildDefaultSchoolConfig({
+          slug: resolvedSlug,
+          schoolCode,
+          schoolName,
+          address,
+          city,
+          state,
+          phone,
+          email,
+        }),
       },
     });
 
     return res.status(201).json({
       success: true,
-      data: school,
+      data: normalizeSchoolPayload(school),
     });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -56,6 +72,55 @@ export const createSchool = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to create school',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+export const getPublicSchoolBySlug = async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase();
+
+    if (!slug) {
+      return res.status(400).json({
+        success: false,
+        message: 'School slug is required',
+      });
+    }
+
+    const school = await prisma.school.findFirst({
+      where: {
+        OR: [
+          { slug },
+          { schoolCode: slug.toUpperCase() },
+          { schoolCode: slug },
+        ],
+      },
+      select: {
+        id: true,
+        schoolName: true,
+        schoolCode: true,
+        slug: true,
+        theme: true,
+        config: true,
+      },
+    });
+
+    if (!school) {
+      return res.status(404).json({
+        success: false,
+        message: 'School not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: normalizeSchoolPayload(school),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch public school',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }

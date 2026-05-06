@@ -5,12 +5,15 @@ import Footer from '../components/Footer.jsx';
 import Seo from '../components/Seo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import apiClient from '../utils/apiClient.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 export const CmsContentPage = ({ slug, fallbackTitle }) => {
   const [page, setPage] = React.useState(null);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   React.useEffect(() => {
-    apiClient.get(`/pages/${slug}`).then((res) => setPage(res.data.data)).catch(() => setPage(null));
+    apiClient.get(`/public/pages/${slug}`).then((res) => setPage(res.data.data)).catch(() => setPage(null));
   }, [slug]);
 
   if (!page) {
@@ -18,7 +21,7 @@ export const CmsContentPage = ({ slug, fallbackTitle }) => {
       <div>
         <Navbar />
         <PageHero title={fallbackTitle} subtitle="Content not published yet." />
-        <section className="pb-14"><div className="section-shell"><Link className="brand-button" to="/admin/pages">Publish this page from CMS</Link></div></section>
+        <section className="pb-14"><div className="section-shell"><Link className="brand-button" to={schoolPath('/admin/pages', schoolSlug)}>Publish this page from CMS</Link></div></section>
         <Footer />
       </div>
     );

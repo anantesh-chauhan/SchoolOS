@@ -5,12 +5,15 @@ import {
 	deleteSchool,
 	getSchoolProfile,
 	getMySchool,
+	getPublicSchoolBySlug,
 	listSchools,
 	updateSchoolProfile,
 	updateMySchoolBasicDetails,
 } from '../controllers/school.controller.js';
 
 const router = express.Router();
+
+router.get('/public/:slug', getPublicSchoolBySlug);
 
 router.use(authMiddleware);
 

@@ -6,12 +6,15 @@ import Seo from '../components/Seo.jsx';
 import PageHero from '../components/PageHero.jsx';
 import apiClient from '../utils/apiClient.js';
 import { formatDate, truncateText } from '../utils/formatters.js';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 export const EventsPage = () => {
   const [items, setItems] = React.useState([]);
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   React.useEffect(() => {
-    apiClient.get('/events').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
+    apiClient.get('/public/events').then((res) => setItems(res.data.data || [])).catch(() => setItems([]));
   }, []);
 
   const now = Date.now();
@@ -40,7 +43,7 @@ export const EventsPage = () => {
                   <p className="text-xs text-[var(--color-primary)]">{formatDate(item.startDate)}</p>
                   <h3 className="text-xl mt-1">{item.title}</h3>
                   <p className="text-sm mt-2 text-[var(--color-muted)]">{truncateText(item.description, 110)}</p>
-                  <Link to={`/events/${item.slug}`} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
+                  <Link to={schoolPath(`/events/${item.slug}`, schoolSlug)} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
                     Read details
                   </Link>
                 </div>
@@ -62,7 +65,7 @@ export const EventsPage = () => {
                   <p className="text-xs text-[var(--color-primary)]">{formatDate(item.startDate)}</p>
                   <h3 className="text-xl mt-1">{item.title}</h3>
                   <p className="text-sm mt-2 text-[var(--color-muted)]">{truncateText(item.description, 110)}</p>
-                  <Link to={`/events/${item.slug}`} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
+                  <Link to={schoolPath(`/events/${item.slug}`, schoolSlug)} className="inline-block mt-4 text-sm font-semibold text-[var(--color-primary)]">
                     Read details
                   </Link>
                 </div>

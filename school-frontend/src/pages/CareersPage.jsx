@@ -6,10 +6,13 @@ import PageHero from '../components/PageHero.jsx';
 import Seo from '../components/Seo.jsx';
 import apiClient from '../utils/apiClient.js';
 import { Link } from 'react-router-dom';
+import useSchoolStore from '../store/schoolStore.js';
+import { schoolPath } from '../utils/schoolPath.js';
 
 export const CareersPage = () => {
   const [jobs, setJobs] = React.useState([]);
   const [forms, setForms] = useState({});
+  const schoolSlug = useSchoolStore((state) => state.schoolSlug);
 
   React.useEffect(() => {
     apiClient.get('/careers').then((res) => setJobs(res.data.data || [])).catch(() => setJobs([]));
@@ -65,7 +68,7 @@ export const CareersPage = () => {
               </div>
               <label className="mt-3 flex items-start gap-2 text-sm text-[var(--color-muted)]">
                 <input type="checkbox" checked={Boolean(forms[job._id]?.acceptedPolicies)} onChange={(e) => setForms((p) => ({ ...p, [job._id]: { ...(p[job._id] || {}), acceptedPolicies: e.target.checked } }))} className="mt-1" />
-                <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to="/terms">Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to="/privacy">Privacy Policy</Link>.</span>
+                <span>I agree to the <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/terms', schoolSlug)}>Terms</Link> and <Link className="text-[var(--color-primary)] font-semibold" to={schoolPath('/privacy', schoolSlug)}>Privacy Policy</Link>.</span>
               </label>
               <button className="brand-button mt-4" onClick={() => apply(job._id)}>Apply Now</button>
             </article>
