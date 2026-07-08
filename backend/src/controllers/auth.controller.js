@@ -528,6 +528,7 @@ export const getDemoAccounts = async (req, res) => {
       select: {
         id: true,
         email: true,
+        contactEmail: true,
         name: true,
         role: true,
         schoolId: true,
@@ -540,9 +541,19 @@ export const getDemoAccounts = async (req, res) => {
     });
 
     const teacherEmails = users.filter((user) => user.role === 'TEACHER').map((user) => user.email);
-    const teachers = teacherEmails.length
+    const teacherUsers = users.filter((user) => user.role === 'TEACHER');
+    const teacherContactEmails = teacherUsers.map((user) => user.contactEmail).filter(Boolean);
+    const teacherEmployeeIds = teacherUsers.map((user) => user.employeeId).filter(Boolean);
+    const teachers = teacherUsers.length
       ? await prisma.teacher.findMany({
-          where: { email: { in: teacherEmails }, deletedAt: null },
+          where: {
+            deletedAt: null,
+            OR: [
+              ...(teacherEmails.length ? [{ email: { in: teacherEmails } }] : []),
+              ...(teacherContactEmails.length ? [{ email: { in: teacherContactEmails } }] : []),
+              ...(teacherEmployeeIds.length ? [{ employeeId: { in: teacherEmployeeIds } }] : []),
+            ],
+          },
           include: {
             school: { select: { schoolName: true } },
             teacherAssignments: {
@@ -558,7 +569,14 @@ export const getDemoAccounts = async (req, res) => {
         })
       : [];
 
-    const teacherByEmail = new Map(teachers.map((teacher) => [teacher.email, teacher]));
+    const teacherByLoginEmail = new Map();
+    const teacherByContactEmail = new Map();
+    const teacherByEmployee = new Map();
+    teachers.forEach((teacher) => {
+      teacherByLoginEmail.set(teacher.email, teacher);
+      teacherByContactEmail.set(teacher.email, teacher);
+      teacherByEmployee.set(`${teacher.schoolId}:${teacher.employeeId}`, teacher);
+    });
     const labelByRole = {
       PLATFORM_OWNER: 'Platform Owner',
       SCHOOL_OWNER: 'School Admins',
@@ -574,7 +592,11 @@ export const getDemoAccounts = async (req, res) => {
     users.forEach((user) => {
       const label = labelByRole[user.role];
       if (!label || !groupByLabel.has(label)) return;
-      const teacher = teacherByEmail.get(user.email);
+      const teacher = user.role === 'TEACHER'
+        ? teacherByLoginEmail.get(user.email)
+          || teacherByContactEmail.get(user.contactEmail)
+          || teacherByEmployee.get(`${user.schoolId}:${user.employeeId}`)
+        : null;
       const assignmentPreview = teacher?.teacherAssignments?.length
         ? teacher.teacherAssignments
             .slice(0, 4)

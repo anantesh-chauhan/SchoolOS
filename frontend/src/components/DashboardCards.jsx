@@ -1,5 +1,5 @@
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 /* =====================================================
@@ -13,6 +13,7 @@ export const SummaryCard = ({
   trend,
   color = "blue",
 }) => {
+  const reduceMotion = useReducedMotion();
   const colors = {
     blue:
       "bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 border-blue-200 dark:border-blue-800",
@@ -46,13 +47,12 @@ export const SummaryCard = ({
   return (
     <motion.div
       whileHover={{
-        y: -6,
-        scale: 1.02,
+        y: reduceMotion ? 0 : -2,
+        scale: reduceMotion ? 1 : 1.01,
       }}
       transition={{
-        type: "spring",
-        stiffness: 260,
-        damping: 18,
+        duration: 0.22,
+        ease: "easeOut",
       }}
       className={`
         relative
@@ -138,6 +138,7 @@ export const WelcomeCard = ({
   name,
   role,
 }) => {
+  const reduceMotion = useReducedMotion();
 
   const hours = new Date().getHours();
 
@@ -154,14 +155,14 @@ export const WelcomeCard = ({
     <motion.div
       initial={{
         opacity: 0,
-        y: 24,
+        y: reduceMotion ? 0 : 12,
       }}
       animate={{
         opacity: 1,
         y: 0,
       }}
       transition={{
-        duration: 0.4,
+        duration: 0.3,
         ease: "easeOut",
       }}
       className="
@@ -175,7 +176,7 @@ export const WelcomeCard = ({
         bg-gradient-to-r
         from-indigo-600
         via-blue-600
-        to-purple-600
+        to-cyan-600
       "
     >
 
@@ -202,9 +203,8 @@ export const WelcomeCard = ({
 
           {greeting},{" "}
           <span className="opacity-95">
-            {name}
-          </span>{" "}
-          👋
+            {name || 'there'}
+          </span>
 
         </h2>
 

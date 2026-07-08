@@ -13,7 +13,7 @@ const normalizeSubjectsHandled = (value) => {
 
 const getTeacherWithLoad = async (teacherId) => {
   const assignments = await prisma.teacherAssignment.findMany({
-    where: { teacherId },
+    where: { teacherId, isActive: true },
     select: {
       id: true,
       subjectId: true,
@@ -135,12 +135,13 @@ export const listTeachers = async (req, res) => {
   try {
     const schoolId = getScopedSchoolId(req.user, req.query.schoolId);
     const page = Math.max(1, Number(req.query.page || 1));
-    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
+    const limit = Math.min(1000, Math.max(1, Number(req.query.limit || 10)));
     const search = String(req.query.search || '').trim();
     const subject = String(req.query.subject || '').trim();
 
     const where = {
       schoolId,
+      deletedAt: null,
       ...(search
         ? {
             OR: [
@@ -169,6 +170,7 @@ export const listTeachers = async (req, res) => {
         take: limit,
         include: {
           teacherAssignments: {
+            where: { isActive: true },
             include: {
               class: { select: { id: true, className: true } },
               section: { select: { id: true, sectionName: true } },

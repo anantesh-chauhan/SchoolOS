@@ -10,6 +10,8 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+
     /* Brand Colors */
     --school-primary: #0f766e;
     --school-primary-soft: #ccfbf1;
@@ -28,6 +30,18 @@
     /* Border */
     --border-soft: #e2e8f0;
 
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --muted: #f1f5f9;
+    --muted-foreground: #64748b;
+    --primary: #2563eb;
+    --secondary: #0f766e;
+    --danger: #dc2626;
+    --success: #059669;
+    --warning: #d97706;
+
     /* Radius */
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
@@ -41,6 +55,21 @@
 
   html {
     scroll-behavior: smooth;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: #020617;
+    --foreground: #e2e8f0;
+    --card: #0f172a;
+    --border: #1e293b;
+    --muted: #111827;
+    --muted-foreground: #94a3b8;
+    --primary: #60a5fa;
+    --secondary: #2dd4bf;
+    --danger: #f87171;
+    --success: #34d399;
+    --warning: #fbbf24;
   }
 
   body {
@@ -57,6 +86,7 @@
 
     min-height: 100vh;
     color: var(--text-primary);
+    transition: background-color 300ms ease, color 300ms ease;
   }
 
   /* 🌙 DARK MODE */
@@ -69,7 +99,7 @@
       #020617 100%
     );
 
-    color: #e2e8f0;
+    color: var(--foreground);
   }
 
   code {
@@ -97,6 +127,17 @@
   :focus-visible {
     outline: 2px solid var(--school-accent);
     outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -287,5 +328,114 @@
       px-4
       sm:px-6
       lg:px-8;
+  }
+
+  /* Dark-mode fallbacks for legacy components that still use light-only utilities. */
+  .dark :where(.bg-white) {
+    background-color: rgb(15 23 42);
+  }
+
+  .dark :where(.bg-white\/95) {
+    background-color: rgb(15 23 42 / 0.95);
+  }
+
+  .dark :where(.bg-white\/90) {
+    background-color: rgb(15 23 42 / 0.9);
+  }
+
+  .dark :where(.bg-white\/80) {
+    background-color: rgb(15 23 42 / 0.8);
+  }
+
+  .dark :where(.bg-white\/70) {
+    background-color: rgb(15 23 42 / 0.7);
+  }
+
+  .dark :where(.bg-slate-50) {
+    background-color: rgb(2 6 23);
+  }
+
+  .dark :where(.bg-slate-100) {
+    background-color: rgb(30 41 59);
+  }
+
+  .dark :where(.bg-slate-200) {
+    background-color: rgb(51 65 85);
+  }
+
+  .dark :where(.bg-slate-300) {
+    background-color: rgb(71 85 105);
+  }
+
+  .dark :where(.hover\:bg-white:hover) {
+    background-color: rgb(30 41 59);
+  }
+
+  .dark :where(.hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover) {
+    background-color: rgb(30 41 59);
+  }
+
+  .dark :where(.hover\:bg-slate-200:hover, .hover\:bg-slate-300:hover) {
+    background-color: rgb(51 65 85);
+  }
+
+  .dark :where(.border-slate-100) {
+    border-color: rgb(30 41 59);
+  }
+
+  .dark :where(.border-slate-200) {
+    border-color: rgb(30 41 59);
+  }
+
+  .dark :where(.border-slate-300) {
+    border-color: rgb(51 65 85);
+  }
+
+  .dark :where(.border-gray-100, .border-gray-200) {
+    border-color: rgb(30 41 59);
+  }
+
+  .dark :where(.border-gray-300) {
+    border-color: rgb(51 65 85);
+  }
+
+  .dark :where(.text-black, .text-slate-950, .text-slate-900, .text-gray-950, .text-gray-900) {
+    color: rgb(241 245 249);
+  }
+
+  .dark :where(.text-slate-800, .text-slate-700, .text-gray-800, .text-gray-700) {
+    color: rgb(226 232 240);
+  }
+
+  .dark :where(.text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500) {
+    color: rgb(148 163 184);
+  }
+
+  .dark :where(.text-slate-400, .text-gray-400) {
+    color: rgb(100 116 139);
+  }
+
+  .dark :where(.placeholder\:text-slate-400::placeholder, .placeholder\:text-gray-400::placeholder) {
+    color: rgb(100 116 139);
+  }
+
+  .dark :where(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+    background-color: rgb(15 23 42);
+    border-color: rgb(51 65 85);
+    color: rgb(241 245 249);
+  }
+
+  .dark :where(input:disabled, select:disabled, textarea:disabled) {
+    background-color: rgb(30 41 59);
+    color: rgb(100 116 139);
+  }
+
+  .dark :where(table) {
+    color: rgb(226 232 240);
+  }
+
+  .dark :where(thead, tr):where(.bg-slate-100) {
+    background-color: rgb(30 41 59);
+    color: rgb(226 232 240);
   }
 }

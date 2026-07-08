@@ -22,17 +22,17 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed }) => {
       <button
         type="button"
         onClick={onToggle}
-        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl transition ${
+        className={`flex items-center justify-between w-full px-3 py-2 rounded-xl transition-all duration-200 active:scale-[0.98] ${
           desktopCollapsed ? 'justify-center' : 'justify-between'
-        } ${isActiveGroup ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}
+        } ${isActiveGroup ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'}`}
       >
         <div className="flex items-center gap-3">
           {group.icon ? <group.icon size={18} /> : null}
-          {!desktopCollapsed && <span className="font-semibold text-slate-700">{group.group}</span>}
+          {!desktopCollapsed && <span className="font-semibold">{group.group}</span>}
         </div>
 
         {!desktopCollapsed && (
-          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} className="text-slate-500">
+          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} className="text-slate-500 dark:text-slate-400">
             <ChevronDown size={16} />
           </motion.span>
         )}

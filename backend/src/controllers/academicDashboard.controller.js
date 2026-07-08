@@ -40,6 +40,13 @@ const mapSubject = (row, teacherName = 'Unassigned') => ({
   room: row.subject.isLab ? 'Lab' : 'Classroom',
 });
 
+const buildSectionNameVariants = (sectionName) => {
+  const raw = String(sectionName || '').trim();
+  const withoutPrefix = raw.replace(/^section\s+/i, '').trim();
+  const withPrefix = withoutPrefix ? `Section ${withoutPrefix}` : raw;
+  return [...new Set([raw, withoutPrefix, withPrefix].filter(Boolean))];
+};
+
 const mapStudent = (student, subjects) => ({
   id: student.id,
   name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '),
@@ -90,19 +97,39 @@ export const getClassSectionDashboard = async (req, res) => {
     }
 
     const subjectIds = subjectRows.map((row) => row.subject.id);
-    const assignments = await prisma.teacherAssignment.findMany({
-      where: { schoolId, classId, sectionId, subjectId: { in: subjectIds } },
-      include: { teacher: true },
-    });
+    const [assignments, weeklyRequirements] = await Promise.all([
+      prisma.teacherAssignment.findMany({
+        where: { schoolId, classId, sectionId, subjectId: { in: subjectIds }, isActive: true },
+        include: { teacher: true },
+      }),
+      prisma.subjectWeeklyRequirement.findMany({
+        where: {
+          schoolId,
+          classId,
+          subjectId: { in: subjectIds },
+          OR: [{ sectionId }, { sectionId: null }],
+        },
+      }),
+    ]);
     const teacherBySubject = new Map(assignments.map((row) => [row.subjectId, row.teacher?.teacherName || 'Unassigned']));
+    const requirementBySubject = new Map();
+    weeklyRequirements.forEach((row) => {
+      const existing = requirementBySubject.get(row.subjectId);
+      if (!existing || row.sectionId === sectionId) {
+        requirementBySubject.set(row.subjectId, row);
+      }
+    });
 
-    const subjects = subjectRows.map((row) => mapSubject(row, teacherBySubject.get(row.subject.id)));
+    const subjects = subjectRows.map((row) => mapSubject({
+      ...row,
+      periodsPerWeek: row.periodsPerWeek || requirementBySubject.get(row.subject.id)?.periodsPerWeek || 0,
+    }, teacherBySubject.get(row.subject.id)));
 
     const students = await prisma.student.findMany({
       where: {
         schoolId,
         className: section.class.className,
-        section: section.sectionName,
+        section: { in: buildSectionNameVariants(section.sectionName) },
         isActive: true,
       },
       orderBy: [{ rollNumber: 'asc' }, { studentFirstName: 'asc' }],

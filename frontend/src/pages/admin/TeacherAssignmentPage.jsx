@@ -18,7 +18,7 @@ export default function TeacherAssignmentPage() {
 
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all'],
-    queryFn: () => teacherService.list({ page: 1, limit: 200 }),
+    queryFn: () => teacherService.list({ page: 1, limit: 1000 }),
   });
 
   const assignmentTableQuery = useQuery({

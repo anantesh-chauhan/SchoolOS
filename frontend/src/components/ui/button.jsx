@@ -9,10 +9,10 @@ import { Loader2 } from "lucide-react";
 const variants = {
 
   default:
-    "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
+    "bg-slate-900 text-white hover:bg-slate-800 shadow-sm dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white",
 
   secondary:
-    "bg-slate-100 text-slate-900 hover:bg-slate-200",
+    "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700",
 
   primary:
     "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
@@ -27,13 +27,13 @@ const variants = {
     "bg-red-600 text-white hover:bg-red-700 shadow-sm",
 
   outline:
-    "border border-slate-300 text-slate-900 hover:bg-slate-50",
+    "border border-slate-300 text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800",
 
   ghost:
-    "text-slate-700 hover:bg-slate-100",
+    "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
 
   link:
-    "text-indigo-600 hover:underline underline-offset-4 px-0 py-0 h-auto",
+    "text-indigo-600 hover:underline underline-offset-4 px-0 py-0 h-auto dark:text-indigo-300",
 
 };
 
@@ -103,6 +103,7 @@ export function Button({
         "font-medium whitespace-nowrap",
 
         "transition-all duration-200",
+        "hover:scale-[1.02]",
 
         "focus-visible:outline-none",
         "focus-visible:ring-2",
@@ -111,7 +112,7 @@ export function Button({
         "disabled:opacity-50",
         "disabled:pointer-events-none",
 
-        "active:scale-[0.98]",
+        "active:scale-[0.97]",
 
         fullWidth && "w-full",
 

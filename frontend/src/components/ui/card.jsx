@@ -23,12 +23,13 @@ export function Card({
         "bg-white",
         "shadow-sm",
 
-        "transition-all duration-200",
+        "transition-all duration-300",
 
-        hover && "hover:shadow-md hover:-translate-y-[1px]",
+        hover && "hover:shadow-md hover:-translate-y-[2px]",
 
         "dark:bg-slate-900",
-        "dark:border-slate-700",
+        "dark:border-slate-800",
+        "dark:shadow-slate-950/20",
 
         className
 
@@ -64,7 +65,7 @@ export function CardHeader({
 
         "px-6 py-4",
 
-        "dark:border-slate-700",
+        "dark:border-slate-800",
 
         className
 
@@ -204,7 +205,7 @@ export function CardFooter({
 
         "px-6 py-4",
 
-        "dark:border-slate-700",
+        "dark:border-slate-800",
 
         className
 
