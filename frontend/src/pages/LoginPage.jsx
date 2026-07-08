@@ -63,6 +63,7 @@ export default function LoginPage() {
   const [instantLoginEmail, setInstantLoginEmail] = useState('');
   const [errors, setErrors] = useState({});
   const [branding, setBranding] = useState(null);
+  const [demoAccounts, setDemoAccounts] = useState(demoAccountsByRole);
 
 
   useEffect(() => {
@@ -116,6 +117,26 @@ export default function LoginPage() {
       mounted = false;
     };
   }, [searchParams]);
+
+  useEffect(() => {
+    let mounted = true;
+    authService
+      .getDemoAccounts()
+      .then((groups) => {
+        if (mounted && Array.isArray(groups) && groups.length > 0) {
+          setDemoAccounts(groups);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setDemoAccounts(demoAccountsByRole);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const featureList = useMemo(
     () => [
@@ -422,15 +443,26 @@ export default function LoginPage() {
                   <p className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 font-medium uppercase">Password: admin123</p>
                 </div>
                 <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-2 space-y-3 custom-scrollbar">
-                  {demoAccountsByRole.map((group) => (
+                  {demoAccounts.map((group) => (
                     <div key={group.role} className="p-1">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group.role}</p>
                       <div className="space-y-2">
+                        {group.users.length === 0 && (
+                          <div className="rounded-xl border border-dashed border-slate-200 bg-white/70 p-3 text-[11px] font-medium text-slate-400">
+                            No active accounts found in DB.
+                          </div>
+                        )}
                         {group.users.map((user) => (
-                          <div key={user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex items-center justify-between gap-3 shadow-sm hover:border-blue-200 transition-colors">
+                          <div key={user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex items-start justify-between gap-3 shadow-sm hover:border-blue-200 transition-colors">
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
                               <p className="text-[11px] text-slate-400 truncate mt-0.5">{user.email}</p>
+                              {(user.schoolName || user.assignmentPreview) && (
+                                <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
+                                  {user.schoolName}
+                                  {user.assignmentPreview ? ` · ${user.assignmentPreview}` : ''}
+                                </p>
+                              )}
                             </div>
                             <button
                               type="button"

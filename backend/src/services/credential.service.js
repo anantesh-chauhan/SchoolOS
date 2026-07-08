@@ -4,11 +4,10 @@
  * Combines serial, student ID, parent ID, and passwords into a single operation
  */
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { generateStudentPassword, generateParentPassword, hashPassword } from './password.service.js';
 import { formatParentUserId, formatStudentUserId } from './identity.service.js';
 
-const prisma = new PrismaClient();
 
 /**
  * Generate complete credentials for a student

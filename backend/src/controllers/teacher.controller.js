@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 
-const prisma = new PrismaClient();
 const DEFAULT_OVERLOAD_THRESHOLD = Number(process.env.TEACHER_OVERLOAD_THRESHOLD || 8);
 
 const normalizeSubjectsHandled = (value) => {
@@ -423,6 +422,7 @@ export const bulkUpsertTeacherAssignments = async (req, res) => {
       .map((item) => ({
         subjectId: item.subjectId,
         teacherId: item.teacherId,
+        roleType: ['SUBJECT_TEACHER', 'CLASS_TEACHER', 'BOTH'].includes(item.roleType) ? item.roleType : 'SUBJECT_TEACHER',
         isTemporary: Boolean(item.isTemporary),
       }))
       .filter((item) => item.subjectId && item.teacherId);
@@ -485,6 +485,8 @@ export const bulkUpsertTeacherAssignments = async (req, res) => {
           sectionId,
           subjectId: item.subjectId,
           teacherId: item.teacherId,
+          roleType: item.roleType,
+          isActive: true,
           isTemporary: item.isTemporary,
         })),
       });
@@ -542,7 +544,7 @@ export const listTeacherAssignmentSummary = async (req, res) => {
     });
 
     if (exportFormat === 'csv') {
-      const header = 'Class,Section,Subject,SubjectCode,Teacher,EmployeeId,Specialization';
+      const header = 'Class,Section,Subject,SubjectCode,Teacher,EmployeeId,Specialization,RoleType,Active';
       const lines = rows.map((row) => [
         row.class.className,
         row.section.sectionName,
@@ -551,6 +553,8 @@ export const listTeacherAssignmentSummary = async (req, res) => {
         row.teacher.teacherName,
         row.teacher.employeeId,
         row.teacher.specialization,
+        row.roleType,
+        row.isActive ? 'Yes' : 'No',
       ].map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','));
 
       res.setHeader('Content-Type', 'text/csv');

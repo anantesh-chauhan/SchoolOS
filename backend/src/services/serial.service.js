@@ -3,9 +3,8 @@
  * Handles generation and management of student serial numbers
  */
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 
-const prisma = new PrismaClient();
 
 /**
  * Generate a serial number for a student

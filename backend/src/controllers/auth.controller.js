@@ -1,8 +1,7 @@
 import bcryptjs from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { generateRefreshToken, generateToken, verifyRefreshToken } from '../utils/jwt.util.js';
 
-const prisma = new PrismaClient();
 
 export const login = async (req, res) => {
   try {
@@ -515,6 +514,91 @@ export const refreshSession = async (req, res) => {
       success: false,
       message: error.message || 'Failed to refresh session',
       code: 'REFRESH_FAILED',
+    });
+  }
+};
+
+export const getDemoAccounts = async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        schoolId: true,
+        employeeId: true,
+        school: { select: { id: true, schoolName: true } },
+        class: { select: { className: true } },
+        section: { select: { sectionName: true } },
+      },
+      orderBy: [{ role: 'asc' }, { name: 'asc' }],
+    });
+
+    const teacherEmails = users.filter((user) => user.role === 'TEACHER').map((user) => user.email);
+    const teachers = teacherEmails.length
+      ? await prisma.teacher.findMany({
+          where: { email: { in: teacherEmails }, deletedAt: null },
+          include: {
+            school: { select: { schoolName: true } },
+            teacherAssignments: {
+              where: { isActive: true },
+              include: {
+                class: { select: { className: true } },
+                section: { select: { sectionName: true } },
+                subject: { select: { subjectName: true } },
+              },
+              orderBy: [{ class: { classOrder: 'asc' } }, { section: { sectionOrder: 'asc' } }],
+            },
+          },
+        })
+      : [];
+
+    const teacherByEmail = new Map(teachers.map((teacher) => [teacher.email, teacher]));
+    const labelByRole = {
+      PLATFORM_OWNER: 'Platform Owner',
+      SCHOOL_OWNER: 'School Admins',
+      ADMIN: 'School Admins',
+      TEACHER: 'Teachers',
+      STUDENT: 'Students',
+      PARENT: 'Parents',
+    };
+
+    const groups = ['Platform Owner', 'School Admins', 'Teachers', 'Students', 'Parents'].map((role) => ({ role, users: [] }));
+    const groupByLabel = new Map(groups.map((group) => [group.role, group]));
+
+    users.forEach((user) => {
+      const label = labelByRole[user.role];
+      if (!label || !groupByLabel.has(label)) return;
+      const teacher = teacherByEmail.get(user.email);
+      const assignmentPreview = teacher?.teacherAssignments?.length
+        ? teacher.teacherAssignments
+            .slice(0, 4)
+            .map((row) => `${row.class.className}-${row.section.sectionName} ${row.subject.subjectName}`)
+            .join(', ')
+        : '';
+
+      groupByLabel.get(label).users.push({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        schoolName: user.school?.schoolName || teacher?.school?.schoolName || 'Platform',
+        className: user.class?.className || null,
+        sectionName: user.section?.sectionName || null,
+        assignmentPreview,
+      });
+    });
+
+    return res.json({ success: true, data: groups });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load demo accounts',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };

@@ -12,6 +12,7 @@ import {
   bulkGeneratePasswordsController,
   generateAllCredentialsController,
   generateStudentCredentialsController,
+  getMyStudentAcademics,
   downloadStudentPdfController,
   promoteStudentController,
 } from '../controllers/student.controller.js';
@@ -100,6 +101,8 @@ router.get('/:id/pdf', downloadStudentPdfController);
  * Promote a student and archive current academic state
  */
 router.post('/:id/promote', promoteStudentController);
+
+router.get('/me/academics', getMyStudentAcademics);
 
 /**
  * GET /api/students

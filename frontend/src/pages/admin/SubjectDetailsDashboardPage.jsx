@@ -92,6 +92,18 @@ function ChapterCard({ chapter, onOpen }) {
         </div>
 
         <div className="mt-3 text-xs text-slate-500">Updated: {new Date(chapter.updatedAt).toLocaleDateString()}</div>
+        {(chapter.remarks || chapter.lastUpdatedBy) && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            {chapter.remarks && (
+              <p className="text-xs text-slate-600">
+                Remarks: <span className="font-semibold text-slate-800">{chapter.remarks}</span>
+              </p>
+            )}
+            {chapter.lastUpdatedBy && (
+              <p className="mt-1 text-[11px] text-slate-500">Updated by {chapter.lastUpdatedBy}</p>
+            )}
+          </div>
+        )}
       </button>
     </motion.div>
   );

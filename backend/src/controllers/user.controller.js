@@ -1,5 +1,5 @@
 import bcryptjs from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import {
   formatStaffUserId,
@@ -8,7 +8,6 @@ import {
   normalize,
 } from '../services/identity.service.js';
 
-const prisma = new PrismaClient();
 
 const toYear = (value) => {
   const parsed = Number.parseInt(value, 10);

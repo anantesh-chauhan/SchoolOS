@@ -125,4 +125,9 @@ export const authService = {
       throw error;
     }
   },
+
+  getDemoAccounts: async () => {
+    const response = await apiClient.get('/auth/demo-accounts');
+    return response.data.data;
+  },
 };

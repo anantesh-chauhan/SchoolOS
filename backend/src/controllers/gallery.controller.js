@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import { getOptimizedCloudinaryImageUrl } from '../utils/cloudinary.util.js';
 
-const prisma = new PrismaClient();
 
 const toInt = (value, fallback = 0) => {
   const parsed = Number.parseInt(value, 10);

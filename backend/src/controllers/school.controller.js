@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { buildDefaultSchoolConfig, buildSchoolTheme, deriveSchoolSlug, normalizeSchoolPayload } from '../utils/publicSchool.util.js';
 import { seedAcademicDataForSchool } from '../../prisma/seedAcademicData.js';
 
-const prisma = new PrismaClient();
 
 const toInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);

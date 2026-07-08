@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, loginStudent, loginParent, getMe, logout, refreshSession } from '../controllers/auth.controller.js';
+import { login, loginStudent, loginParent, getMe, logout, refreshSession, getDemoAccounts } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -9,6 +9,7 @@ router.post('/login', login);
 router.post('/login-student', loginStudent);
 router.post('/login-parent', loginParent);
 router.post('/refresh', refreshSession);
+router.get('/demo-accounts', getDemoAccounts);
 
 // Protected routes
 router.get('/me', authMiddleware, getMe);

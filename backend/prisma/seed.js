@@ -1,3 +1,7 @@
-import { seedAcademicData } from './seedAcademicData.js';
+import { disconnectAcademicSeed, seedAcademicData } from './seedAcademicData.js';
 
-await seedAcademicData();
+try {
+  await seedAcademicData();
+} finally {
+  await disconnectAcademicSeed();
+}

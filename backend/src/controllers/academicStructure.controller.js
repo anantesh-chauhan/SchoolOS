@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import {
   ACADEMIC_LEVELS,
@@ -13,7 +13,6 @@ import {
   WEEK_DAYS,
 } from '../constants/academicTemplate.js';
 
-const prisma = new PrismaClient();
 
 const WEEKLY_TOTAL = 48;
 

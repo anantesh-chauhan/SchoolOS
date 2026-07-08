@@ -1,7 +1,6 @@
 import bcryptjs from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 
-const prisma = new PrismaClient();
 
 const schoolSelect = {
   id: true,

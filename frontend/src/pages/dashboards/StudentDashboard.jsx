@@ -1,143 +1,125 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { BookOpen, CheckCircle2, FileText, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { WelcomeCard, SummaryCard } from '../../components/DashboardCards';
-import { BookOpen, Calendar, Award, Clock } from 'lucide-react';
+import { studentAcademicsService } from '../../services/studentAcademicsService';
 
-const StudentDashboard = () => {
-  const [user] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch (error) {
-      return {};
-    }
-  });
+const statusClass = {
+  NOT_STARTED: 'bg-slate-50 text-slate-700 border-slate-200',
+  ONGOING: 'bg-amber-50 text-amber-700 border-amber-200',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
 
-  const stats = {
-    attendance: '94%',
-    homeworkCount: 5,
-    averageGPA: '3.8',
-    upcomingDeadlines: 3,
-  };
+const label = (status) => String(status || 'NOT_STARTED').replace(/_/g, ' ');
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
+function Stat({ icon: Icon, label: text, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{text}</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+          <Icon size={20} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
-  };
+export default function StudentDashboard() {
+  const [payload, setPayload] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    studentAcademicsService
+      .getMyAcademics()
+      .then(setPayload)
+      .catch((error) => toast.error(error.response?.data?.message || 'Unable to load student academics'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const chapters = useMemo(() => (payload?.subjects || []).flatMap((subject) => subject.chapters || []), [payload]);
+  const completed = chapters.filter((chapter) => chapter.status === 'COMPLETED').length;
+  const ongoing = chapters.filter((chapter) => chapter.status === 'ONGOING').length;
 
   return (
     <DashboardLayout role="STUDENT">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        <WelcomeCard name={user.name} role="STUDENT" />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Calendar className="w-8 h-8" />}
-              label="Attendance"
-              value={stats.attendance}
-              color="blue"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<BookOpen className="w-8 h-8" />}
-              label="Pending Homework"
-              value={stats.homeworkCount}
-              color="green"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Award className="w-8 h-8" />}
-              label="GPA"
-              value={stats.averageGPA}
-              color="purple"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Clock className="w-8 h-8" />}
-              label="Upcoming Deadlines"
-              value={stats.upcomingDeadlines}
-              color="orange"
-            />
-          </motion.div>
+      {loading ? (
+        <div className="flex h-80 items-center justify-center rounded-3xl border border-slate-200 bg-white text-slate-500">
+          <Loader2 className="mr-2 animate-spin" size={18} />
+          Loading your section academics...
         </div>
+      ) : (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-bold text-indigo-700">{payload?.school?.schoolName}</p>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Welcome, {payload?.student?.name || 'Student'}</h1>
+            <p className="mt-2 text-sm text-slate-600">
+              {payload?.student?.className} · Section {payload?.student?.sectionName || '-'} · Your section subjects, progress, and visible resources
+            </p>
+          </section>
 
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">My Assignments</h3>
-          <div className="space-y-3">
-            <div className="p-4 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/20 rounded">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">Mathematics Assignment 5</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Due: Oct 30, 2024</p>
-                </div>
-                <span className="text-red-600 dark:text-red-400 text-sm font-semibold">DUE SOON</span>
-              </div>
-            </div>
-            <div className="p-4 border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">Science Project</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Due: Nov 5, 2024</p>
-                </div>
-                <span className="text-yellow-600 dark:text-yellow-400 text-sm font-semibold">IN PROGRESS</span>
-              </div>
-            </div>
-            <div className="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 rounded">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">English Essay</p>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Due: Nov 10, 2024</p>
-                </div>
-                <span className="text-green-600 dark:text-green-400 text-sm font-semibold">PENDING</span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+          <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Stat icon={BookOpen} label="Subjects" value={payload?.subjects?.length || 0} />
+            <Stat icon={FileText} label="Chapters" value={chapters.length} />
+            <Stat icon={CheckCircle2} label="Completed" value={completed} />
+            <Stat icon={FileText} label="Resources" value={payload?.resources?.length || 0} />
+          </section>
 
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-blue-900 dark:text-blue-100">View Grades</p>
-              <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">Check grades</p>
-            </button>
-            <button className="p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-purple-900 dark:text-purple-100">Submit Assignment</p>
-              <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">Upload work</p>
-            </button>
-            <button className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-green-900 dark:text-green-100">Contact Teacher</p>
-              <p className="text-sm text-green-600 dark:text-green-300 mt-1">Send message</p>
-            </button>
-          </div>
+          <section className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.75fr] gap-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-black text-slate-950">My Subjects</h2>
+              <div className="mt-4 space-y-4">
+                {(payload?.subjects || []).map((subject) => (
+                  <div key={subject.subjectId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-black text-slate-950">{subject.subjectName}</p>
+                      <span className="text-xs font-bold text-slate-500">{subject.chapters.length} chapters</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {subject.chapters.map((chapter) => (
+                        <div key={chapter.chapterId} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <p className="text-sm font-bold text-slate-900">{chapter.chapterOrder}. {chapter.chapterName}</p>
+                          <span className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusClass[chapter.status]}`}>
+                            {label(chapter.status)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-black text-slate-950">Visible Resources</h2>
+              <div className="mt-4 space-y-3">
+                {(payload?.resources || []).length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-600">
+                    No resources shared yet.
+                  </div>
+                )}
+                {(payload?.resources || []).map((resource) => (
+                  <a
+                    key={resource.id}
+                    href={resource.externalUrl || resource.fileUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block rounded-2xl border border-slate-200 p-4 hover:border-indigo-300 hover:bg-indigo-50/40"
+                  >
+                    <p className="text-sm font-black text-slate-950">{resource.title}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-500">{resource.subject?.subjectName} · {resource.resourceType}</p>
+                    {resource.description && <p className="mt-2 text-sm text-slate-600">{resource.description}</p>}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </section>
         </motion.div>
-      </motion.div>
+      )}
     </DashboardLayout>
   );
-};
-
-export default StudentDashboard;
+}

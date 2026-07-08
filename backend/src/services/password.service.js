@@ -5,9 +5,8 @@
  */
 
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 
-const prisma = new PrismaClient();
 
 /**
  * Format name: lowercase + remove spaces

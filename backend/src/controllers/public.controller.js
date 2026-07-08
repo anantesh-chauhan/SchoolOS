@@ -1,7 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { normalizeSchoolPayload } from '../utils/publicSchool.util.js';
 
-const prisma = new PrismaClient();
 
 const SCHOOL_ALIASES = {
   dps: 'DPS002',

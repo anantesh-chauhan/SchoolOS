@@ -25,7 +25,12 @@ const toFormData = (file, signatureData) => {
 
 const uploadToCloudinary = async (file, signatureData) => {
   const cloudName = signatureData.cloudName;
-  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  const resourceType = file.type?.startsWith('video/')
+    ? 'video'
+    : file.type?.startsWith('image/')
+      ? 'image'
+      : 'raw';
+  const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
   const formData = toFormData(file, signatureData);
 
   const response = await fetch(endpoint, {
@@ -48,6 +53,10 @@ export const cloudinaryUploadService = {
   },
   getSchoolLogoSignature: async ({ schoolId }) => {
     const response = await apiClient.post('/uploads/school-logo-signature', { schoolId });
+    return response.data;
+  },
+  getSectionResourceSignature: async ({ schoolId, classId, sectionId, subjectId }) => {
+    const response = await apiClient.post('/uploads/section-resource-signature', { schoolId, classId, sectionId, subjectId });
     return response.data;
   },
   uploadToCloudinary,

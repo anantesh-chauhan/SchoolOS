@@ -5,10 +5,9 @@
  * Example: rahul.2627.0123@dpslko.schoolos
  */
 
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { formatStudentUserId } from './identity.service.js';
 
-const prisma = new PrismaClient();
 
 /**
  * Generate studentUserId for a student

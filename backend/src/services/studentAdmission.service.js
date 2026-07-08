@@ -1,10 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import bcrypt from 'bcrypt';
 import PDFDocument from 'pdfkit';
 import { PassThrough } from 'stream';
 import { formatParentUserId, formatStudentUserId } from './identity.service.js';
 
-const prisma = new PrismaClient();
 
 const PASSWORD_SALT_ROUNDS = 10;
 

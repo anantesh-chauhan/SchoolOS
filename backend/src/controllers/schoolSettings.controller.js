@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 
-const prisma = new PrismaClient();
 
 const sanitizeHexColor = (value, fallback) => {
   if (!value) {

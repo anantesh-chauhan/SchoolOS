@@ -1,134 +1,498 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
+import {
+  BookOpenCheck,
+  CheckCircle2,
+  ClipboardList,
+  ExternalLink,
+  FileText,
+  GraduationCap,
+  Layers,
+  Link as LinkIcon,
+  Loader2,
+  Plus,
+  RefreshCw,
+  School,
+  Send,
+  Users,
+} from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { WelcomeCard, SummaryCard } from '../../components/DashboardCards';
-import { BookOpen, Clock, FileText, Users } from 'lucide-react';
+import { teacherDashboardService } from '../../services/teacherDashboardService';
+import { cloudinaryUploadService } from '../../services/cloudinaryUploadService';
 
-const TeacherDashboard = () => {
-  const [user] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch (error) {
-      return {};
-    }
+const statusStyles = {
+  NOT_STARTED: 'bg-slate-50 text-slate-700 border-slate-200',
+  ONGOING: 'bg-amber-50 text-amber-700 border-amber-200',
+  COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
+
+const statusLabels = {
+  NOT_STARTED: 'Not Started',
+  ONGOING: 'Ongoing',
+  COMPLETED: 'Completed',
+};
+
+function StatCard({ icon: Icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+          <p className="mt-2 text-3xl font-black text-slate-900">{value ?? 0}</p>
+        </div>
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700">
+          <Icon size={20} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="h-36 rounded-3xl bg-white border border-slate-200 animate-pulse" />
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-4">
+        {Array.from({ length: 7 }).map((_, index) => (
+          <div key={index} className="h-28 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-44 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function flattenAssignments(groups) {
+  return groups.flatMap((classGroup) =>
+    classGroup.sections.flatMap((section) =>
+      section.subjects.map((subject) => ({
+        ...subject,
+        classId: classGroup.classId,
+        className: classGroup.className,
+        sectionId: section.sectionId,
+        sectionName: section.sectionName,
+      }))
+    )
+  );
+}
+
+export default function TeacherDashboard() {
+  const [dashboard, setDashboard] = useState(null);
+  const [assignmentGroups, setAssignmentGroups] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [chaptersPayload, setChaptersPayload] = useState(null);
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [uploadingResource, setUploadingResource] = useState(false);
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [remarksByChapter, setRemarksByChapter] = useState({});
+  const [resourceForm, setResourceForm] = useState({
+    title: '',
+    description: '',
+    resourceType: 'NOTE',
+    externalUrl: '',
+    fileUrl: '',
+    file: null,
+    chapterId: '',
+    isVisibleToStudents: true,
   });
 
-  const stats = {
-    assignedClasses: 5,
-    todayClasses: 3,
-    assignments: 12,
-    students: 150,
+  const assignments = useMemo(() => flattenAssignments(assignmentGroups), [assignmentGroups]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [dashboardData, assignmentData] = await Promise.all([
+        teacherDashboardService.getDashboard(),
+        teacherDashboardService.getAssignments(),
+      ]);
+      setDashboard(dashboardData);
+      setAssignmentGroups(assignmentData);
+      const first = flattenAssignments(assignmentData)[0] || null;
+      setSelected((current) => current || first);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to load teacher dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadDetails = useCallback(async (target) => {
+    if (!target) return;
+    setDetailLoading(true);
+    try {
+      const [chapterData, resourceData] = await Promise.all([
+        teacherDashboardService.getChapters({ sectionId: target.sectionId, subjectId: target.subjectId }),
+        teacherDashboardService.getResources({ sectionId: target.sectionId, subjectId: target.subjectId }),
+      ]);
+      setChaptersPayload(chapterData);
+      setResources(resourceData);
+      setRemarksByChapter(Object.fromEntries((chapterData.chapters || []).map((chapter) => [chapter.chapterId, chapter.remarks || ''])));
+    } catch (error) {
+      setChaptersPayload(null);
+      toast.error(error.response?.data?.message || 'You are not assigned to this section or subject.');
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    loadDetails(selected);
+  }, [selected, loadDetails]);
+
+  const updateProgress = async (chapter, status) => {
+    if (!selected) return;
+    try {
+      await teacherDashboardService.updateProgress({
+        classId: selected.classId,
+        sectionId: selected.sectionId,
+        subjectId: selected.subjectId,
+        chapterId: chapter.chapterId,
+        status,
+        remarks: remarksByChapter[chapter.chapterId] || '',
+      });
+      toast.success('Chapter progress updated');
+      await Promise.all([loadDetails(selected), load()]);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to update progress');
+    }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
+  const createResource = async (event) => {
+    event.preventDefault();
+    if (!selected || !resourceForm.title.trim()) return;
+    setUploadingResource(true);
+    try {
+      let fileUrl = resourceForm.fileUrl;
+      let resourceType = resourceForm.resourceType;
+
+      if (resourceForm.file) {
+        const signature = await cloudinaryUploadService.getSectionResourceSignature({
+          classId: selected.classId,
+          sectionId: selected.sectionId,
+          subjectId: selected.subjectId,
+        });
+        const uploaded = await cloudinaryUploadService.uploadToCloudinary(resourceForm.file, signature.data);
+        fileUrl = uploaded.secure_url;
+        if (resourceForm.file.type?.startsWith('image/')) resourceType = 'IMAGE';
+        else if (resourceForm.file.type?.startsWith('video/')) resourceType = 'VIDEO';
+        else if (resourceForm.file.type === 'application/pdf') resourceType = 'PDF';
+      }
+
+      await teacherDashboardService.createResource({
+        ...resourceForm,
+        file: undefined,
+        fileUrl,
+        resourceType,
+        classId: selected.classId,
+        sectionId: selected.sectionId,
+        subjectId: selected.subjectId,
+        chapterId: resourceForm.chapterId || null,
+      });
+      toast.success('Resource shared');
+      setResourceForm({
+        title: '',
+        description: '',
+        resourceType: 'NOTE',
+        externalUrl: '',
+        fileUrl: '',
+        file: null,
+        chapterId: '',
+        isVisibleToStudents: true,
+      });
+      await Promise.all([loadDetails(selected), load()]);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to share resource');
+    } finally {
+      setUploadingResource(false);
+    }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
+  const deleteResource = async (resourceId) => {
+    try {
+      await teacherDashboardService.deleteResource(resourceId);
+      toast.success('Resource deleted');
+      await Promise.all([loadDetails(selected), load()]);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'You do not have permission to manage this resource.');
+    }
   };
+
+  const today = new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date());
+
+  if (loading) {
+    return (
+      <DashboardLayout role="TEACHER">
+        <Skeleton />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout role="TEACHER">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        <WelcomeCard name={user.name} role="TEACHER" />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<BookOpen className="w-8 h-8" />}
-              label="Assigned Classes"
-              value={stats.assignedClasses}
-              color="blue"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Clock className="w-8 h-8" />}
-              label="Today's Classes"
-              value={stats.todayClasses}
-              color="purple"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<FileText className="w-8 h-8" />}
-              label="Assignments"
-              value={stats.assignments}
-              color="green"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Users className="w-8 h-8" />}
-              label="Total Students"
-              value={stats.students}
-              color="orange"
-            />
-          </motion.div>
-        </div>
-
-        {/* Today's Schedule */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Today's Schedule
-          </h3>
-          <div className="space-y-3">
-            <div className="p-4 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 rounded">
-              <p className="font-semibold text-gray-900 dark:text-white">Class X - A (9:00 AM - 10:00 AM)</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">English - Room 101</p>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-bold text-cyan-700">
+                  <GraduationCap size={14} />
+                  Teacher
+                </span>
+                <span className="text-sm text-slate-500">{today}</span>
+              </div>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-950">
+                Welcome, {dashboard?.teacher?.name || 'Teacher'}
+              </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                {dashboard?.school?.schoolName || 'SchoolOS'} · Manage your assigned sections and subjects
+              </p>
             </div>
-            <div className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/20 rounded">
-              <p className="font-semibold text-gray-900 dark:text-white">Class X - B (10:30 AM - 11:30 AM)</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">English - Room 102</p>
-            </div>
-            <div className="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 rounded">
-              <p className="font-semibold text-gray-900 dark:text-white">Class XI - C (2:00 PM - 3:00 PM)</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">English - Room 201</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Quick Actions */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-blue-900 dark:text-blue-100">Create Assignment</p>
-              <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">Add new assignment</p>
-            </button>
-            <button className="p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-purple-900 dark:text-purple-100">Mark Attendance</p>
-              <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">Class attendance</p>
-            </button>
-            <button className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-green-900 dark:text-green-100">View Grades</p>
-              <p className="text-sm text-green-600 dark:text-green-300 mt-1">Student grades</p>
+            <button
+              type="button"
+              onClick={load}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <RefreshCw size={16} />
+              Refresh
             </button>
           </div>
-        </motion.div>
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-7 gap-4">
+          <StatCard icon={School} label="Assigned Classes" value={dashboard?.stats?.assignedClasses} />
+          <StatCard icon={Users} label="Assigned Sections" value={dashboard?.stats?.assignedSections} />
+          <StatCard icon={Layers} label="Assigned Subjects" value={dashboard?.stats?.assignedSubjects} />
+          <StatCard icon={CheckCircle2} label="Completed" value={dashboard?.stats?.completedChapters} />
+          <StatCard icon={BookOpenCheck} label="Ongoing" value={dashboard?.stats?.ongoingChapters} />
+          <StatCard icon={ClipboardList} label="Pending" value={dashboard?.stats?.pendingChapters} />
+          <StatCard icon={FileText} label="Resources" value={dashboard?.stats?.totalSharedResources} />
+        </section>
+
+        {assignments.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+            <p className="text-base font-bold text-slate-900">No assignments found. Please contact your school admin.</p>
+          </div>
+        ) : (
+          <section className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.35fr] gap-5">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">My Teaching Assignments</h2>
+                <p className="mt-1 text-sm text-slate-500">Select a class-section-subject to manage chapters and resources.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                {assignments.map((assignment) => (
+                  <button
+                    key={`${assignment.classId}-${assignment.sectionId}-${assignment.subjectId}`}
+                    type="button"
+                    onClick={() => {
+                      setSelected(assignment);
+                      setActiveTab('Chapters');
+                    }}
+                    className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                      selected?.sectionId === assignment.sectionId && selected?.subjectId === assignment.subjectId
+                        ? 'border-cyan-300 ring-2 ring-cyan-100'
+                        : 'border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-950">{assignment.className} · Section {assignment.sectionName}</p>
+                        <p className="mt-1 text-sm font-semibold text-cyan-700">{assignment.subjectName}</p>
+                      </div>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                        {assignment.roleType.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+                        <span>{assignment.completedChapters}/{assignment.totalChapters} completed</span>
+                        <span>{assignment.progressPercentage}%</span>
+                      </div>
+                      <div className="mt-2 h-2 rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-cyan-600" style={{ width: `${assignment.progressPercentage}%` }} />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <span className="rounded-xl bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700">View Chapters</span>
+                      <span className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">Share Resource</span>
+                      <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700">View Resources</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">
+                      Dashboard / {selected?.className} / Section {selected?.sectionName} / {selected?.subjectName}
+                    </p>
+                    <h2 className="mt-1 text-xl font-black text-slate-950">{activeTab}</h2>
+                  </div>
+                  <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                    {['Overview', 'Chapters', 'Resources', 'Students'].map((tab) => (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setActiveTab(tab)}
+                        className={`rounded-lg px-3 py-2 text-xs font-bold ${activeTab === tab ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600'}`}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4">
+                {detailLoading ? (
+                  <div className="flex h-56 items-center justify-center text-slate-500">
+                    <Loader2 className="mr-2 animate-spin" size={18} />
+                    Loading assigned data...
+                  </div>
+                ) : activeTab === 'Overview' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <StatCard icon={CheckCircle2} label="Completed" value={selected?.completedChapters} />
+                    <StatCard icon={BookOpenCheck} label="Ongoing" value={selected?.ongoingChapters} />
+                    <StatCard icon={ClipboardList} label="Pending" value={selected?.pendingChapters} />
+                  </div>
+                ) : activeTab === 'Chapters' ? (
+                  <div className="space-y-3">
+                    {(chaptersPayload?.chapters || []).length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700">
+                        No chapters added for this subject yet.
+                      </div>
+                    )}
+                    {(chaptersPayload?.chapters || []).map((chapter) => (
+                      <div key={chapter.chapterId} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-slate-500">Chapter {chapter.chapterOrder}</p>
+                            <h3 className="mt-1 text-base font-black text-slate-950">{chapter.chapterName}</h3>
+                            {chapter.completedAt && (
+                              <p className="mt-1 text-xs text-slate-500">Completed {new Date(chapter.completedAt).toLocaleDateString()}</p>
+                            )}
+                          </div>
+                          <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${statusStyles[chapter.status]}`}>
+                            {statusLabels[chapter.status]}
+                          </span>
+                        </div>
+                        <textarea
+                          value={remarksByChapter[chapter.chapterId] || ''}
+                          onChange={(event) => setRemarksByChapter((prev) => ({ ...prev, [chapter.chapterId]: event.target.value }))}
+                          placeholder="Add or edit remarks"
+                          className="mt-4 min-h-[76px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+                        />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {['NOT_STARTED', 'ONGOING', 'COMPLETED'].map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => updateProgress(chapter, status)}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:border-cyan-300 hover:text-cyan-700"
+                            >
+                              Mark {statusLabels[status]}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setResourceForm((prev) => ({ ...prev, chapterId: chapter.chapterId }));
+                              setActiveTab('Resources');
+                            }}
+                            className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-3 py-2 text-xs font-bold text-white hover:bg-cyan-700"
+                          >
+                            <Send size={14} />
+                            Share Resource
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : activeTab === 'Resources' ? (
+                  <div className="space-y-5">
+                    <form onSubmit={createResource} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input className="h-11 rounded-xl border border-slate-200 px-3 text-sm" placeholder="Resource title" value={resourceForm.title} onChange={(event) => setResourceForm((prev) => ({ ...prev, title: event.target.value }))} />
+                        <select className="h-11 rounded-xl border border-slate-200 px-3 text-sm" value={resourceForm.resourceType} onChange={(event) => setResourceForm((prev) => ({ ...prev, resourceType: event.target.value }))}>
+                          {['NOTE', 'LINK', 'PDF', 'IMAGE', 'VIDEO', 'ASSIGNMENT', 'OTHER'].map((type) => <option key={type}>{type}</option>)}
+                        </select>
+                        <input className="h-11 rounded-xl border border-slate-200 px-3 text-sm" placeholder="External URL" value={resourceForm.externalUrl} onChange={(event) => setResourceForm((prev) => ({ ...prev, externalUrl: event.target.value }))} />
+                        <input className="h-11 rounded-xl border border-slate-200 px-3 text-sm" placeholder="File URL" value={resourceForm.fileUrl} onChange={(event) => setResourceForm((prev) => ({ ...prev, fileUrl: event.target.value }))} />
+                        <input className="h-11 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" type="file" accept=".pdf,image/*,video/*" onChange={(event) => setResourceForm((prev) => ({ ...prev, file: event.target.files?.[0] || null }))} />
+                        <select className="h-11 rounded-xl border border-slate-200 px-3 text-sm" value={resourceForm.chapterId} onChange={(event) => setResourceForm((prev) => ({ ...prev, chapterId: event.target.value }))}>
+                          <option value="">Attach to subject</option>
+                          {(chaptersPayload?.chapters || []).map((chapter) => <option key={chapter.chapterId} value={chapter.chapterId}>{chapter.chapterOrder}. {chapter.chapterName}</option>)}
+                        </select>
+                        <label className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+                          <input type="checkbox" checked={resourceForm.isVisibleToStudents} onChange={(event) => setResourceForm((prev) => ({ ...prev, isVisibleToStudents: event.target.checked }))} />
+                          Visible to students
+                        </label>
+                      </div>
+                      <textarea className="mt-3 min-h-[72px] w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Description or note" value={resourceForm.description} onChange={(event) => setResourceForm((prev) => ({ ...prev, description: event.target.value }))} />
+                      <button type="submit" disabled={uploadingResource} className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-cyan-600 px-4 text-sm font-bold text-white hover:bg-cyan-700 disabled:opacity-60">
+                        {uploadingResource ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                        {uploadingResource ? 'Uploading...' : 'Add Resource'}
+                      </button>
+                    </form>
+
+                    {resources.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700">
+                        No resources shared yet.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {resources.map((resource) => (
+                          <div key={resource.id} className="rounded-2xl border border-slate-200 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-black text-slate-950">{resource.title}</p>
+                                <p className="mt-1 text-xs font-bold text-slate-500">{resource.resourceType} · {resource.chapter?.chapterName || 'Subject resource'}</p>
+                              </div>
+                              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                                {resource.isVisibleToStudents ? 'Students' : 'Private'}
+                              </span>
+                            </div>
+                            {resource.description && <p className="mt-3 text-sm text-slate-600">{resource.description}</p>}
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {(resource.externalUrl || resource.fileUrl) && (
+                                <a className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-cyan-700" href={resource.externalUrl || resource.fileUrl} target="_blank" rel="noreferrer">
+                                  {resource.externalUrl ? <ExternalLink size={14} /> : <LinkIcon size={14} />}
+                                  Open
+                                </a>
+                              )}
+                              <button type="button" onClick={() => deleteResource(resource.id)} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50">
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700">
+                    Student list access is controlled by school policy. Assigned section students can be connected here when enabled.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
       </motion.div>
     </DashboardLayout>
   );
-};
-
-export default TeacherDashboard;
+}

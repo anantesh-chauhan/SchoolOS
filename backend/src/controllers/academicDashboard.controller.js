@@ -1,19 +1,32 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 
-const prisma = new PrismaClient();
 
 const toTitleStatus = (status) => {
   const normalized = String(status || 'not_started').toLowerCase();
   if (normalized === 'completed') return 'Completed';
-  if (normalized === 'in_progress') return 'In Progress';
+  if (normalized === 'in_progress' || normalized === 'ongoing') return 'In Progress';
   return 'Not Started';
 };
 
 const toDbStatus = (status) => {
   const normalized = String(status || '').trim().toLowerCase().replace(/\s+/g, '_');
   if (['not_started', 'in_progress', 'completed'].includes(normalized)) return normalized;
+  if (normalized === 'ongoing') return 'in_progress';
   return 'not_started';
+};
+
+const toProgressStatus = (status) => {
+  const normalized = String(status || '').trim().toUpperCase().replace(/\s+/g, '_');
+  if (normalized === 'IN_PROGRESS') return 'ONGOING';
+  if (['NOT_STARTED', 'ONGOING', 'COMPLETED'].includes(normalized)) return normalized;
+  return 'NOT_STARTED';
+};
+
+const progressCompletion = (status) => {
+  if (status === 'COMPLETED') return 100;
+  if (status === 'ONGOING') return 50;
+  return 0;
 };
 
 const mapSubject = (row, teacherName = 'Unassigned') => ({
@@ -153,8 +166,8 @@ export const getSubjectDashboard = async (req, res) => {
           schoolId,
           classId,
           subjectId,
-          sectionId: null,
           deletedAt: null,
+          OR: [{ sectionId }, { sectionId: null }],
         },
         orderBy: { chapterNumber: 'asc' },
       }),
@@ -169,16 +182,52 @@ export const getSubjectDashboard = async (req, res) => {
       prisma.teacherAssignment.findFirst({ where: { schoolId, classId, sectionId, subjectId }, include: { teacher: true } }),
     ]);
 
+    const chapterIds = chapters.map((chapter) => chapter.id);
+    const [progressRows, resources] = await Promise.all([
+      chapterIds.length
+        ? prisma.chapterProgress.findMany({
+            where: {
+              schoolId,
+              classId,
+              sectionId,
+              subjectId,
+              chapterId: { in: chapterIds },
+            },
+            include: { teacher: { select: { teacherName: true } } },
+          })
+        : [],
+      prisma.sectionResource.findMany({
+        where: {
+          schoolId,
+          classId,
+          sectionId,
+          subjectId,
+        },
+        select: { id: true, chapterId: true },
+      }),
+    ]);
+
+    const progressByChapterId = new Map(progressRows.map((row) => [row.chapterId, row]));
+    const resourcesByChapterId = resources.reduce((map, resource) => {
+      if (resource.chapterId) {
+        map.set(resource.chapterId, (map.get(resource.chapterId) || 0) + 1);
+      }
+      return map;
+    }, new Map());
+
     const mappedChapters = chapters.map((chapter) => ({
       id: chapter.id,
       chapterName: chapter.chapterName,
       chapterNumber: chapter.chapterNumber,
-      status: toTitleStatus(chapter.status),
+      status: toTitleStatus(progressByChapterId.get(chapter.id)?.status || 'NOT_STARTED'),
+      remarks: progressByChapterId.get(chapter.id)?.remarks || '',
+      completedAt: progressByChapterId.get(chapter.id)?.completedAt || null,
+      lastUpdatedBy: progressByChapterId.get(chapter.id)?.teacher?.teacherName || null,
       estimatedClasses: chapter.estimatedClasses,
-      resources: chapter.resourcesCount,
+      resources: resourcesByChapterId.get(chapter.id) || 0,
       assignments: chapter.assignmentsCount,
-      completion: chapter.completion,
-      updatedAt: chapter.updatedAt,
+      completion: progressCompletion(progressByChapterId.get(chapter.id)?.status || 'NOT_STARTED'),
+      updatedAt: progressByChapterId.get(chapter.id)?.updatedAt || chapter.updatedAt,
     }));
 
     const completedChapters = mappedChapters.filter((chapter) => chapter.status === 'Completed').length;
@@ -209,7 +258,7 @@ export const getSubjectDashboard = async (req, res) => {
           upcomingChapters: mappedChapters.filter((chapter) => chapter.status === 'Not Started').length,
           assignments: mappedChapters.reduce((sum, chapter) => sum + Number(chapter.assignments || 0), 0),
           homework: 0,
-          resources: mappedChapters.reduce((sum, chapter) => sum + Number(chapter.resources || 0), 0),
+          resources: resources.length,
         },
       },
     });
@@ -272,13 +321,46 @@ export const updateChapter = async (req, res) => {
       data: {
         ...(req.body.chapterName ? { chapterName: String(req.body.chapterName).trim() } : {}),
         ...(req.body.chapterNumber !== undefined ? { chapterNumber: Number(req.body.chapterNumber) } : {}),
-        ...(req.body.status ? { status: toDbStatus(req.body.status) } : {}),
+        ...(req.body.status && !req.body.sectionId ? { status: toDbStatus(req.body.status) } : {}),
         ...(req.body.estimatedClasses !== undefined ? { estimatedClasses: Number(req.body.estimatedClasses) } : {}),
-        ...(req.body.resourcesCount !== undefined ? { resourcesCount: Number(req.body.resourcesCount) } : {}),
         ...(req.body.assignmentsCount !== undefined ? { assignmentsCount: Number(req.body.assignmentsCount) } : {}),
-        ...(req.body.completion !== undefined ? { completion: Number(req.body.completion) } : {}),
       },
     });
+
+    if (req.body.status && req.body.sectionId && existing.classId && existing.subjectId) {
+      const section = await prisma.section.findFirst({
+        where: { id: req.body.sectionId, schoolId, classId: existing.classId, deletedAt: null },
+      });
+      if (!section) return res.status(404).json({ success: false, message: 'Section not found for chapter progress update' });
+
+      const status = toProgressStatus(req.body.status);
+      await prisma.chapterProgress.upsert({
+        where: {
+          schoolId_classId_sectionId_subjectId_chapterId: {
+            schoolId,
+            classId: existing.classId,
+            sectionId: req.body.sectionId,
+            subjectId: existing.subjectId,
+            chapterId: id,
+          },
+        },
+        create: {
+          schoolId,
+          classId: existing.classId,
+          sectionId: req.body.sectionId,
+          subjectId: existing.subjectId,
+          chapterId: id,
+          status,
+          remarks: req.body.remarks?.trim() || null,
+          completedAt: status === 'COMPLETED' ? new Date() : null,
+        },
+        update: {
+          status,
+          remarks: req.body.remarks?.trim() || null,
+          completedAt: status === 'COMPLETED' ? new Date() : null,
+        },
+      });
+    }
 
     return res.json({ success: true, data: chapter });
   } catch (error) {

@@ -72,6 +72,8 @@ model School {
   sections                  Section[]
   subjects                  Subject[]
   chapters                  Chapter[]
+  chapterProgress           ChapterProgress[]
+  sectionResources          SectionResource[]
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teachers                  Teacher[]
   teacherAssignments        TeacherAssignment[]
@@ -186,6 +188,8 @@ model Class {
   classStreams              ClassStream[]
   teacherSubjects           TeacherSubject[]
   chapters                  Chapter[]
+  chapterProgress           ChapterProgress[]
+  sectionResources          SectionResource[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -215,6 +219,8 @@ model Section {
   classStreams              ClassStream[]
   teacherSubjects           TeacherSubject[]
   chapters                  Chapter[]
+  chapterProgress           ChapterProgress[]
+  sectionResources          SectionResource[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -252,6 +258,8 @@ model Subject {
   teacherSubjects           TeacherSubject[]
   labRules                  LabSubjectRule[]
   chapters                  Chapter[]
+  chapterProgress           ChapterProgress[]
+  sectionResources          SectionResource[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -283,6 +291,8 @@ model Chapter {
   class   Class?   @relation(fields: [classId], references: [id], onDelete: Cascade)
   section Section? @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  progress ChapterProgress[]
+  resources SectionResource[]
 
   @@unique([schoolId, classId, sectionId, subjectId, chapterName])
   @@unique([schoolId, classId, sectionId, subjectId, chapterNumber])
@@ -332,6 +342,8 @@ model Teacher {
   schoolId           String
   school             School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherAssignments TeacherAssignment[]
+  chapterProgress     ChapterProgress[]
+  sectionResources    SectionResource[]
   teacherSubjects    TeacherSubject[]
   timetableSlots     TimetableSlot[]
   deletedAt          DateTime?
@@ -351,10 +363,13 @@ model TeacherAssignment {
   classId       String
   sectionId     String
   schoolId      String
+  roleType      TeacherAssignmentRoleType @default(SUBJECT_TEACHER)
+  isActive      Boolean   @default(true)
   isTemporary   Boolean   @default(false)
   effectiveFrom DateTime  @default(now())
   effectiveTo   DateTime?
   createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
@@ -362,11 +377,69 @@ model TeacherAssignment {
   section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  @@unique([schoolId, classId, sectionId, subjectId])
+  @@unique([schoolId, teacherId, classId, sectionId, subjectId])
   @@index([teacherId])
+  @@index([schoolId, teacherId, isActive])
   @@index([schoolId, sectionId])
   @@index([schoolId, subjectId])
   @@index([schoolId, classId, sectionId])
+}
+
+model ChapterProgress {
+  id          String                @id @default(cuid())
+  schoolId    String
+  classId     String
+  sectionId   String
+  subjectId   String
+  chapterId   String
+  teacherId   String?
+  status      ChapterProgressStatus @default(NOT_STARTED)
+  remarks     String?
+  completedAt DateTime?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, classId, sectionId, subjectId, chapterId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, status])
+}
+
+model SectionResource {
+  id                  String              @id @default(cuid())
+  schoolId            String
+  classId             String
+  sectionId           String
+  subjectId           String
+  chapterId           String?
+  teacherId           String?
+  title               String
+  description         String?
+  resourceType        SectionResourceType @default(NOTE)
+  fileUrl             String?
+  externalUrl         String?
+  isVisibleToStudents Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, chapterId])
+  @@index([schoolId, isVisibleToStudents])
 }
 
 model SubjectWeeklyRequirement {
@@ -964,4 +1037,26 @@ enum SubjectType {
   OPTIONAL
   LAB
   ACTIVITY
+}
+
+enum TeacherAssignmentRoleType {
+  SUBJECT_TEACHER
+  CLASS_TEACHER
+  BOTH
+}
+
+enum ChapterProgressStatus {
+  NOT_STARTED
+  ONGOING
+  COMPLETED
+}
+
+enum SectionResourceType {
+  NOTE
+  LINK
+  PDF
+  IMAGE
+  VIDEO
+  ASSIGNMENT
+  OTHER
 }

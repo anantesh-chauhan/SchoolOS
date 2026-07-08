@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import { getWidgetsForRole, WIDGET_CATALOG } from '../constants/widgetCatalog.js';
 
-const prisma = new PrismaClient();
 
 const getUserContext = (req) => {
   if (!req.user?.id) {
