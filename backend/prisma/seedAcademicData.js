@@ -11,6 +11,16 @@ import {
 
 const prisma = new PrismaClient();
 const DEMO_PASSWORD = 'admin123';
+const DEMO_STUDENT_NAMES = [
+  ['Aarav', 'Mehta'],
+  ['Anika', 'Sharma'],
+  ['Kabir', 'Rao'],
+  ['Ishita', 'Nair'],
+  ['Vivaan', 'Kapoor'],
+  ['Diya', 'Iyer'],
+  ['Reyansh', 'Gupta'],
+  ['Sara', 'Khan'],
+];
 
 const normalizeCode = (name) => (
   SUBJECT_CODE_BY_NAME[name] || String(name).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '')
@@ -421,8 +431,8 @@ export const seedTeacherDashboardDemoDataForSchool = async (school) => {
 export const seedAcademicDataForSchool = async (schoolId) => {
   const stats = {
     schoolId,
-    created: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0 },
-    existing: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0 },
+    created: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0 },
+    existing: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0 },
   };
 
   const tx = prisma;
@@ -468,7 +478,115 @@ export const seedAcademicDataForSchool = async (schoolId) => {
     }
   }
 
+  await seedDemoStudentsForSchool(tx, schoolId, stats);
+
   return stats;
+};
+
+const cleanCode = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(0, 18);
+
+const seedDemoStudentsForSchool = async (tx, schoolId, stats) => {
+  const school = await tx.school.findUnique({ where: { id: schoolId }, select: { schoolCode: true } });
+  if (!school) return;
+  const passwordHash = await bcryptjs.hash(DEMO_PASSWORD, 10);
+  const sections = await tx.section.findMany({
+    where: { schoolId, deletedAt: null },
+    include: { class: { select: { id: true, className: true, classOrder: true } } },
+    orderBy: [{ class: { classOrder: 'asc' } }, { sectionOrder: 'asc' }],
+  });
+
+  for (const section of sections) {
+    for (let index = 0; index < DEMO_STUDENT_NAMES.length; index += 1) {
+      const [firstName, lastName] = DEMO_STUDENT_NAMES[index];
+      const rollNumber = String(index + 1).padStart(2, '0');
+      const classCode = cleanCode(section.class.className).toUpperCase();
+      const sectionCode = cleanCode(section.sectionName).toUpperCase();
+      const admissionNo = `${school.schoolCode}-${classCode}-${sectionCode}-${rollNumber}`;
+      const studentUserId = `${cleanCode(firstName)}.${cleanCode(section.class.className)}${cleanCode(section.sectionName)}.${rollNumber}@${cleanCode(school.schoolCode)}.schoolos`;
+      const parentUserId = `parent.${cleanCode(firstName)}.${cleanCode(section.class.className)}${cleanCode(section.sectionName)}.${rollNumber}@${cleanCode(school.schoolCode)}.schoolos`;
+      const dob = new Date(Date.UTC(2010 + (index % 5), index % 12, 5 + index));
+
+      const existingStudent = await tx.student.findUnique({ where: { admissionNo } });
+      const studentData = {
+        schoolId,
+        admissionNo,
+        studentFirstName: firstName,
+        studentLastName: lastName,
+        dob,
+        gender: index % 2 === 0 ? 'Male' : 'Female',
+        bloodGroup: ['O+', 'A+', 'B+', 'AB+'][index % 4],
+        mobile: `98${String(70000000 + index).slice(0, 8)}`,
+        email: studentUserId,
+        address: 'Demo residential address',
+        city: 'Demo City',
+        state: 'Demo State',
+        pincode: '110001',
+        className: section.class.className,
+        section: section.sectionName,
+        rollNumber,
+        admissionDate: new Date(Date.UTC(2026, 3, 1)),
+        fatherName: ['Rajesh', 'Sanjay', 'Amit', 'Vikram'][index % 4],
+        motherName: ['Priya', 'Neha', 'Kavita', 'Sunita'][index % 4],
+        parentMobile: `99${String(60000000 + index).slice(0, 8)}`,
+        parentEmail: parentUserId,
+        occupation: 'Service',
+        session: '2026-27',
+        serialNo: index + 1,
+        studentUserId,
+        parentUserId,
+        studentPasswordHash: passwordHash,
+        parentPasswordHash: passwordHash,
+        passwordGenerated: true,
+        lastPasswordGeneratedAt: new Date(),
+        isActive: true,
+      };
+
+      const student = existingStudent
+        ? await tx.student.update({ where: { id: existingStudent.id }, data: studentData })
+        : await tx.student.create({ data: studentData });
+      if (existingStudent) stats.existing.students += 1;
+      else stats.created.students += 1;
+
+      const existingUser = await tx.user.findUnique({ where: { email: studentUserId } });
+      await tx.user.upsert({
+        where: { email: studentUserId },
+        update: {
+          password: passwordHash,
+          name: `${firstName} ${lastName}`,
+          role: 'STUDENT',
+          schoolId,
+          classId: section.classId,
+          sectionId: section.id,
+          isActive: true,
+        },
+        create: {
+          email: studentUserId,
+          password: passwordHash,
+          name: `${firstName} ${lastName}`,
+          role: 'STUDENT',
+          schoolId,
+          classId: section.classId,
+          sectionId: section.id,
+          isActive: true,
+        },
+      });
+      if (existingUser) stats.existing.studentUsers += 1;
+      else stats.created.studentUsers += 1;
+
+      const history = await tx.studentAcademicHistory.findFirst({ where: { studentId: student.id, session: '2026-27' } });
+      if (!history) {
+        await tx.studentAcademicHistory.create({
+          data: {
+            studentId: student.id,
+            className: section.class.className,
+            section: section.sectionName,
+            session: '2026-27',
+            rollNumber,
+          },
+        });
+      }
+    }
+  }
 };
 
 export const seedAcademicData = async () => {

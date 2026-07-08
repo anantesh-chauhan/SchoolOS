@@ -35,6 +35,8 @@ model User {
   widgetActivities      UserWidgetActivity[]
   loginStreaks          UserLoginStreak[]
   createdSystemContents SystemContent[]
+  createdChapterPolls   ChapterPoll[]            @relation("ChapterPollCreatedByAdmin")
+  compiledChapterSummaries ChapterAnalysisSummary[] @relation("ChapterAnalysisCompiledByAdmin")
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -102,6 +104,10 @@ model School {
   loginStreaks              UserLoginStreak[]
   systemContents            SystemContent[]
   students                  Student[]
+  chapterPolls              ChapterPoll[]
+  studentChapterVotes       StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries  ChapterAnalysisSummary[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -190,6 +196,10 @@ model Class {
   chapters                  Chapter[]
   chapterProgress           ChapterProgress[]
   sectionResources          SectionResource[]
+  chapterPolls              ChapterPoll[]
+  studentChapterVotes       StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries  ChapterAnalysisSummary[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -221,6 +231,10 @@ model Section {
   chapters                  Chapter[]
   chapterProgress           ChapterProgress[]
   sectionResources          SectionResource[]
+  chapterPolls              ChapterPoll[]
+  studentChapterVotes       StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries  ChapterAnalysisSummary[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -260,6 +274,10 @@ model Subject {
   chapters                  Chapter[]
   chapterProgress           ChapterProgress[]
   sectionResources          SectionResource[]
+  chapterPolls              ChapterPoll[]
+  studentChapterVotes       StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries  ChapterAnalysisSummary[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -293,6 +311,10 @@ model Chapter {
   subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   progress ChapterProgress[]
   resources SectionResource[]
+  chapterPolls ChapterPoll[]
+  studentChapterVotes StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries ChapterAnalysisSummary[]
 
   @@unique([schoolId, classId, sectionId, subjectId, chapterName])
   @@unique([schoolId, classId, sectionId, subjectId, chapterNumber])
@@ -344,6 +366,9 @@ model Teacher {
   teacherAssignments TeacherAssignment[]
   chapterProgress     ChapterProgress[]
   sectionResources    SectionResource[]
+  chapterPolls        ChapterPoll[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
+  chapterAnalysisSummaries ChapterAnalysisSummary[]
   teacherSubjects    TeacherSubject[]
   timetableSlots     TimetableSlot[]
   deletedAt          DateTime?
@@ -955,6 +980,8 @@ model Student {
 
   school          School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   academicHistory StudentAcademicHistory[]
+  studentChapterVotes StudentChapterVote[]
+  teacherStudentEvaluations TeacherStudentEvaluation[]
 
   @@unique([studentUserId])
   @@unique([parentUserId])
@@ -965,6 +992,146 @@ model Student {
   @@index([email])
   @@index([session])
   @@index([isActive])
+}
+
+model ChapterPoll {
+  id               String            @id @default(cuid())
+  schoolId         String
+  classId          String
+  sectionId        String
+  subjectId        String
+  chapterId        String
+  teacherId        String?
+  createdByAdminId String?
+  title            String
+  description      String?
+  status           ChapterPollStatus @default(DRAFT)
+  startAt          DateTime?
+  endAt            DateTime?
+  compiledAt       DateTime?
+  publishedAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  school         School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class          Class                    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section        Section                  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject        Subject                  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter        Chapter                  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  teacher        Teacher?                 @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  createdByAdmin User?                    @relation("ChapterPollCreatedByAdmin", fields: [createdByAdminId], references: [id], onDelete: SetNull)
+  votes          StudentChapterVote[]
+  evaluations    TeacherStudentEvaluation[]
+  summary        ChapterAnalysisSummary?
+
+  @@unique([schoolId, classId, sectionId, subjectId, chapterId])
+  @@index([schoolId, status])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, classId, sectionId, subjectId])
+}
+
+model StudentChapterVote {
+  id                  String   @id @default(cuid())
+  pollId              String
+  schoolId            String
+  classId             String
+  sectionId           String
+  subjectId           String
+  chapterId           String
+  studentId           String
+  understandingRating Int
+  difficultyRating    Int
+  confidenceRating    Int
+  teachingRating      Int
+  paceRating          Int
+  clarityRating       Int
+  comment             String?
+  submittedAt         DateTime @default(now())
+
+  poll    ChapterPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  school  School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, studentId])
+  @@index([schoolId, pollId])
+  @@index([schoolId, studentId])
+}
+
+model TeacherStudentEvaluation {
+  id                    String   @id @default(cuid())
+  pollId                String
+  schoolId              String
+  classId               String
+  sectionId             String
+  subjectId             String
+  chapterId             String
+  teacherId             String
+  studentId             String
+  attentionRating       Int
+  participationRating   Int
+  homeworkRating        Int
+  conceptClarityRating  Int
+  improvementNeedRating Int
+  strengths             String?
+  weaknesses            String?
+  recommendation        String?
+  submittedAt           DateTime @default(now())
+
+  poll    ChapterPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  school  School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class   Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  teacher Teacher     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  student Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, teacherId, studentId])
+  @@index([schoolId, pollId])
+  @@index([schoolId, teacherId])
+  @@index([schoolId, studentId])
+}
+
+model ChapterAnalysisSummary {
+  id                      String   @id @default(cuid())
+  pollId                  String   @unique
+  schoolId                String
+  classId                 String
+  sectionId               String
+  subjectId               String
+  chapterId               String
+  teacherId               String?
+  compiledByAdminId       String?
+  overallUnderstandingScore Float
+  overallTeachingScore      Float
+  classStrengths          Json
+  classWeaknesses         Json
+  teacherStrengths        Json
+  teacherImprovementAreas Json
+  studentSummaries        Json
+  riskStudents            Json
+  topperStudents          Json
+  recommendations         Json
+  adminNotes              String?
+  isPublished             Boolean  @default(false)
+  compiledAt              DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  poll            ChapterPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  school          School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class           Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section         Section     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject         Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter         Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  teacher         Teacher?    @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  compiledByAdmin User?       @relation("ChapterAnalysisCompiledByAdmin", fields: [compiledByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, isPublished])
 }
 
 model StudentAcademicHistory {
@@ -1049,6 +1216,14 @@ enum ChapterProgressStatus {
   NOT_STARTED
   ONGOING
   COMPLETED
+}
+
+enum ChapterPollStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  COMPILED
+  PUBLISHED
 }
 
 enum SectionResourceType {

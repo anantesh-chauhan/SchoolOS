@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 
-import { Users, Users2, Calendar, CheckCircle } from 'lucide-react';
+import { BarChart3, Calendar, CheckCircle, Loader2, Play, Send, Users, Users2 } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { SummaryCard, WelcomeCard } from '../../components/DashboardCards';
+import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 
 export default function AdminDashboard() {
   const [user] = useState(() => {
@@ -15,6 +17,30 @@ export default function AdminDashboard() {
       return {};
     }
   });
+  const [completionQueue, setCompletionQueue] = useState([]);
+  const [polls, setPolls] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+
+  const loadFeedback = useCallback(async () => {
+    setFeedbackLoading(true);
+    try {
+      const [queueRows, pollRows] = await Promise.all([
+        chapterFeedbackService.getAdminCompletions(),
+        chapterFeedbackService.getAdminPolls(),
+      ]);
+      setCompletionQueue(queueRows);
+      setPolls(pollRows);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to load chapter feedback analysis');
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFeedback();
+  }, [loadFeedback]);
 
   const stats = {
     totalStudents: 1250,
@@ -38,6 +64,53 @@ export default function AdminDashboard() {
       y: 0,
       transition: { duration: 0.5 },
     },
+  };
+
+  const createPoll = async (row, activate = false) => {
+    setBusyId(row.id);
+    try {
+      await chapterFeedbackService.createPoll({
+        classId: row.classId,
+        sectionId: row.sectionId,
+        subjectId: row.subjectId,
+        chapterId: row.chapterId,
+        status: activate ? 'ACTIVE' : 'DRAFT',
+      });
+      toast.success(activate ? 'Poll created and activated' : 'Poll created as draft');
+      await loadFeedback();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to create poll');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const setPollStatus = async (poll, status) => {
+    if (!window.confirm(`Change poll status to ${status}?`)) return;
+    setBusyId(poll.id);
+    try {
+      await chapterFeedbackService.updatePollStatus(poll.id, status);
+      toast.success(`Poll marked ${status.toLowerCase()}`);
+      await loadFeedback();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to update poll');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const compilePoll = async (poll) => {
+    if (!window.confirm('Compile and save the final chapter analysis?')) return;
+    setBusyId(poll.id);
+    try {
+      await chapterFeedbackService.compilePoll(poll.id, { recompile: poll.status === 'COMPILED' || poll.status === 'PUBLISHED' });
+      toast.success('Analysis compiled');
+      await loadFeedback();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to compile analysis');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -143,6 +216,104 @@ export default function AdminDashboard() {
               <p className="text-sm text-rose-600 dark:text-rose-300 mt-1">Assign teacher to section subjects</p>
             </Link>
           </div>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Chapter Understanding & Teaching Feedback Analysis
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Create polls after teacher completion, monitor counts, compile summaries, and publish only final analysis.
+              </p>
+            </div>
+            <button type="button" onClick={loadFeedback} className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-700">
+              <BarChart3 size={16} />
+              Refresh
+            </button>
+          </div>
+
+          {feedbackLoading ? (
+            <div className="mt-5 flex h-32 items-center justify-center rounded-xl border border-gray-200 text-gray-500 dark:border-gray-700">
+              <Loader2 className="mr-2 animate-spin" size={18} />
+              Loading feedback flow...
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-1 xl:grid-cols-2 gap-5">
+              <div>
+                <h4 className="font-black text-gray-900 dark:text-white">Chapter Completion Queue</h4>
+                <div className="mt-3 space-y-3">
+                  {completionQueue.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">
+                      No completed chapters waiting for poll creation.
+                    </div>
+                  )}
+                  {completionQueue.map((row) => (
+                    <div key={row.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                      <p className="font-black text-gray-900 dark:text-white">{row.chapter?.chapterName}</p>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                        {row.class?.className} · Section {row.section?.sectionName} · {row.subject?.subjectName} · {row.teacher?.teacherName || 'Teacher'}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => createPoll(row, false)} disabled={busyId === row.id} className="inline-flex h-9 items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3 text-xs font-bold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60">
+                          {busyId === row.id ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          Create Draft
+                        </button>
+                        <button type="button" onClick={() => createPoll(row, true)} disabled={busyId === row.id} className="inline-flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-60">
+                          <Play size={14} />
+                          Create & Activate
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-black text-gray-900 dark:text-white">Poll Management</h4>
+                <div className="mt-3 space-y-3">
+                  {polls.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm font-semibold text-gray-500 dark:border-gray-700">
+                      No polls created yet.
+                    </div>
+                  )}
+                  {polls.map((poll) => {
+                    const total = poll.counts?.totalStudents || 0;
+                    const votes = poll.counts?.studentVotesSubmitted || 0;
+                    const evaluations = poll.counts?.teacherEvaluationsSubmitted || 0;
+                    const progress = total ? Math.round((votes / total) * 100) : 0;
+                    return (
+                      <div key={poll.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-black text-gray-900 dark:text-white">{poll.chapter?.chapterName}</p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{poll.subject?.subjectName} · {poll.class?.className}-{poll.section?.sectionName}</p>
+                          </div>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-200">{poll.status}</span>
+                        </div>
+                        <div className="mt-3">
+                          <div className="flex justify-between text-xs font-bold text-gray-500">
+                            <span>Student votes {votes}/{total}</span>
+                            <span>Teacher evals {evaluations}/{total}</span>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                            <div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {poll.status === 'DRAFT' && <button type="button" onClick={() => setPollStatus(poll, 'ACTIVE')} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">Activate</button>}
+                          {poll.status === 'ACTIVE' && <button type="button" onClick={() => setPollStatus(poll, 'CLOSED')} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">Close</button>}
+                          {['CLOSED', 'COMPILED', 'PUBLISHED'].includes(poll.status) && <button type="button" onClick={() => compilePoll(poll)} disabled={busyId === poll.id} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">Compile</button>}
+                          {poll.status === 'COMPILED' && <button type="button" onClick={() => setPollStatus(poll, 'PUBLISHED')} className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white">Publish</button>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </DashboardLayout>

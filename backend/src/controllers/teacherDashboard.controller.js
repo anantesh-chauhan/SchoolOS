@@ -358,6 +358,24 @@ export const patchTeacherProgress = async (req, res) => {
       },
     });
 
+    if (status === 'COMPLETED') {
+      const admins = await prisma.user.findMany({
+        where: { schoolId: req.user.schoolId, isActive: true, role: { in: ['ADMIN', 'SCHOOL_OWNER'] } },
+        select: { id: true },
+      });
+      if (admins.length) {
+        await prisma.userWidgetNotification.createMany({
+          data: admins.map((admin) => ({
+            schoolId: req.user.schoolId,
+            userId: admin.id,
+            title: 'Chapter completed',
+            body: `${req.user.name} marked ${chapter.chapterName} complete. A feedback poll can now be created.`,
+            type: 'CHAPTER_COMPLETED',
+          })),
+        });
+      }
+    }
+
     return res.json({ success: true, data: progress });
   } catch (error) {
     if (sendAuthorizationError(res, error)) return;

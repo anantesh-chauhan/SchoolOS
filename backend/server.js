@@ -19,6 +19,7 @@ import academicStructureRoutes from './src/routes/academicStructure.js';
 import widgetRoutes from './src/routes/widgets.js';
 import studentRoutes from './src/routes/students.js';
 import usersRoutes from './src/routes/users.js';
+import chapterFeedbackRoutes from './src/routes/chapterFeedback.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -93,6 +94,7 @@ app.use('/api/academic-structure', academicStructureRoutes);
 app.use('/api/widgets', widgetRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api', chapterFeedbackRoutes);
 
 
 // 404 Handler

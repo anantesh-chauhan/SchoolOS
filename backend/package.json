@@ -12,6 +12,7 @@
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
     "seed:teacher-dashboard": "node prisma/seedTeacherDashboardData.js",
+    "seed:class-teachers": "node prisma/seedClassTeachers.js",
     "seed:cbse-weekly-slots": "node prisma/seedCbseWeeklySlots.js"
   },
   "keywords": [

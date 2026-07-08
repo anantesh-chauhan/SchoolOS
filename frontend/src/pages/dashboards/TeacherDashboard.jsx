@@ -20,6 +20,7 @@ import {
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { teacherDashboardService } from '../../services/teacherDashboardService';
 import { cloudinaryUploadService } from '../../services/cloudinaryUploadService';
+import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 
 const statusStyles = {
   NOT_STARTED: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
@@ -95,11 +96,14 @@ export default function TeacherDashboard() {
   const [selected, setSelected] = useState(null);
   const [chaptersPayload, setChaptersPayload] = useState(null);
   const [resources, setResources] = useState([]);
+  const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [uploadingResource, setUploadingResource] = useState(false);
+  const [submittingEvaluationId, setSubmittingEvaluationId] = useState(null);
   const [activeTab, setActiveTab] = useState('Overview');
   const [remarksByChapter, setRemarksByChapter] = useState({});
+  const [evaluationForms, setEvaluationForms] = useState({});
   const [resourceForm, setResourceForm] = useState({
     title: '',
     description: '',
@@ -150,9 +154,18 @@ export default function TeacherDashboard() {
     }
   }, []);
 
+  const loadPolls = useCallback(async () => {
+    try {
+      setPolls(await chapterFeedbackService.getTeacherPolls());
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to load chapter feedback polls');
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadPolls();
+  }, [load, loadPolls]);
 
   useEffect(() => {
     loadDetails(selected);
@@ -233,6 +246,52 @@ export default function TeacherDashboard() {
       await Promise.all([loadDetails(selected), load()]);
     } catch (error) {
       toast.error(error.response?.data?.message || 'You do not have permission to manage this resource.');
+    }
+  };
+
+  const setEvaluationField = (pollId, studentId, field, value) => {
+    setEvaluationForms((prev) => ({
+      ...prev,
+      [pollId]: {
+        ...(prev[pollId] || {}),
+        [studentId]: {
+          attentionRating: 4,
+          participationRating: 4,
+          homeworkRating: 4,
+          conceptClarityRating: 4,
+          improvementNeedRating: 2,
+          strengths: '',
+          weaknesses: '',
+          recommendation: '',
+          ...((prev[pollId] || {})[studentId] || {}),
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const submitEvaluations = async (poll) => {
+    const rows = (poll.students || []).map((student) => ({
+      studentId: student.id,
+      attentionRating: 4,
+      participationRating: 4,
+      homeworkRating: 4,
+      conceptClarityRating: 4,
+      improvementNeedRating: 2,
+      strengths: '',
+      weaknesses: '',
+      recommendation: '',
+      ...((evaluationForms[poll.id] || {})[student.id] || {}),
+    }));
+    setSubmittingEvaluationId(poll.id);
+    try {
+      await chapterFeedbackService.submitTeacherEvaluations(poll.id, rows);
+      toast.success('Student evaluations submitted');
+      await loadPolls();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to submit evaluations');
+    } finally {
+      setSubmittingEvaluationId(null);
     }
   };
 
@@ -349,7 +408,7 @@ export default function TeacherDashboard() {
                     <h2 className="mt-1 text-xl font-black text-slate-950 dark:text-slate-100">{activeTab}</h2>
                   </div>
                   <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-950">
-                    {['Overview', 'Chapters', 'Resources', 'Students'].map((tab) => (
+                    {['Overview', 'Chapters', 'Resources', 'Feedback', 'Students'].map((tab) => (
                       <button
                         key={tab}
                         type="button"
@@ -488,6 +547,84 @@ export default function TeacherDashboard() {
                         ))}
                       </div>
                     )}
+                  </div>
+                ) : activeTab === 'Feedback' ? (
+                  <div className="space-y-4">
+                    {polls.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                        No chapter feedback polls assigned yet.
+                      </div>
+                    )}
+                    {polls.map((poll) => (
+                      <div key={poll.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400">{poll.class?.className} · Section {poll.section?.sectionName} · {poll.subject?.subjectName}</p>
+                            <h3 className="mt-1 text-base font-black text-slate-950 dark:text-slate-100">{poll.chapter?.chapterName}</h3>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                              Teacher evaluations: {poll.teacherEvaluation?.submitted || 0}/{poll.teacherEvaluation?.total || 0}
+                            </p>
+                          </div>
+                          <span className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                            {poll.status}
+                          </span>
+                        </div>
+                        {['ACTIVE', 'CLOSED'].includes(poll.status) ? (
+                          <div className="mt-4 space-y-3">
+                            {(poll.students || []).map((student) => {
+                              const form = (evaluationForms[poll.id] || {})[student.id] || {};
+                              return (
+                                <div key={student.id} className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+                                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                    <p className="text-sm font-black text-slate-950 dark:text-slate-100">{student.rollNumber || '-'} · {student.name}</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {['Excellent', 'Needs Revision', 'Low Participation', 'Strong Concepts', 'Homework Pending'].map((tag) => (
+                                        <button key={tag} type="button" onClick={() => setEvaluationField(poll.id, student.id, 'recommendation', tag)} className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-cyan-50 hover:text-cyan-700 dark:bg-slate-800 dark:text-slate-300">
+                                          {tag}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-2">
+                                    {[
+                                      ['attentionRating', 'Attention'],
+                                      ['participationRating', 'Participation'],
+                                      ['homeworkRating', 'Homework'],
+                                      ['conceptClarityRating', 'Concepts'],
+                                      ['improvementNeedRating', 'Needs Help'],
+                                    ].map(([field, text]) => (
+                                      <label key={field} className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                                        {text}
+                                        <select value={form[field] || (field === 'improvementNeedRating' ? 2 : 4)} onChange={(event) => setEvaluationField(poll.id, student.id, field, Number(event.target.value))} className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                                          {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                                        </select>
+                                      </label>
+                                    ))}
+                                  </div>
+                                  <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    {[
+                                      ['strengths', 'Strengths'],
+                                      ['weaknesses', 'Weaknesses'],
+                                      ['recommendation', 'Recommendation'],
+                                    ].map(([field, placeholder]) => (
+                                      <input key={field} value={form[field] || ''} onChange={(event) => setEvaluationField(poll.id, student.id, field, event.target.value)} placeholder={placeholder} className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-cyan-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100" />
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <button type="button" onClick={() => submitEvaluations(poll)} disabled={submittingEvaluationId === poll.id} className="inline-flex h-10 items-center gap-2 rounded-xl bg-cyan-600 px-4 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:opacity-60">
+                              {submittingEvaluationId === poll.id ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                              Submit Evaluations
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                            Evaluations open after admin activates the poll. Student votes are never shown here.
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">

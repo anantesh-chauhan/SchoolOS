@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BookOpen, CheckCircle2, FileText, Loader2 } from 'lucide-react';
+import { Bell, BookOpen, CheckCircle2, FileText, Loader2, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { studentAcademicsService } from '../../services/studentAcademicsService';
+import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 
 const statusClass = {
   NOT_STARTED: 'bg-slate-50 text-slate-700 border-slate-200',
@@ -31,19 +32,64 @@ function Stat({ icon: Icon, label: text, value }) {
 
 export default function StudentDashboard() {
   const [payload, setPayload] = useState(null);
+  const [polls, setPolls] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submittingPollId, setSubmittingPollId] = useState(null);
+  const [voteForms, setVoteForms] = useState({});
 
   useEffect(() => {
-    studentAcademicsService
-      .getMyAcademics()
-      .then(setPayload)
-      .catch((error) => toast.error(error.response?.data?.message || 'Unable to load student academics'))
+    Promise.all([studentAcademicsService.getMyAcademics(), chapterFeedbackService.getStudentPolls()])
+      .then(([academics, pollRows]) => {
+        setPayload(academics);
+        setPolls(pollRows);
+      })
+      .catch((error) => toast.error(error.response?.data?.message || 'Unable to load student dashboard'))
       .finally(() => setLoading(false));
   }, []);
 
   const chapters = useMemo(() => (payload?.subjects || []).flatMap((subject) => subject.chapters || []), [payload]);
   const completed = chapters.filter((chapter) => chapter.status === 'COMPLETED').length;
   const ongoing = chapters.filter((chapter) => chapter.status === 'ONGOING').length;
+  const pendingPolls = polls.filter((poll) => poll.status === 'ACTIVE' && !poll.submitted);
+
+  const setVoteField = (pollId, field, value) => {
+    setVoteForms((prev) => ({
+      ...prev,
+      [pollId]: {
+        understandingRating: 4,
+        difficultyRating: 3,
+        confidenceRating: 4,
+        teachingRating: 4,
+        paceRating: 4,
+        clarityRating: 4,
+        comment: '',
+        ...(prev[pollId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const submitVote = async (pollId) => {
+    setSubmittingPollId(pollId);
+    try {
+      await chapterFeedbackService.submitStudentVote(pollId, voteForms[pollId] || {
+        understandingRating: 4,
+        difficultyRating: 3,
+        confidenceRating: 4,
+        teachingRating: 4,
+        paceRating: 4,
+        clarityRating: 4,
+        comment: '',
+      });
+      toast.success('Your response has been submitted. Results will be visible after admin compilation.');
+      const freshPolls = await chapterFeedbackService.getStudentPolls();
+      setPolls(freshPolls);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to submit poll');
+    } finally {
+      setSubmittingPollId(null);
+    }
+  };
 
   return (
     <DashboardLayout role="STUDENT">
@@ -66,7 +112,68 @@ export default function StudentDashboard() {
             <Stat icon={BookOpen} label="Subjects" value={payload?.subjects?.length || 0} />
             <Stat icon={FileText} label="Chapters" value={chapters.length} />
             <Stat icon={CheckCircle2} label="Completed" value={completed} />
-            <Stat icon={FileText} label="Resources" value={payload?.resources?.length || 0} />
+            <Stat icon={Bell} label="Pending Polls" value={pendingPolls.length} />
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">Chapter Understanding Polls</h2>
+                <p className="mt-1 text-sm text-slate-500">Raw responses stay private. Summaries appear only after admin publishes them.</p>
+              </div>
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">{pendingPolls.length} pending</span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {polls.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-600">
+                  No active chapter polls right now.
+                </div>
+              )}
+              {polls.map((poll) => {
+                const form = voteForms[poll.id] || {};
+                return (
+                  <div key={poll.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-950">{poll.subject?.subjectName} · {poll.chapter?.chapterName}</p>
+                        <p className="mt-1 text-xs font-bold text-slate-500">{poll.class?.className} · Section {poll.section?.sectionName}</p>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600">{poll.submitted ? 'Submitted' : poll.status}</span>
+                    </div>
+                    {poll.submitted ? (
+                      <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800">
+                        Your response has been submitted. Results will be visible after admin compilation.
+                      </p>
+                    ) : poll.status === 'ACTIVE' ? (
+                      <div className="mt-4 space-y-3">
+                        {[
+                          ['understandingRating', 'How well did you understand this chapter?'],
+                          ['difficultyRating', 'How difficult was this chapter?'],
+                          ['confidenceRating', 'How confident are you in solving questions?'],
+                          ['teachingRating', "How was the teacher's teaching quality?"],
+                          ['clarityRating', "How clear was the teacher's explanation?"],
+                          ['paceRating', 'Was the teaching pace comfortable?'],
+                        ].map(([field, text]) => (
+                          <label key={field} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                            <span>{text}</span>
+                            <select value={form[field] || (field === 'difficultyRating' ? 3 : 4)} onChange={(event) => setVoteField(poll.id, field, Number(event.target.value))} className="h-9 rounded-lg border border-slate-200 px-2">
+                              {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+                            </select>
+                          </label>
+                        ))}
+                        <textarea value={form.comment || ''} onChange={(event) => setVoteField(poll.id, 'comment', event.target.value)} placeholder="Optional comment" className="min-h-[72px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400" />
+                        <button type="button" onClick={() => submitVote(poll.id)} disabled={submittingPollId === poll.id} className="inline-flex h-10 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-700 disabled:opacity-60">
+                          {submittingPollId === poll.id ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                          Submit Poll
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="mt-4 text-sm font-semibold text-slate-600">This poll is not open for submission.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-[1.25fr_0.75fr] gap-5">
