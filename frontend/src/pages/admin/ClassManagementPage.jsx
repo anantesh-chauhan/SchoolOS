@@ -117,87 +117,103 @@ export default function ClassManagementPage() {
             <CardTitle>Class List</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Expand</th>
-                    <th className="px-4 py-3 text-left font-semibold">Class Name</th>
-                    <th className="px-4 py-3 text-left font-semibold">Order</th>
-                    <th className="px-4 py-3 text-left font-semibold">Sections</th>
-                    <th className="px-4 py-3 text-left font-semibold">Subjects</th>
-                    <th className="px-4 py-3 text-left font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-6 text-slate-500">
-                        Loading classes...
-                      </td>
-                    </tr>
-                  )}
-                  {!isLoading && rows.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-6 text-slate-500">
-                        No classes yet.
-                      </td>
-                    </tr>
-                  )}
-                  {rows.map((row) => (
-                    <React.Fragment key={row.id}>
-                      <tr className="border-b border-slate-100">
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleExpand(row.id)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200"
-                          >
-                            {expandedClassId === row.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 font-medium">{row.className}</td>
-                        <td className="px-4 py-3">{row.classOrder}</td>
-                        <td className="px-4 py-3">{row._count?.sections || 0}</td>
-                        <td className="px-4 py-3">{row._count?.classSubjects || 0}</td>
-                        <td className="px-4 py-3">
-                          <Button variant="danger" className="h-8 px-3" onClick={() => confirmDeleteClass(row)}>
+            {isLoading && (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="h-4 w-40 rounded bg-slate-100 animate-pulse" />
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      <div className="h-3 w-full rounded bg-slate-100 animate-pulse" />
+                      <div className="h-3 w-full rounded bg-slate-100 animate-pulse" />
+                      <div className="h-3 w-full rounded bg-slate-100 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+                <p className="text-sm text-slate-500">Loading classes...</p>
+              </div>
+            )}
+
+            {!isLoading && rows.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <p className="text-sm font-medium text-slate-700">No classes yet.</p>
+                <p className="mt-1 text-xs text-slate-500">Add your first class to start building sections and schedules.</p>
+              </div>
+            )}
+
+            {!isLoading && rows.length > 0 && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {rows.map((row) => {
+                  const isExpanded = expandedClassId === row.id;
+                  const sectionsCount = row._count?.sections || 0;
+                  const subjectsCount = row._count?.classSubjects || 0;
+
+                  return (
+                    <div key={row.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+                      <div className="p-5 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpand(row.id)}
+                              aria-label={isExpanded ? 'Collapse class details' : 'Expand class details'}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                            >
+                              {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                            </button>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-900 truncate">{row.className}</p>
+                              <p className="mt-0.5 text-xs text-slate-500">Class Order: {row.classOrder}</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-3 gap-3">
+                            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                              <p className="text-[10px] uppercase tracking-wide text-slate-500">Sections</p>
+                              <p className="text-sm font-semibold text-slate-900">{sectionsCount}</p>
+                            </div>
+                            <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 col-span-2">
+                              <p className="text-[10px] uppercase tracking-wide text-slate-500">Subjects</p>
+                              <p className="text-sm font-semibold text-slate-900">{subjectsCount}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-3">
+                          <Button variant="danger" className="h-9 px-4" onClick={() => confirmDeleteClass(row)}>
                             Delete
                           </Button>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
 
-                      {expandedClassId === row.id && (
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <td colSpan={6} className="px-4 py-4">
-                            <div className="flex items-center justify-between gap-3 mb-3">
-                              <p className="text-sm font-semibold text-slate-800">
-                                Sections in {row.className}
-                              </p>
-                              <Button
-                                className="h-8 px-3"
-                                onClick={() => createSectionMutation.mutate({ classId: row.id })}
-                                disabled={createSectionMutation.isPending}
-                              >
-                                {createSectionMutation.isPending ? 'Adding...' : 'Add Section'}
-                              </Button>
-                            </div>
+                      {isExpanded && (
+                        <div className="px-5 pb-5">
+                          <div className="flex items-center justify-between gap-3 mb-3">
+                            <p className="text-sm font-semibold text-slate-800">Sections in {row.className}</p>
+                            <Button
+                              className="h-9 px-4"
+                              onClick={() => createSectionMutation.mutate({ classId: row.id })}
+                              disabled={createSectionMutation.isPending}
+                            >
+                              {createSectionMutation.isPending ? 'Adding...' : 'Add Section'}
+                            </Button>
+                          </div>
 
-                            {sectionsQuery.isLoading && <p className="text-sm text-slate-500">Loading sections...</p>}
-                            {!sectionsQuery.isLoading && currentSections.length === 0 && (
-                              <p className="text-sm text-slate-500">No sections yet.</p>
-                            )}
+                          {sectionsQuery.isLoading && <p className="text-sm text-slate-500">Loading sections...</p>}
+                          {!sectionsQuery.isLoading && currentSections.length === 0 && (
+                            <p className="text-sm text-slate-500">No sections yet.</p>
+                          )}
 
-                            <div className="space-y-2">
+                          {currentSections.length > 0 && (
+                            <div className="space-y-2 mt-3">
                               {currentSections.map((section) => (
                                 <div
                                   key={section.id}
-                                  className="rounded-lg bg-white border border-slate-200 px-3 py-2 flex items-center justify-between"
+                                  className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-3 flex items-center justify-between gap-3"
                                 >
                                   <p className="text-sm font-medium text-slate-800">Section {section.sectionName}</p>
                                   <Button
                                     variant="danger"
-                                    className="h-7 px-2"
+                                    className="h-8 px-3"
                                     onClick={() => {
                                       if (window.confirm(`Delete section ${section.sectionName}?`)) {
                                         deleteSectionMutation.mutate(section.id);
@@ -209,14 +225,14 @@ export default function ClassManagementPage() {
                                 </div>
                               ))}
                             </div>
-                          </td>
-                        </tr>
+                          )}
+                        </div>
                       )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

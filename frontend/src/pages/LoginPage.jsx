@@ -64,6 +64,7 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [branding, setBranding] = useState(null);
 
+
   useEffect(() => {
     let mounted = true;
 
@@ -222,8 +223,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="grid min-h-screen lg:grid-cols-[1.2fr_0.8fr]">
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto w-full grid min-h-screen lg:grid-cols-[1.2fr_0.8fr]">
         <motion.section
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, x: 0 }}
@@ -315,12 +316,20 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.05 }}
-          className="p-6 sm:p-12 lg:p-20 flex items-center bg-slate-50"
+          className="p-6 sm:p-12 lg:p-20 flex items-center"
         >
-          <div className="w-full max-w-lg mx-auto">
-            <div className="rounded-3xl bg-white shadow-2xl shadow-slate-200/50 border border-slate-200 p-8 sm:p-10">
-              <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Sign in</h2>
-              <p className="mt-1 text-sm text-slate-500">Use your role account to access the right dashboard.</p>
+          <div className="w-full max-w-lg mx-auto relative">
+            <div className="relative rounded-3xl bg-white/80 shadow-2xl shadow-slate-200/60 border border-slate-200 backdrop-blur p-8 sm:p-10">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Sign in</h2>
+                  <p className="mt-1 text-sm text-slate-500">Use your role account to access the right dashboard.</p>
+                </div>
+                <div className="hidden sm:flex h-10 w-10 rounded-2xl bg-blue-50 border border-blue-100 items-center justify-center text-blue-700">
+                  <ShieldCheck size={18} />
+                </div>
+              </div>
+
 
               {errors.submit && (
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-6 rounded-xl border border-rose-100 bg-rose-50/50 px-4 py-3 flex items-start gap-3">
@@ -361,10 +370,12 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/30 rounded-md"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                     </button>
+
                   </div>
                   {errors.password && <p className="mt-1 text-xs text-rose-600">{errors.password}</p>}
                 </div>
@@ -425,7 +436,8 @@ export default function LoginPage() {
                               type="button"
                               onClick={() => handleInstantLogin(user.email)}
                               disabled={Boolean(instantLoginEmail)}
-                              className="shrink-0 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] font-bold px-3 py-1.5 transition-all disabled:opacity-60"
+                              className="shrink-0 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] font-bold px-3 py-1.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                              aria-label={`Instant login as ${user.name}`}
                             >
                               {instantLoginEmail === user.email ? 'Logging...' : 'Instant Login'}
                             </button>

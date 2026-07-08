@@ -166,75 +166,111 @@ export default function SubjectManagementPage() {
             <CardTitle>Subject List</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100 text-slate-700">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Subject Name</th>
-                    <th className="px-4 py-3 text-left">Subject Code</th>
-                    <th className="px-4 py-3 text-left">Assigned Classes</th>
-                    <th className="px-4 py-3 text-left">Assigned Sections</th>
-                    <th className="px-4 py-3 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subjectsQuery.isLoading && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-6 text-slate-500">Loading subjects...</td>
-                    </tr>
-                  )}
+            {subjectsQuery.isLoading && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, idx) => (
+                  <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="h-4 w-48 rounded bg-slate-100 animate-pulse" />
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div className="h-3 rounded bg-slate-100 animate-pulse" />
+                      <div className="h-3 rounded bg-slate-100 animate-pulse" />
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <div className="h-9 w-24 rounded-xl bg-slate-100 animate-pulse" />
+                      <div className="h-9 w-28 rounded-xl bg-slate-100 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-                  {!subjectsQuery.isLoading && pagedRows.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-6 text-slate-500">No subjects found.</td>
-                    </tr>
-                  )}
+            {!subjectsQuery.isLoading && pagedRows.length === 0 && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <p className="text-sm font-medium text-slate-700">No subjects found.</p>
+                <p className="mt-1 text-xs text-slate-500">Add subjects to start mapping them to classes and sections.</p>
+              </div>
+            )}
 
-                  {pagedRows.map((row) => {
-                    const classNames = (row.classSubjects || []).map((item) => item.class.className);
-                    const sectionNames = (row.sectionSubjects || []).map(
-                      (item) => `${item.section.class.className}-${item.section.sectionName}`
-                    );
+            {!subjectsQuery.isLoading && pagedRows.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {pagedRows.map((row) => {
+                  const classNames = (row.classSubjects || []).map((item) => item.class.className);
+                  const sectionNames = (row.sectionSubjects || []).map(
+                    (item) => `${item.section.class.className}-${item.section.sectionName}`
+                  );
 
-                    return (
-                      <tr key={row.id} className="border-b border-slate-100">
-                        <td className="px-4 py-3 font-medium text-slate-900">{row.subjectName}</td>
-                        <td className="px-4 py-3 text-slate-600">{row.subjectCode}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {classNames.length > 0 ? classNames.join(', ') : 'None'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {sectionNames.length > 0 ? sectionNames.join(', ') : 'None'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="secondary" className="h-8 px-3" onClick={() => openEdit(row)}>
-                              Edit Subject
-                            </Button>
-                            <Button variant="secondary" className="h-8 px-3" onClick={() => toast.success('Use Subject Assignment page for mapping details')}>
-                              View Assignment
-                            </Button>
-                            <Button variant="danger" className="h-8 px-3" onClick={() => confirmDelete(row)}>
-                              Delete Subject
-                            </Button>
+                  return (
+                    <div key={row.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 truncate">{row.subjectName}</p>
+                          <p className="mt-1 text-xs text-slate-500">Code: <span className="font-medium text-slate-700">{row.subjectCode}</span></p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">Mapped</div>
+                          <div className="inline-flex items-center gap-2">
+                            <span className="inline-flex items-center justify-center h-6 px-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+                              {classNames.length + (sectionNames.length > 0 ? 0 : 0)}
+                            </span>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </div>
+                      </div>
 
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">Assigned Classes</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
+                            {classNames.length > 0 ? classNames.join(', ') : 'None'}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-500">Assigned Sections</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900 truncate">
+                            {sectionNames.length > 0 ? sectionNames.join(', ') : 'None'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="secondary" className="h-9 px-3" onClick={() => openEdit(row)}>
+                          Edit Subject
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          className="h-9 px-3"
+                          onClick={() => toast.success('Use Subject Assignment page for mapping details')}
+                        >
+                          View Assignment
+                        </Button>
+                        <Button variant="danger" className="h-9 px-3" onClick={() => confirmDelete(row)}>
+                          Delete Subject
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-between text-sm text-slate-600">
               <p>
                 Page {currentPage} of {maxPage}
               </p>
               <div className="flex gap-2">
-                <Button variant="secondary" className="h-8 px-3" disabled={currentPage === 1} onClick={() => setCurrentPage((prev) => prev - 1)}>
+                <Button
+                  variant="secondary"
+                  className="h-9 px-3"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((prev) => prev - 1)}
+                >
                   Prev
                 </Button>
-                <Button variant="secondary" className="h-8 px-3" disabled={currentPage === maxPage} onClick={() => setCurrentPage((prev) => prev + 1)}>
+                <Button
+                  variant="secondary"
+                  className="h-9 px-3"
+                  disabled={currentPage === maxPage}
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                >
                   Next
                 </Button>
               </div>

@@ -24,8 +24,12 @@ import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
 import { useBranding } from '../contexts/BrandingContext';
 import Sidebar from '../components/Sidebar/Sidebar';
+import NotificationButton from '../components/ui/NotificationButton';
+import PageHeader from '../components/ui/PageHeader';
+import SectionHeader from '../components/ui/SectionHeader';
 
 const DashboardLayout = ({ children, role }) => {
+
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -247,8 +251,10 @@ const DashboardLayout = ({ children, role }) => {
 
   const sidePanelClasses = desktopCollapsed ? 'w-20' : 'w-[260px]';
 
+
   return (
     <div className="flex h-screen bg-slate-50">
+
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <button
@@ -282,7 +288,8 @@ const DashboardLayout = ({ children, role }) => {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-200 bg-white px-4 sm:px-6 flex items-center justify-between">
+        <header className="h-16 border-b border-slate-200/70 bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-4 sm:px-6 flex items-center justify-between">
+
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -305,24 +312,28 @@ const DashboardLayout = ({ children, role }) => {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 placeholder="Search classes, sections, subjects..."
-                className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-10 w-full rounded-2xl border border-slate-200 bg-white/80 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50"
               />
             </div>
+
           </div>
 
           <div className="flex items-center gap-3">
-            <button type="button" className="relative h-9 w-9 rounded-lg border border-slate-200 text-slate-600">
-              <Bell size={16} className="mx-auto" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
-            </button>
+            <NotificationButton
+              icon={<Bell size={16} className="mx-auto" />}
+              badge
+              ariaLabel="Notifications"
+            />
 
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setProfileOpen((prev) => !prev)}
-                className="h-9 px-2 rounded-lg border border-slate-200 flex items-center gap-2"
+                className="h-10 px-2 rounded-2xl border border-slate-200 flex items-center gap-2 bg-white/80 shadow-sm hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50"
               >
-                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center">
+
+                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
+
                   {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="hidden sm:block text-left">
@@ -335,21 +346,24 @@ const DashboardLayout = ({ children, role }) => {
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-52 rounded-lg border border-slate-200 bg-white shadow-lg p-2 z-20">
+                <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white/90 backdrop-blur shadow-xl p-2 z-20">
+
                   <button
                     type="button"
                     onClick={() => {
                       setProfileOpen(false);
                       navigate(profileRouteByRole[role] || '/dashboard');
                     }}
-                    className="w-full text-left rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    className="w-full text-left rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+
                   >
                     My Profile
                   </button>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left rounded-md px-3 py-2 text-sm text-red-700 hover:bg-red-50"
+                    className="w-full text-left rounded-xl px-3 py-2 text-sm text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500/20"
+
                   >
                     Logout
                   </button>
@@ -360,18 +374,24 @@ const DashboardLayout = ({ children, role }) => {
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">
-          <div className="mb-4 sm:hidden">
-            <p className="text-xs text-slate-500">{breadcrumb.join(' / ')}</p>
-            <div className="mt-2 relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                placeholder="Search classes, sections, subjects..."
-                className="h-9 w-full rounded-lg border border-slate-200 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+
+          <div className="mx-auto w-full max-w-7xl">
+            <div className="mb-4 sm:hidden">
+              <p className="text-xs text-slate-500">{breadcrumb.join(' / ')}</p>
+              <div className="mt-2 relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  placeholder="Search classes, sections, subjects..."
+                  className="h-10 w-full rounded-2xl border border-slate-200 bg-white/80 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {children}
             </div>
           </div>
 
-          {children}
         </main>
       </div>
     </div>

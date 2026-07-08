@@ -20,7 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "^5.22.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
