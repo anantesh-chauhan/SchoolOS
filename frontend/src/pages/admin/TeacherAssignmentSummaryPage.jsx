@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService, teacherService } from '../../services/managementService';
+import { teacherService } from '../../services/managementService';
+import { useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { authService } from '../../services/authService';
@@ -11,13 +12,8 @@ export default function TeacherAssignmentSummaryPage() {
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
   const [teacherId, setTeacherId] = useState('');
+  const academicStructure = useAcademicStructure();
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', classId],
-    queryFn: () => sectionService.list(classId),
-    enabled: Boolean(classId),
-  });
   const teachersQuery = useQuery({ queryKey: ['teachers', 'lookup'], queryFn: () => teacherService.list({ page: 1, limit: 200 }) });
 
   const summaryQuery = useQuery({
@@ -26,8 +22,8 @@ export default function TeacherAssignmentSummaryPage() {
   });
 
   const rows = summaryQuery.data?.data || [];
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(classId);
   const teachers = teachersQuery.data?.data || [];
 
   const exportUrl = useMemo(() => {

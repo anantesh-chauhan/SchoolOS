@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { classService, sectionService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -15,12 +16,7 @@ export default function ClassManagementPage() {
   const [expandedClassId, setExpandedClassId] = useState('');
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', expandedClassId],
-    queryFn: () => sectionService.list(expandedClassId),
-    enabled: Boolean(expandedClassId),
-  });
+  const academicStructure = useAcademicStructure();
 
   const createMutation = useMutation({
     mutationFn: classService.create,
@@ -29,6 +25,7 @@ export default function ClassManagementPage() {
       setClassOrder('');
       toast.success('Class created');
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to add class'),
   });
@@ -38,6 +35,7 @@ export default function ClassManagementPage() {
     onSuccess: () => {
       toast.success('Class deleted');
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to delete class'),
   });
@@ -48,6 +46,7 @@ export default function ClassManagementPage() {
       toast.success('Section added');
       queryClient.invalidateQueries({ queryKey: ['sections', expandedClassId] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to add section'),
   });
@@ -58,11 +57,12 @@ export default function ClassManagementPage() {
       toast.success('Section deleted');
       queryClient.invalidateQueries({ queryKey: ['sections', expandedClassId] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to delete section'),
   });
 
-  const rows = data?.data || [];
+  const rows = academicStructure.classes;
 
   const submit = (event) => {
     event.preventDefault();
@@ -79,7 +79,7 @@ export default function ClassManagementPage() {
     }
   };
 
-  const currentSections = sectionsQuery.data?.data || [];
+  const currentSections = academicStructure.getSections(expandedClassId);
 
   return (
     <DashboardLayout role="ADMIN">
@@ -118,7 +118,7 @@ export default function ClassManagementPage() {
             <CardTitle>Class List</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading && (
+            {academicStructure.isLoading && (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, idx) => (
                   <div key={idx} className="rounded-xl border border-slate-200 bg-white p-4">
@@ -134,19 +134,19 @@ export default function ClassManagementPage() {
               </div>
             )}
 
-            {!isLoading && rows.length === 0 && (
+            {!academicStructure.isLoading && rows.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                 <p className="text-sm font-medium text-slate-700">No classes yet.</p>
                 <p className="mt-1 text-xs text-slate-500">Add your first class to start building sections and schedules.</p>
               </div>
             )}
 
-            {!isLoading && rows.length > 0 && (
+            {!academicStructure.isLoading && rows.length > 0 && (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                 {rows.map((row) => {
                   const isExpanded = expandedClassId === row.id;
-                  const sectionsCount = row._count?.sections || 0;
-                  const subjectsCount = row._count?.classSubjects || 0;
+                  const sectionsCount = row.sections?.length || row._count?.sections || 0;
+                  const subjectsCount = row.classSubjects?.length || row._count?.classSubjects || 0;
 
                   return (
                     <div key={row.id} className="rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -199,8 +199,8 @@ export default function ClassManagementPage() {
                             </Button>
                           </div>
 
-                          {sectionsQuery.isLoading && <p className="text-sm text-slate-500">Loading sections...</p>}
-                          {!sectionsQuery.isLoading && currentSections.length === 0 && (
+                          {academicStructure.isFetching && <p className="text-sm text-slate-500">Refreshing sections...</p>}
+                          {!academicStructure.isFetching && currentSections.length === 0 && (
                             <p className="text-sm text-slate-500">No sections yet.</p>
                           )}
 

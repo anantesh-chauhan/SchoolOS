@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService, timetableService } from '../../services/managementService';
+import { timetableService } from '../../services/managementService';
+import { useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
 export default function TimetableReconciliationPage() {
   const [selectedClassId, setSelectedClassId] = useState('');
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [academicYear, setAcademicYear] = useState('');
-
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
+  const academicStructure = useAcademicStructure();
 
   const reportQuery = useQuery({
     queryKey: ['timetable-reconciliation', selectedClassId, selectedSectionId, academicYear],
@@ -25,8 +20,8 @@ export default function TimetableReconciliationPage() {
     }),
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
   const summary = reportQuery.data?.data?.summary;
   const rows = reportQuery.data?.data?.sections || [];
 

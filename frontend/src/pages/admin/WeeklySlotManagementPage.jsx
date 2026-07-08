@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService, subjectService, timetableService } from '../../services/managementService';
+import { timetableService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 
@@ -17,40 +18,14 @@ export default function WeeklySlotManagementPage() {
   const [scope, setScope] = useState('CLASS');
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [rows, setRows] = useState([]);
-
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
-
-  const classSubjectsQuery = useQuery({
-    queryKey: ['class-subjects', selectedClassId],
-    queryFn: () => subjectService.classSubjects(selectedClassId),
-    enabled: Boolean(selectedClassId) && scope === 'CLASS',
-  });
-
-  const sectionSubjectsQuery = useQuery({
-    queryKey: ['section-subjects', selectedSectionId],
-    queryFn: () => subjectService.sectionSubjects(selectedSectionId),
-    enabled: Boolean(selectedSectionId) && scope === 'SECTION',
-  });
-
-  const requirementsQuery = useQuery({
-    queryKey: ['weekly-requirements', selectedClassId, scope, selectedSectionId],
-    queryFn: () => timetableService.listWeeklyRequirements({
-      classId: selectedClassId,
-      ...(scope === 'SECTION' && selectedSectionId ? { sectionId: selectedSectionId } : {}),
-    }),
-    enabled: Boolean(selectedClassId) && (scope === 'CLASS' || Boolean(selectedSectionId)),
-  });
+  const academicStructure = useAcademicStructure();
 
   const saveMutation = useMutation({
     mutationFn: timetableService.saveWeeklyRequirements,
     onSuccess: () => {
       toast.success('Weekly slot requirements saved');
       queryClient.invalidateQueries({ queryKey: ['weekly-requirements', selectedClassId, scope, selectedSectionId] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to save weekly requirements'),
   });
@@ -61,16 +36,19 @@ export default function WeeklySlotManagementPage() {
       const classesProcessed = response?.data?.classesProcessed || 0;
       toast.success(`Weekly templates propagated (${classesProcessed} class${classesProcessed === 1 ? '' : 'es'})`);
       queryClient.invalidateQueries({ queryKey: ['weekly-requirements'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to propagate templates'),
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
   const sourceSubjects = scope === 'SECTION'
-    ? (sectionSubjectsQuery.data?.data || [])
-    : (classSubjectsQuery.data?.data || []);
-  const existingRequirements = requirementsQuery.data?.data || [];
+    ? academicStructure.getSectionSubjects(selectedClassId, selectedSectionId)
+    : academicStructure.getClassSubjects(selectedClassId);
+  const existingRequirements = scope === 'SECTION'
+    ? academicStructure.getSectionWeeklyRequirements(selectedClassId, selectedSectionId)
+    : academicStructure.getClassWeeklyRequirements(selectedClassId);
 
   const selectedClass = useMemo(
     () => classes.find((row) => row.id === selectedClassId) || null,
@@ -205,10 +183,10 @@ export default function WeeklySlotManagementPage() {
               <p>Total weekly periods configured: {summary.totalPeriods} / 48</p>
               <p>Mandatory subjects: {summary.mandatoryCount}</p>
               <p>Optional subjects: {summary.optionalCount}</p>
-              <p className="text-xs mt-1 text-slate-500">Active saved scope: {requirementsQuery.data?.scope || 'N/A'}</p>
+              <p className="text-xs mt-1 text-slate-500">Active saved scope: {scope === 'SECTION' ? 'Section-specific' : 'Class template'}</p>
               {[9, 10, 11, 12].includes(classNo) && (
                 <p className="mt-1 text-xs font-semibold text-amber-700">
-                  Class 9-12 rule: exactly 5 mandatory + 1 optional subject.
+                  Class 9-12 rule: keep at least 5 academic subjects; electives, labs, PE, art, library and value periods may complete the 48-period week.
                 </p>
               )}
             </div>
@@ -242,7 +220,7 @@ export default function WeeklySlotManagementPage() {
               <p className="text-sm text-slate-500">Select a section to configure section-wise requirements.</p>
             )}
 
-            {(requirementsQuery.isLoading || classSubjectsQuery.isLoading || sectionSubjectsQuery.isLoading) && (
+            {academicStructure.isLoading && (
               <div className="space-y-2">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <div key={index} className="h-10 rounded-md bg-slate-100 animate-pulse" />
@@ -250,7 +228,7 @@ export default function WeeklySlotManagementPage() {
               </div>
             )}
 
-            {!requirementsQuery.isLoading && rows.length > 0 && (
+            {!academicStructure.isLoading && rows.length > 0 && (
               <div className="overflow-auto">
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-100 text-slate-700">
@@ -319,7 +297,7 @@ export default function WeeklySlotManagementPage() {
               </div>
             )}
 
-            {!requirementsQuery.isLoading && selectedClassId && rows.length === 0 && (
+            {!academicStructure.isLoading && selectedClassId && rows.length === 0 && (
               <p className="text-sm text-slate-500">No subjects available for selected scope. Assign subjects first.</p>
             )}
 

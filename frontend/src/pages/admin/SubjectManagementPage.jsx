@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { subjectService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -17,8 +18,7 @@ export default function SubjectManagementPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [editingSubject, setEditingSubject] = useState(null);
   const [editForm, setEditForm] = useState({ subjectName: '', subjectCode: '' });
-
-  const subjectsQuery = useQuery({ queryKey: ['subject-mappings'], queryFn: subjectService.mappings });
+  const academicStructure = useAcademicStructure();
 
   const createMutation = useMutation({
     mutationFn: subjectService.create,
@@ -28,6 +28,7 @@ export default function SubjectManagementPage() {
       toast.success('Subject created');
       queryClient.invalidateQueries({ queryKey: ['subject-mappings'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to create subject'),
   });
@@ -39,6 +40,7 @@ export default function SubjectManagementPage() {
       setEditingSubject(null);
       queryClient.invalidateQueries({ queryKey: ['subject-mappings'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to update subject'),
   });
@@ -49,11 +51,12 @@ export default function SubjectManagementPage() {
       toast.success('Subject deleted');
       queryClient.invalidateQueries({ queryKey: ['subject-mappings'] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to delete subject'),
   });
 
-  const rows = subjectsQuery.data?.data || [];
+  const rows = academicStructure.subjectMappings;
 
   const filteredRows = useMemo(() => {
     const query = searchText.trim().toLowerCase();
@@ -166,7 +169,7 @@ export default function SubjectManagementPage() {
             <CardTitle>Subject List</CardTitle>
           </CardHeader>
           <CardContent>
-            {subjectsQuery.isLoading && (
+            {academicStructure.isLoading && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {Array.from({ length: 4 }).map((_, idx) => (
                   <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -184,14 +187,14 @@ export default function SubjectManagementPage() {
               </div>
             )}
 
-            {!subjectsQuery.isLoading && pagedRows.length === 0 && (
+            {!academicStructure.isLoading && pagedRows.length === 0 && (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                 <p className="text-sm font-medium text-slate-700">No subjects found.</p>
                 <p className="mt-1 text-xs text-slate-500">Add subjects to start mapping them to classes and sections.</p>
               </div>
             )}
 
-            {!subjectsQuery.isLoading && pagedRows.length > 0 && (
+            {!academicStructure.isLoading && pagedRows.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {pagedRows.map((row) => {
                   const classNames = (row.classSubjects || []).map((item) => item.class.className);

@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService, teacherService } from '../../services/managementService';
+import { teacherService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -13,13 +14,8 @@ export default function TeacherAssignmentPage() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [teacherSearch, setTeacherSearch] = useState('');
   const [selectedTeachersBySubject, setSelectedTeachersBySubject] = useState({});
+  const academicStructure = useAcademicStructure();
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all'],
     queryFn: () => teacherService.list({ page: 1, limit: 200 }),
@@ -37,12 +33,13 @@ export default function TeacherAssignmentPage() {
       toast.success('Teacher assignments saved');
       queryClient.invalidateQueries({ queryKey: ['teacher-assignment-table', selectedClassId, selectedSectionId] });
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to save assignments'),
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
   const teachers = teachersQuery.data?.data || [];
   const tableRows = assignmentTableQuery.data?.data?.table || [];
   const stats = assignmentTableQuery.data?.data?.stats || { totalSubjects: 0, assignedSubjects: 0, unassignedSubjects: 0 };

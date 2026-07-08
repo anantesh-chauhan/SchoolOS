@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService, subjectService } from '../../services/managementService';
+import { subjectService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -14,30 +15,11 @@ export default function SubjectAssignmentPage() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [searchText, setSearchText] = useState('');
   const [selectedSubjectIds, setSelectedSubjectIds] = useState([]);
-
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
-  const subjectsQuery = useQuery({ queryKey: ['subjects'], queryFn: subjectService.list });
-
-  const classAssignmentsQuery = useQuery({
-    queryKey: ['class-subjects', selectedClassId],
-    queryFn: () => subjectService.classSubjects(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
-
-  const sectionAssignmentsQuery = useQuery({
-    queryKey: ['section-subjects', selectedSectionId],
-    queryFn: () => subjectService.sectionSubjects(selectedSectionId),
-    enabled: Boolean(selectedSectionId),
-  });
+  const academicStructure = useAcademicStructure();
 
   const activeAssignments = selectedSectionId
-    ? sectionAssignmentsQuery.data?.data || []
-    : classAssignmentsQuery.data?.data || [];
+    ? academicStructure.getSectionSubjects(selectedClassId, selectedSectionId)
+    : academicStructure.getClassSubjects(selectedClassId);
 
   const assignmentMutation = useMutation({
     mutationFn: async ({ checked, subjectId }) => {
@@ -62,6 +44,7 @@ export default function SubjectAssignmentPage() {
       queryClient.invalidateQueries({ queryKey: ['class-subjects', selectedClassId] });
       queryClient.invalidateQueries({ queryKey: ['section-subjects', selectedSectionId] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      invalidateAcademicStructure(queryClient);
       toast.success('Assignment updated');
     },
     onError: (error) => toast.error(error.response?.data?.message || error.message || 'Assignment failed'),
@@ -73,6 +56,7 @@ export default function SubjectAssignmentPage() {
       toast.success('Bulk assignment saved');
       queryClient.invalidateQueries({ queryKey: ['class-subjects', selectedClassId] });
       queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Bulk assignment failed'),
   });
@@ -82,7 +66,7 @@ export default function SubjectAssignmentPage() {
     [activeAssignments]
   );
 
-  const subjects = subjectsQuery.data?.data || [];
+  const subjects = academicStructure.subjects;
   const filteredSubjects = subjects.filter((subject) => {
     const query = searchText.trim().toLowerCase();
     if (!query) return true;
@@ -92,8 +76,8 @@ export default function SubjectAssignmentPage() {
     );
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
 
   const toggleBulkSelection = (subjectId) => {
     setSelectedSubjectIds((prev) => {

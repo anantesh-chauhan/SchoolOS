@@ -481,9 +481,55 @@ export const listAcademicStructure = async (req, res) => {
       prisma.class.findMany({
         where: { schoolId, deletedAt: null },
         include: {
-          sections: { where: { deletedAt: null }, include: { stream: true }, orderBy: { sectionOrder: 'asc' } },
+          sections: {
+            where: { deletedAt: null },
+            include: {
+              stream: true,
+              sectionSubjects: {
+                include: { subject: true },
+                orderBy: { createdAt: 'asc' },
+              },
+              subjectWeeklyRequirements: {
+                include: { subject: true },
+                orderBy: { subject: { subjectName: 'asc' } },
+              },
+              teacherAssignments: {
+                where: { isActive: true },
+                include: { teacher: true, subject: true },
+                orderBy: { createdAt: 'asc' },
+              },
+              _count: {
+                select: {
+                  users: true,
+                  sectionSubjects: true,
+                  teacherAssignments: true,
+                },
+              },
+            },
+            orderBy: { sectionOrder: 'asc' },
+          },
           academicLevel: true,
-          classSubjects: { include: { subject: true } },
+          classSubjects: {
+            include: { subject: true },
+            orderBy: { createdAt: 'asc' },
+          },
+          subjectWeeklyRequirements: {
+            where: { sectionId: null },
+            include: { subject: true },
+            orderBy: { subject: { subjectName: 'asc' } },
+          },
+          teacherAssignments: {
+            where: { isActive: true },
+            include: { teacher: true, subject: true, section: true },
+            orderBy: { createdAt: 'asc' },
+          },
+          _count: {
+            select: {
+              sections: true,
+              classSubjects: true,
+              users: true,
+            },
+          },
         },
         orderBy: { classOrder: 'asc' },
       }),

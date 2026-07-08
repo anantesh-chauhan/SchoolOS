@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { classService, sectionService } from '../../services/managementService';
+import { sectionService } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 
@@ -10,13 +11,7 @@ export default function SectionManagementPage() {
   const queryClient = useQueryClient();
   const [selectedClassId, setSelectedClassId] = useState('');
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
+  const academicStructure = useAcademicStructure();
 
   const createMutation = useMutation({
     mutationFn: sectionService.createNext,
@@ -24,6 +19,7 @@ export default function SectionManagementPage() {
       toast.success('Next section added');
       queryClient.invalidateQueries({ queryKey: ['sections', selectedClassId] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to create section'),
   });
@@ -34,11 +30,12 @@ export default function SectionManagementPage() {
       toast.success('Section deleted');
       queryClient.invalidateQueries({ queryKey: ['sections', selectedClassId] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
+      invalidateAcademicStructure(queryClient);
     },
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
 
   const selectedClass = useMemo(
     () => classes.find((row) => row.id === selectedClassId),

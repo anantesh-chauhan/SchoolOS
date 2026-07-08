@@ -3,11 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import {
-  classService,
-  sectionService,
   teacherService,
   timetableService,
 } from '../../services/managementService';
+import { invalidateAcademicStructure, useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 
@@ -20,13 +19,8 @@ export default function TimetableBuilderPage() {
   const [academicYear, setAcademicYear] = useState(DEFAULT_ACADEMIC_YEAR);
   const [selectedTimetableId, setSelectedTimetableId] = useState('');
   const [editorBySlot, setEditorBySlot] = useState({});
+  const academicStructure = useAcademicStructure();
 
-  const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
-  const sectionsQuery = useQuery({
-    queryKey: ['sections', selectedClassId],
-    queryFn: () => sectionService.list(selectedClassId),
-    enabled: Boolean(selectedClassId),
-  });
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all'],
     queryFn: () => teacherService.list({ page: 1, limit: 300 }),
@@ -63,6 +57,7 @@ export default function TimetableBuilderPage() {
       queryClient.invalidateQueries({ queryKey: ['timetable-body', selectedTimetableId] });
       queryClient.invalidateQueries({ queryKey: ['teacher-assignment-table', selectedClassId, selectedSectionId] });
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      invalidateAcademicStructure(queryClient);
       toast.success('Slot assigned and teacher mapping synced');
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to assign slot'),
@@ -82,8 +77,8 @@ export default function TimetableBuilderPage() {
     onError: (error) => toast.error(error.response?.data?.message || 'Validation failed'),
   });
 
-  const classes = classesQuery.data?.data || [];
-  const sections = sectionsQuery.data?.data || [];
+  const classes = academicStructure.classes;
+  const sections = academicStructure.getSections(selectedClassId);
   const timetables = timetablesQuery.data?.data || [];
 
   const timetable = timetableBodyQuery.data?.data?.timetable;

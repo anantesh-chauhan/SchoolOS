@@ -90,13 +90,13 @@ const validateRequirementPayload = (className, requirements) => {
   }
 
   if ([9, 10, 11, 12].includes(classNo)) {
-    if (mandatoryCount !== 5 || optionalCount !== 1 || requirements.length !== 6) {
-      return 'For Class 9-12 exactly 5 mandatory subjects and 1 optional subject are required';
+    if (mandatoryCount < 5) {
+      return 'For Class 9-12 at least 5 mandatory academic subjects are required';
     }
   }
 
-  if (optionalCount > 1) {
-    return 'Only one optional subject is allowed';
+  if ([9, 10, 11, 12].includes(classNo) && optionalCount > 2) {
+    return 'Class 9-12 can have up to 2 optional/elective weekly requirements';
   }
 
   return null;
