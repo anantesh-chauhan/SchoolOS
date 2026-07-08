@@ -7,6 +7,7 @@ import { classService, sectionService } from '../../services/managementService';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
+import { Link } from 'react-router-dom';
 
 export default function ClassManagementPage() {
   const [className, setClassName] = useState('');
@@ -210,7 +211,16 @@ export default function ClassManagementPage() {
                                   key={section.id}
                                   className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-3 flex items-center justify-between gap-3"
                                 >
-                                  <p className="text-sm font-medium text-slate-800">Section {section.sectionName}</p>
+                                  <Link
+                                    to={`/dashboard/admin/academic/classes/${row.id}/sections/${section.id}`}
+                                    className="min-w-0 flex-1"
+                                  >
+                                    <p className="text-sm font-medium text-slate-800 truncate">
+                                      Section {section.sectionName}
+                                    </p>
+                                    <p className="text-xs text-slate-500">Open class workspace</p>
+                                  </Link>
+
                                   <Button
                                     variant="danger"
                                     className="h-8 px-3"

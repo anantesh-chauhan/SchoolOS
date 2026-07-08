@@ -15,6 +15,7 @@ const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard'));
 const SchoolManagementPage = lazy(() => import('./pages/platform/SchoolManagementPage'));
 const SchoolSettingsPage = lazy(() => import('./pages/platform/SchoolSettingsPage'));
 const ClassManagementPage = lazy(() => import('./pages/admin/ClassManagementPage'));
+const ClassDetailsDashboardPage = lazy(() => import('./pages/admin/ClassDetailsDashboardPage'));
 const SectionManagementPage = lazy(() => import('./pages/admin/SectionManagementPage'));
 const SubjectManagementPage = lazy(() => import('./pages/admin/SubjectManagementPage'));
 const SubjectAssignmentPage = lazy(() => import('./pages/admin/SubjectAssignmentPage'));
@@ -204,6 +205,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
               <ClassManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/admin/academic/classes/:classId/sections/:sectionId"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+              <ClassDetailsDashboardPage />
             </ProtectedRoute>
           }
         />
