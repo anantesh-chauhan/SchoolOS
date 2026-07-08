@@ -16,6 +16,9 @@ const SchoolManagementPage = lazy(() => import('./pages/platform/SchoolManagemen
 const SchoolSettingsPage = lazy(() => import('./pages/platform/SchoolSettingsPage'));
 const ClassManagementPage = lazy(() => import('./pages/admin/ClassManagementPage'));
 const ClassDetailsDashboardPage = lazy(() => import('./pages/admin/ClassDetailsDashboardPage'));
+const SubjectDetailsDashboardPage = lazy(() => import('./pages/admin/SubjectDetailsDashboardPage'));
+const ChapterComingSoonPage = lazy(() => import('./pages/admin/ChapterComingSoonPage'));
+
 const SectionManagementPage = lazy(() => import('./pages/admin/SectionManagementPage'));
 const SubjectManagementPage = lazy(() => import('./pages/admin/SubjectManagementPage'));
 const SubjectAssignmentPage = lazy(() => import('./pages/admin/SubjectAssignmentPage'));
@@ -210,6 +213,24 @@ export default function App() {
         />
 
         <Route
+          path="/dashboard/admin/academic/classes/:classId/sections/:sectionId/subjects/:subjectId"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+              <SubjectDetailsDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/admin/academic/classes/:classId/sections/:sectionId/subjects/:subjectId/chapters/:chapterId"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+              <ChapterComingSoonPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/dashboard/admin/academic/classes/:classId/sections/:sectionId"
           element={
             <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
@@ -370,4 +391,5 @@ export default function App() {
     </Router>
   );
 }
+
 
