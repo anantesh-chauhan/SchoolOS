@@ -24,7 +24,10 @@ const SubjectManagementPage = lazy(() => import('./pages/admin/SubjectManagement
 const SubjectAssignmentPage = lazy(() => import('./pages/admin/SubjectAssignmentPage'));
 const TeacherManagementPage = lazy(() => import('./pages/admin/TeacherManagementPage'));
 const TeacherAssignmentPage = lazy(() => import('./pages/admin/TeacherAssignmentPage'));
+const ClassTeacherAssignmentPage = lazy(() => import('./pages/admin/ClassTeacherAssignmentPage'));
 const TeacherAssignmentSummaryPage = lazy(() => import('./pages/admin/TeacherAssignmentSummaryPage'));
+const StudentAttendancePage = lazy(() => import('./pages/attendance/StudentAttendancePage'));
+const TeacherAttendancePage = lazy(() => import('./pages/attendance/TeacherAttendancePage'));
 const WeeklySlotManagementPage = lazy(() => import('./pages/admin/WeeklySlotManagementPage'));
 const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPage'));
 const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
@@ -295,6 +298,33 @@ export default function App() {
           />
 
           <Route
+            path="/dashboard/admin/class-teachers"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <ClassTeacherAssignmentPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/attendance/students"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <StudentAttendancePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/admin/attendance/teachers"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+                <TeacherAttendancePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/dashboard/admin/teacher-assignment-summary"
             element={
               <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
@@ -362,6 +392,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={['TEACHER']}>
                 <TeacherDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/dashboard/teacher/attendance"
+            element={
+              <ProtectedRoute allowedRoles={['TEACHER']}>
+                <StudentAttendancePage />
               </ProtectedRoute>
             }
           />

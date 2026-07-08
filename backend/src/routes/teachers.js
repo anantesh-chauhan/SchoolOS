@@ -5,9 +5,11 @@ import {
   createTeacher,
   deleteTeacher,
   getTeacherWorkload,
+  listClassTeacherAssignments,
   listTeacherAssignmentSummary,
   listTeacherAssignmentsForSection,
   listTeachers,
+  upsertClassTeacherAssignment,
   updateTeacher,
 } from '../controllers/teacher.controller.js';
 
@@ -25,5 +27,7 @@ router.get('/:id/workload', getTeacherWorkload);
 router.get('/assignments/section', listTeacherAssignmentsForSection);
 router.post('/assignments/bulk', bulkUpsertTeacherAssignments);
 router.get('/assignments/summary', listTeacherAssignmentSummary);
+router.get('/assignments/class-teachers', listClassTeacherAssignments);
+router.post('/assignments/class-teachers', upsertClassTeacherAssignment);
 
 export default router;

@@ -20,6 +20,7 @@ import widgetRoutes from './src/routes/widgets.js';
 import studentRoutes from './src/routes/students.js';
 import usersRoutes from './src/routes/users.js';
 import chapterFeedbackRoutes from './src/routes/chapterFeedback.js';
+import attendanceRoutes from './src/routes/attendance.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -94,6 +95,7 @@ app.use('/api/academic-structure', academicStructureRoutes);
 app.use('/api/widgets', widgetRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/attendance', attendanceRoutes);
 app.use('/api', chapterFeedbackRoutes);
 
 

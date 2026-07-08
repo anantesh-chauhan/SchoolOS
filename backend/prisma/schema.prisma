@@ -37,6 +37,8 @@ model User {
   createdSystemContents SystemContent[]
   createdChapterPolls   ChapterPoll[]            @relation("ChapterPollCreatedByAdmin")
   compiledChapterSummaries ChapterAnalysisSummary[] @relation("ChapterAnalysisCompiledByAdmin")
+  markedStudentAttendances StudentAttendance[]    @relation("StudentAttendanceMarkedBy")
+  markedTeacherAttendances TeacherAttendance[]    @relation("TeacherAttendanceMarkedBy")
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -108,6 +110,8 @@ model School {
   studentChapterVotes       StudentChapterVote[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
   chapterAnalysisSummaries  ChapterAnalysisSummary[]
+  studentAttendances        StudentAttendance[]
+  teacherAttendances        TeacherAttendance[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -200,6 +204,7 @@ model Class {
   studentChapterVotes       StudentChapterVote[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
   chapterAnalysisSummaries  ChapterAnalysisSummary[]
+  studentAttendances        StudentAttendance[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -235,6 +240,7 @@ model Section {
   studentChapterVotes       StudentChapterVote[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
   chapterAnalysisSummaries  ChapterAnalysisSummary[]
+  studentAttendances        StudentAttendance[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -369,6 +375,7 @@ model Teacher {
   chapterPolls        ChapterPoll[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
   chapterAnalysisSummaries ChapterAnalysisSummary[]
+  teacherAttendances  TeacherAttendance[]
   teacherSubjects    TeacherSubject[]
   timetableSlots     TimetableSlot[]
   deletedAt          DateTime?
@@ -982,6 +989,7 @@ model Student {
   academicHistory StudentAcademicHistory[]
   studentChapterVotes StudentChapterVote[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
+  attendances     StudentAttendance[]
 
   @@unique([studentUserId])
   @@unique([parentUserId])
@@ -1149,6 +1157,52 @@ model StudentAcademicHistory {
   @@index([session])
 }
 
+model StudentAttendance {
+  id             String           @id @default(cuid())
+  schoolId       String
+  classId        String
+  sectionId      String
+  studentId      String
+  attendanceDate DateTime
+  status         AttendanceStatus @default(PRESENT)
+  remarks        String?
+  markedById     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class    Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section  Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  markedBy User?   @relation("StudentAttendanceMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, classId, sectionId, studentId, attendanceDate])
+  @@index([schoolId, classId, sectionId, attendanceDate])
+  @@index([schoolId, studentId, attendanceDate])
+  @@index([schoolId, markedById])
+}
+
+model TeacherAttendance {
+  id             String           @id @default(cuid())
+  schoolId       String
+  teacherId      String
+  attendanceDate DateTime
+  status         AttendanceStatus @default(PRESENT)
+  remarks        String?
+  markedById     String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher  Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  markedBy User?   @relation("TeacherAttendanceMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, teacherId, attendanceDate])
+  @@index([schoolId, attendanceDate])
+  @@index([schoolId, teacherId, attendanceDate])
+  @@index([schoolId, markedById])
+}
+
 // Enums
 enum Role {
   PLATFORM_OWNER
@@ -1224,6 +1278,14 @@ enum ChapterPollStatus {
   CLOSED
   COMPILED
   PUBLISHED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  LEAVE
 }
 
 enum SectionResourceType {

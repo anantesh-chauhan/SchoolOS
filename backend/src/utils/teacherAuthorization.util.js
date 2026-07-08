@@ -71,6 +71,47 @@ export const assertTeacherAssignedToSectionSubject = async (user, { schoolId, cl
   return { teacher, assignment };
 };
 
+export const assertTeacherIsClassTeacherForSection = async (user, { schoolId, classId, sectionId }) => {
+  assertSameSchool(user, schoolId);
+
+  const teacher = await getTeacherForUser(user);
+  if (!teacher) {
+    throw new AuthorizationError('Teacher profile not found for this user.', 403);
+  }
+
+  const assignment = await prisma.teacherAssignment.findFirst({
+    where: {
+      schoolId,
+      teacherId: teacher.id,
+      classId,
+      sectionId,
+      isActive: true,
+      roleType: { in: ['CLASS_TEACHER', 'BOTH'] },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
+    },
+  });
+
+  if (!assignment) {
+    throw new AuthorizationError('Only the class teacher can access attendance for this section.', 403);
+  }
+
+  return { teacher, assignment };
+};
+
+export const requireSchoolAdminOrClassTeacher = async (user, params) => {
+  if (isSchoolAdmin(user)) {
+    assertSameSchool(user, params.schoolId);
+    return { allowed: true, teacher: null, assignment: null, isAdmin: true };
+  }
+
+  if (user?.role !== 'TEACHER') {
+    throw new AuthorizationError('Only school admins or class teachers can access attendance.', 403);
+  }
+
+  const result = await assertTeacherIsClassTeacherForSection(user, params);
+  return { allowed: true, ...result, isAdmin: false };
+};
+
 export const canManageSectionSubject = async (user, params) => {
   if (isSchoolAdmin(user)) {
     assertSameSchool(user, params.schoolId);

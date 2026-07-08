@@ -141,6 +141,33 @@ export const teacherService = {
     const response = await apiClient.get('/teachers/assignments/summary', { params });
     return response.data;
   },
+  classTeacherAssignments: async (params = {}) => {
+    const response = await apiClient.get('/teachers/assignments/class-teachers', { params });
+    return response.data;
+  },
+  saveClassTeacherAssignment: async (payload) => {
+    const response = await apiClient.post('/teachers/assignments/class-teachers', payload);
+    return response.data;
+  },
+};
+
+export const attendanceService = {
+  studentRoster: async (params = {}) => {
+    const response = await apiClient.get('/attendance/students', { params });
+    return response.data;
+  },
+  saveStudentAttendance: async (payload) => {
+    const response = await apiClient.post('/attendance/students', payload);
+    return response.data;
+  },
+  teacherRoster: async (params = {}) => {
+    const response = await apiClient.get('/attendance/teachers', { params });
+    return response.data;
+  },
+  saveTeacherAttendance: async (payload) => {
+    const response = await apiClient.post('/attendance/teachers', payload);
+    return response.data;
+  },
 };
 
 export const userService = {
