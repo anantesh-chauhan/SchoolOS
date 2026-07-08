@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { buildDefaultSchoolConfig, buildSchoolTheme, deriveSchoolSlug, normalizeSchoolPayload } from '../utils/publicSchool.util.js';
+import { seedAcademicDataForSchool } from '../../prisma/seedAcademicData.js';
 
 const prisma = new PrismaClient();
 
@@ -56,6 +57,8 @@ export const createSchool = async (req, res) => {
         }),
       },
     });
+
+    await seedAcademicDataForSchool(school.id);
 
     return res.status(201).json({
       success: true,

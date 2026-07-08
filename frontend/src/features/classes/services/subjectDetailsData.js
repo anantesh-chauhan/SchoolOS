@@ -1,41 +1,23 @@
-import { getChaptersForSubject } from '../data/dummyChapters';
-import { getClassMeta } from '../data/dummyClassMeta';
-import { getSubjectsForClassSection } from '../data/dummySubjects';
+import apiClient from '../../../services/api';
 
 export const subjectDetailsDataService = {
   async getDashboardPayload({ classId, sectionId, subjectId }) {
-    const meta = getClassMeta(classId, sectionId);
-    const subjects = getSubjectsForClassSection(classId, sectionId);
+    const response = await apiClient.get('/academic-structure/subject-dashboard', {
+      params: { classId, sectionId, subjectId },
+    });
 
-    const subject = subjects.find((s) => String(s.id) === String(subjectId))
-      || subjects.find((s) => s.id === subjectId)
-      || subjects[0];
-
-
-    const chapters = getChaptersForSubject({ classId, sectionId, subjectId: subject?.id, subjectName: subject?.name });
-
-    // Dummy totals
-    const totalChapters = chapters.length;
-    const completedChapters = chapters.filter((c) => c.status === 'Completed').length;
-    const completionPct = totalChapters === 0 ? 0 : Math.round((completedChapters / totalChapters) * 100);
-
-    return {
-      meta,
-      subject: {
-        id: subject.id,
-        name: subject.name,
-        teacher: subject.teacher,
-        icon: subject.icon,
-      },
-      chapters,
+    return response.data?.data || {
+      meta: null,
+      subject: null,
+      chapters: [],
       stats: {
-        totalChapters,
-        completedChapters,
-        completionPct,
-        upcomingChapters: Math.max(0, totalChapters - completedChapters),
-        assignments: 12,
-        homework: 9,
-        resources: 26,
+        totalChapters: 0,
+        completedChapters: 0,
+        completionPct: 0,
+        upcomingChapters: 0,
+        assignments: 0,
+        homework: 0,
+        resources: 0,
       },
     };
   },

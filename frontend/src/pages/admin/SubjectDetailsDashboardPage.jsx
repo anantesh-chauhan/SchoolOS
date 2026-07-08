@@ -117,6 +117,7 @@ export default function SubjectDetailsDashboardPage() {
 
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
@@ -126,11 +127,14 @@ export default function SubjectDetailsDashboardPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await subjectDetailsDataService.getDashboardPayload({ classId, sectionId, subjectId });
       setPayload(data);
       setLoading(false);
     } catch (e) {
       setLoading(false);
+      setPayload(null);
+      setError(e.response?.data?.message || 'Unable to load subject data from the server.');
       toast.error('Failed to load subject details');
     }
   }, [classId, sectionId, subjectId]);
@@ -204,10 +208,34 @@ export default function SubjectDetailsDashboardPage() {
           </div>
         )}
 
-        {!loading && meta && subject && (
+        {!loading && error && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+            <p className="text-sm font-bold">Subject data unavailable</p>
+            <p className="mt-1 text-sm">{error}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={load}>Retry</Button>
+              <Link className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700" to={`/dashboard/admin/academic/classes/${classId}/sections/${sectionId}`}>
+                Back to Section
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && meta && subject && (
           <>
             {/* Subject Header */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <Link className="font-semibold text-slate-700 hover:text-blue-700" to="/dashboard/admin/classes">Classes</Link>
+                <span>/</span>
+                <Link className="font-semibold text-slate-700 hover:text-blue-700" to={`/dashboard/admin/academic/classes/${classId}/sections/${sectionId}`}>{meta.className}</Link>
+                <span>/</span>
+                <span>{meta.sectionName}</span>
+                <span>/</span>
+                <span className="text-slate-900 font-semibold">{subject.name}</span>
+                <span>/</span>
+                <span>Chapters</span>
+              </div>
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
@@ -321,7 +349,7 @@ export default function SubjectDetailsDashboardPage() {
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                     <div className="text-4xl">🧩</div>
                     <p className="mt-3 text-sm font-semibold text-slate-800">No chapters available.</p>
-                    <p className="mt-1 text-xs text-slate-500">Update dummy data or connect backend later.</p>
+                    <p className="mt-1 text-xs text-slate-500">Add chapters for this subject to show them here.</p>
                   </div>
                 ) : (
                   <div

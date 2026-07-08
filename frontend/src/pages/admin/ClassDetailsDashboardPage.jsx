@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
@@ -284,6 +284,7 @@ export default function ClassDetailsDashboardPage() {
 
   const [payload, setPayload] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [query, setQuery] = useState('');
   const [filterGender, setFilterGender] = useState('All');
@@ -304,11 +305,14 @@ export default function ClassDetailsDashboardPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await classDetailsDataService.getDashboardPayload({ classId, sectionId });
       setPayload(data);
       setLoading(false);
     } catch (e) {
       setLoading(false);
+      setPayload(null);
+      setError(e.response?.data?.message || 'Unable to load academic data from the server.');
       toast.error('Failed to load class details');
     }
   }, [classId, sectionId]);
@@ -405,10 +409,25 @@ export default function ClassDetailsDashboardPage() {
       >
         {loading && skeleton}
 
-        {!loading && meta && (
+        {!loading && error && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+            <p className="text-sm font-bold">Academic data unavailable</p>
+            <p className="mt-1 text-sm">{error}</p>
+            <Button className="mt-4" variant="secondary" onClick={load}>Retry</Button>
+          </div>
+        )}
+
+        {!loading && !error && meta && (
           <>
             {/* Header */}
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+                <Link className="font-semibold text-slate-700 hover:text-blue-700" to="/dashboard/admin/classes">Classes</Link>
+                <span>/</span>
+                <span>{meta.className}</span>
+                <span>/</span>
+                <span className="text-slate-900 font-semibold">{meta.sectionName}</span>
+              </div>
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
@@ -467,7 +486,12 @@ export default function ClassDetailsDashboardPage() {
                       }}
                     />
                   ))}
-
+                  {subjects.length === 0 && (
+                    <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                      <p className="text-sm font-semibold text-slate-800">No subjects assigned.</p>
+                      <p className="mt-1 text-xs text-slate-500">Assign subjects to this class or section to show them here.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
