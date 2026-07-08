@@ -29,7 +29,9 @@ import { authService } from '../services/authService';
 import { useBranding } from '../contexts/BrandingContext';
 import Sidebar from '../components/Sidebar/Sidebar';
 import NotificationButton from '../components/ui/NotificationButton';
+import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
+
 
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -296,6 +298,7 @@ const DashboardLayout = ({ children, role }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-950 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+      <DateTimeTopBar />
 
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -330,8 +333,9 @@ const DashboardLayout = ({ children, role }) => {
         />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pt-6">
         <header className="h-16 border-b border-slate-200/70 bg-white/75 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/65 sm:px-6 flex items-center justify-between transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75 dark:supports-[backdrop-filter]:bg-slate-950/65">
+
 
           <div className="flex items-center gap-3 min-w-0">
             <button
