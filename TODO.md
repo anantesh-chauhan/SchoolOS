@@ -1,8 +1,5 @@
-# TODO - SchoolOS Class Details Dashboard
-
-## Plan Steps
-- [ ] Add Subject Details dashboard navigation
-- [ ] Ensure subject cards navigate into subject details (from ClassDetailsDashboard)
-- [x] Run frontend build/lint (if available) and manual navigation test
+- [ ] Add a very short, simple footer to the application
+- [x] Update `frontend/src/layouts/DashboardLayout.jsx` to render the footer at the bottom
+- [ ] Verify footer visibility in the running frontend/build
 
 

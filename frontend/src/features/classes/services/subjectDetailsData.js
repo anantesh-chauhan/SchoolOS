@@ -21,5 +21,17 @@ export const subjectDetailsDataService = {
       },
     };
   },
+  async getChapterPayload({ classId, sectionId, subjectId, chapterId }) {
+    const response = await apiClient.get('/academic-structure/chapter-dashboard', {
+      params: { classId, sectionId, subjectId, chapterId },
+    });
+
+    return response.data?.data || {
+      meta: null,
+      subject: null,
+      chapter: null,
+      resources: [],
+    };
+  },
 };
 

@@ -117,11 +117,56 @@ const MIDDLE_CHAPTERS = {
 const SECONDARY_CHAPTERS = {
   English: ['A Letter to God', 'Nelson Mandela', 'Two Stories about Flying', 'From the Diary of Anne Frank', 'Writing and Grammar'],
   Hindi: ['Kshitij Gadya', 'Kshitij Padya', 'Kritika Path', 'Vyakaran', 'Rachnatmak Lekhan'],
-  Mathematics: ['Real Numbers', 'Polynomials', 'Pair of Linear Equations', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles'],
-  Science: ['Chemical Reactions and Equations', 'Acids Bases and Salts', 'Life Processes', 'Light', 'Electricity', 'Our Environment'],
+  Mathematics: ['Real Numbers', 'Polynomials', 'Pair of Linear Equations in Two Variables', 'Quadratic Equations', 'Arithmetic Progressions', 'Triangles', 'Coordinate Geometry', 'Introduction to Trigonometry', 'Some Applications of Trigonometry', 'Circles', 'Areas Related to Circles', 'Surface Areas and Volumes', 'Statistics', 'Probability'],
+  Science: ['Chemical Reactions and Equations', 'Acids, Bases and Salts', 'Metals and Non-metals', 'Carbon and its Compounds', 'Life Processes', 'Control and Coordination', 'How do Organisms Reproduce?', 'Heredity', 'Light - Reflection and Refraction', 'The Human Eye and the Colourful World', 'Electricity', 'Magnetic Effects of Electric Current', 'Our Environment'],
   'Social Science': ['India Size and Location', 'French Revolution', 'Democracy in the Contemporary World', 'Poverty as a Challenge', 'Resources and Development'],
   'Computer Applications': ['Internet Basics', 'HTML and CSS', 'Cyber Ethics', 'Office Tools', 'Introduction to Python'],
   'Physical Education': ['Physical Fitness', 'Yoga', 'Team Games', 'Health and Nutrition'],
+};
+
+export const OFFICIAL_RESOURCE_LINKS = {
+  ncertTextbooks: 'https://ncert.nic.in/textbook.php?ln=en',
+  cbseCurriculum: 'https://cbseacademic.nic.in/curriculum_2027.html',
+  cbseQuestionBanks: 'https://cbseacademic.nic.in/',
+};
+
+export const NCERT_CHAPTER_RESOURCE_CATALOG = {
+  'Class 10': {
+    Mathematics: {
+      bookTitle: 'NCERT Mathematics Class X',
+      bookCode: 'jemh1',
+      chapters: SECONDARY_CHAPTERS.Mathematics,
+    },
+    Science: {
+      bookTitle: 'NCERT Science Class X',
+      bookCode: 'jesc1',
+      chapters: SECONDARY_CHAPTERS.Science,
+    },
+    English: {
+      bookTitle: 'NCERT First Flight Class X',
+      bookCode: 'jeff1',
+      chapters: ['A Letter to God', 'Nelson Mandela: Long Walk to Freedom', 'Two Stories about Flying', 'From the Diary of Anne Frank', 'Glimpses of India', 'Mijbil the Otter', 'Madam Rides the Bus', 'The Sermon at Benares', 'The Proposal'],
+    },
+  },
+};
+
+export const getChapterEntries = ({ className, subjectName }) => {
+  const official = NCERT_CHAPTER_RESOURCE_CATALOG[className]?.[subjectName];
+  const chapterNames = official?.chapters || getChapterNames({ className, subjectName });
+
+  return chapterNames.map((chapterName, index) => {
+    const chapterNumber = index + 1;
+    const padded = String(chapterNumber).padStart(2, '0');
+    return {
+      chapterName,
+      chapterNumber,
+      ncertPdfUrl: official?.bookCode ? `https://ncert.nic.in/textbook/pdf/${official.bookCode}${padded}.pdf` : null,
+      ncertBookTitle: official?.bookTitle || null,
+      ncertTextbookUrl: OFFICIAL_RESOURCE_LINKS.ncertTextbooks,
+      cbseCurriculumUrl: OFFICIAL_RESOURCE_LINKS.cbseCurriculum,
+      dikshaSearchUrl: `https://diksha.gov.in/search?query=${encodeURIComponent(`${className} ${subjectName} ${chapterName}`)}`,
+    };
+  });
 };
 
 const SENIOR_CHAPTERS = {

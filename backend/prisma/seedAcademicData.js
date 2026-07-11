@@ -6,7 +6,7 @@ import {
   SENIOR_CLASS_CATALOG,
   SENIOR_STREAMS,
   SUBJECT_CODE_BY_NAME,
-  getChapterNames,
+  getChapterEntries,
 } from '../src/constants/cbseAcademicSeed.js';
 
 const prisma = new PrismaClient();
@@ -138,11 +138,11 @@ const ensureSectionSubject = async (tx, sectionId, subjectId, stats) => {
 
 const ensureChapters = async (tx, schoolId, classRow, subject, stats) => {
   const { id: classId, className } = classRow;
-  const chapterNames = getChapterNames({ className, subjectName: subject.subjectName });
+  const chapterEntries = getChapterEntries({ className, subjectName: subject.subjectName });
+  const chapters = [];
 
-  for (let index = 0; index < chapterNames.length; index += 1) {
-    const chapterName = chapterNames[index];
-    const chapterNumber = index + 1;
+  for (const entry of chapterEntries) {
+    const { chapterName, chapterNumber } = entry;
     const existing = await tx.chapter.findFirst({
       where: {
         schoolId,
@@ -154,11 +154,18 @@ const ensureChapters = async (tx, schoolId, classRow, subject, stats) => {
 
     if (existing) {
       stats.existing.chapters += 1;
+      const needsUpdate = existing.chapterName !== chapterName || existing.chapterNumber !== chapterNumber || existing.deletedAt;
+      chapters.push(needsUpdate
+        ? await tx.chapter.update({
+            where: { id: existing.id },
+            data: { chapterName, chapterNumber, deletedAt: null },
+          })
+        : existing);
       continue;
     }
 
     stats.created.chapters += 1;
-    await tx.chapter.create({
+    const chapter = await tx.chapter.create({
       data: {
         schoolId,
         classId,
@@ -169,6 +176,91 @@ const ensureChapters = async (tx, schoolId, classRow, subject, stats) => {
         estimatedClasses: Math.min(8, Math.max(3, chapterName.length % 7 + 3)),
       },
     });
+    chapters.push(chapter);
+  }
+
+  return chapters;
+};
+
+const ensureChapterResources = async (tx, schoolId, classRow, section, subject, chapters) => {
+  const entries = getChapterEntries({ className: classRow.className, subjectName: subject.subjectName })
+    .filter((entry) => entry.ncertPdfUrl);
+  if (entries.length === 0) return;
+
+  const chapterByNumber = new Map(chapters.map((chapter) => [chapter.chapterNumber, chapter]));
+  const chapterIds = chapters.map((chapter) => chapter.id);
+  if (chapterIds.length === 0) return;
+
+  const existingResources = await tx.sectionResource.findMany({
+    where: {
+      schoolId,
+      classId: classRow.id,
+      sectionId: section.id,
+      subjectId: subject.id,
+      chapterId: { in: chapterIds },
+    },
+    select: { chapterId: true, title: true },
+  });
+  const existingKeys = new Set(existingResources.map((resource) => `${resource.chapterId}:${resource.title}`));
+  const resourcesToCreate = [];
+
+  for (const entry of entries) {
+    const chapter = chapterByNumber.get(entry.chapterNumber);
+    if (!chapter) continue;
+
+    const resources = [
+      entry.ncertPdfUrl
+        ? {
+            title: `${entry.chapterName} - NCERT PDF`,
+            description: entry.ncertBookTitle || 'Official NCERT textbook chapter PDF.',
+            resourceType: 'PDF',
+            fileUrl: entry.ncertPdfUrl,
+          }
+        : null,
+      {
+        title: `${entry.chapterName} - NCERT Textbook Portal`,
+        description: 'Official NCERT textbook catalogue for PDF lookup.',
+        resourceType: 'LINK',
+        externalUrl: entry.ncertTextbookUrl,
+      },
+      {
+        title: `${entry.chapterName} - CBSE Curriculum`,
+        description: 'CBSE Academic curriculum and syllabus reference for 2026-27.',
+        resourceType: 'LINK',
+        externalUrl: entry.cbseCurriculumUrl,
+      },
+      {
+        title: `${entry.chapterName} - DIKSHA Resources`,
+        description: 'Official DIKSHA search for videos, practice and learning resources.',
+        resourceType: 'LINK',
+        externalUrl: entry.dikshaSearchUrl,
+      },
+    ].filter(Boolean);
+
+    for (const resource of resources) {
+      const key = `${chapter.id}:${resource.title}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+
+      resourcesToCreate.push({
+        schoolId,
+        classId: classRow.id,
+        sectionId: section.id,
+        subjectId: subject.id,
+        chapterId: chapter.id,
+        teacherId: null,
+        title: resource.title,
+        description: resource.description,
+        resourceType: resource.resourceType,
+        fileUrl: resource.fileUrl || null,
+        externalUrl: resource.externalUrl || null,
+        isVisibleToStudents: true,
+      });
+    }
+  }
+
+  if (resourcesToCreate.length > 0) {
+    await tx.sectionResource.createMany({ data: resourcesToCreate });
   }
 };
 
@@ -450,7 +542,10 @@ export const seedAcademicDataForSchool = async (schoolId) => {
       for (const section of sections) {
         await ensureSectionSubject(tx, section.id, subject.id, stats);
       }
-      await ensureChapters(tx, schoolId, classRow, subject, stats);
+      const chapters = await ensureChapters(tx, schoolId, classRow, subject, stats);
+      for (const section of sections) {
+        await ensureChapterResources(tx, schoolId, classRow, section, subject, chapters);
+      }
     }
   }
 
@@ -473,7 +568,8 @@ export const seedAcademicDataForSchool = async (schoolId) => {
         const subject = await ensureSubject(tx, schoolId, SENIOR_STREAMS[streamIndex].subjects[subjectIndex], subjectIndex + 1, stats);
         await ensureClassSubject(tx, classRow.id, subject.id, stats);
         await ensureSectionSubject(tx, section.id, subject.id, stats);
-        await ensureChapters(tx, schoolId, classRow, subject, stats);
+        const chapters = await ensureChapters(tx, schoolId, classRow, subject, stats);
+        await ensureChapterResources(tx, schoolId, classRow, section, subject, chapters);
       }
     }
   }

@@ -337,6 +337,7 @@ const DashboardLayout = ({ children, role }) => {
         <header className="h-16 border-b border-slate-200/70 bg-white/75 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/65 sm:px-6 flex items-center justify-between transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75 dark:supports-[backdrop-filter]:bg-slate-950/65">
 
 
+
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -424,8 +425,8 @@ const DashboardLayout = ({ children, role }) => {
         </header>
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">
-
           <div className="mx-auto w-full max-w-7xl">
+
             <div className="mb-4 sm:hidden">
               <p className="text-xs text-slate-500 dark:text-slate-400">{breadcrumb.join(' / ')}</p>
               <div className="mt-2 relative">
@@ -443,8 +444,13 @@ const DashboardLayout = ({ children, role }) => {
           </div>
 
         </main>
+
+        <footer className="border-t border-slate-200/70 bg-white/60 px-4 py-2 text-center text-[11px] text-slate-500 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-400">
+          © {new Date().getFullYear()} SchoolOS
+        </footer>
       </div>
     </div>
+
   );
 };
 

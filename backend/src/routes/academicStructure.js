@@ -4,6 +4,7 @@ import {
   createChapter,
   deleteChapter,
   getClassSectionDashboard,
+  getChapterDashboard,
   getSubjectDashboard,
   updateChapter,
 } from '../controllers/academicDashboard.controller.js';
@@ -27,6 +28,7 @@ router.use(authMiddleware);
 router.get('/', requireRole('PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN'), listAcademicStructure);
 router.get('/class-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getClassSectionDashboard);
 router.get('/subject-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getSubjectDashboard);
+router.get('/chapter-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getChapterDashboard);
 router.get('/default-template', requireRole('PLATFORM_OWNER'), getDefaultAcademicTemplate);
 router.post('/push-template', requireRole('PLATFORM_OWNER'), pushDefaultTemplateToSchool);
 router.post('/bootstrap', requireRole('PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN'), bootstrapAcademicStructure);

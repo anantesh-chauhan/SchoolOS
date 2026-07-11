@@ -298,6 +298,99 @@ export const getSubjectDashboard = async (req, res) => {
   }
 };
 
+export const getChapterDashboard = async (req, res) => {
+  try {
+    const schoolId = getScopedSchoolId(req.user, req.query.schoolId);
+    const { classId, sectionId, subjectId, chapterId } = req.query;
+
+    if (!classId || !sectionId || !subjectId || !chapterId) {
+      return res.status(400).json({ success: false, message: 'classId, sectionId, subjectId and chapterId are required' });
+    }
+
+    const [section, subject, chapter] = await Promise.all([
+      prisma.section.findFirst({ where: { id: sectionId, classId, schoolId, deletedAt: null }, include: { class: true } }),
+      prisma.subject.findFirst({ where: { id: subjectId, schoolId, deletedAt: null } }),
+      prisma.chapter.findFirst({
+        where: {
+          id: chapterId,
+          schoolId,
+          classId,
+          subjectId,
+          deletedAt: null,
+          OR: [{ sectionId }, { sectionId: null }],
+        },
+      }),
+    ]);
+
+    if (!section || !subject || !chapter) {
+      return res.status(404).json({ success: false, message: 'Chapter, section or subject not found for this school' });
+    }
+
+    const [progress, resources] = await Promise.all([
+      prisma.chapterProgress.findFirst({
+        where: { schoolId, classId, sectionId, subjectId, chapterId },
+        include: { teacher: { select: { teacherName: true } } },
+      }),
+      prisma.sectionResource.findMany({
+        where: {
+          schoolId,
+          classId,
+          sectionId,
+          subjectId,
+          chapterId,
+          isVisibleToStudents: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        meta: {
+          classId,
+          sectionId,
+          className: section.class.className,
+          sectionName: `Section ${section.sectionName}`,
+          academicSession: new Date().getFullYear().toString(),
+        },
+        subject: {
+          id: subject.id,
+          name: subject.subjectName,
+          code: subject.subjectCode,
+        },
+        chapter: {
+          id: chapter.id,
+          chapterName: chapter.chapterName,
+          chapterNumber: chapter.chapterNumber,
+          status: toTitleStatus(progress?.status || 'NOT_STARTED'),
+          remarks: progress?.remarks || '',
+          completedAt: progress?.completedAt || null,
+          lastUpdatedBy: progress?.teacher?.teacherName || null,
+          estimatedClasses: chapter.estimatedClasses,
+          completion: progressCompletion(progress?.status || 'NOT_STARTED'),
+          updatedAt: progress?.updatedAt || chapter.updatedAt,
+        },
+        resources: resources.map((resource) => ({
+          id: resource.id,
+          title: resource.title,
+          description: resource.description,
+          resourceType: resource.resourceType,
+          fileUrl: resource.fileUrl,
+          externalUrl: resource.externalUrl,
+          createdAt: resource.createdAt,
+        })),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to load chapter dashboard',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
 export const createChapter = async (req, res) => {
   try {
     const schoolId = getScopedSchoolId(req.user, req.body.schoolId);
