@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom';
 import { Users, Building2, TrendingUp, ArrowUpRight } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { SummaryCard, WelcomeCard } from '../../components/DashboardCards';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../../services/dashboardService';
 
 export default function PlatformOwnerDashboard() {
   const [user] = useState(() => {
@@ -15,13 +17,8 @@ export default function PlatformOwnerDashboard() {
     }
   });
 
-  // Mock data - would come from API
-  const stats = {
-    totalSchools: 156,
-    totalUsers: 4250,
-    activeSchools: 142,
-    growth: 12,
-  };
+  const { data, isLoading } = useQuery({ queryKey: ['dashboard-summary', 'platform'], queryFn: dashboardService.summary });
+  const stats = data?.stats || {};
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -57,9 +54,8 @@ export default function PlatformOwnerDashboard() {
             <SummaryCard
               icon={<Building2 className="w-8 h-8" />}
               label="Total Schools"
-              value={stats.totalSchools}
+              value={isLoading ? '…' : stats.totalSchools || 0}
               color="blue"
-              trend={stats.growth}
             />
           </motion.div>
 
@@ -67,9 +63,8 @@ export default function PlatformOwnerDashboard() {
             <SummaryCard
               icon={<Users className="w-8 h-8" />}
               label="Total Users"
-              value={stats.totalUsers}
+              value={isLoading ? '…' : stats.totalUsers || 0}
               color="purple"
-              trend={8}
             />
           </motion.div>
 
@@ -77,17 +72,16 @@ export default function PlatformOwnerDashboard() {
             <SummaryCard
               icon={<TrendingUp className="w-8 h-8" />}
               label="Active Schools"
-              value={stats.activeSchools}
+              value={isLoading ? '…' : stats.activeSchools || 0}
               color="green"
-              trend={5}
             />
           </motion.div>
 
           <motion.div variants={itemVariants}>
             <SummaryCard
               icon={<ArrowUpRight className="w-8 h-8" />}
-              label="Growth Rate"
-              value={`${stats.growth}%`}
+              label="New Schools (30 days)"
+              value={isLoading ? '…' : stats.newSchools || 0}
               color="orange"
             />
           </motion.div>

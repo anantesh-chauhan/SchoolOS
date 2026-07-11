@@ -21,6 +21,7 @@ import studentRoutes from './src/routes/students.js';
 import usersRoutes from './src/routes/users.js';
 import chapterFeedbackRoutes from './src/routes/chapterFeedback.js';
 import attendanceRoutes from './src/routes/attendance.js';
+import dashboardRoutes from './src/routes/dashboard.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -96,6 +97,7 @@ app.use('/api/widgets', widgetRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api', chapterFeedbackRoutes);
 
 

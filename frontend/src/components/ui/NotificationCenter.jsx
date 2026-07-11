@@ -1,0 +1,17 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { Bell, CheckCheck, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { widgetService } from '../../services/widgetService';
+import NotificationButton from './NotificationButton';
+
+export default function NotificationCenter({ enabled = true }) {
+  const navigate = useNavigate(); const root = useRef(null);
+  const [open, setOpen] = useState(false); const [rows, setRows] = useState([]); const [loading, setLoading] = useState(true);
+  const load = async () => { try { const response = await widgetService.listNotifications(); setRows(response.data || []); } finally { setLoading(false); } };
+  useEffect(() => { if (!enabled) { setLoading(false); return undefined; } load(); const timer = setInterval(load, 60000); return () => clearInterval(timer); }, [enabled]);
+  useEffect(() => { const close = (event) => { if (!root.current?.contains(event.target)) setOpen(false); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
+  const unread = rows.filter((row) => !row.isRead).length;
+  const select = async (row) => { if (!row.isRead) { await widgetService.markNotificationRead(row.id); setRows((old) => old.map((item) => item.id === row.id ? { ...item, isRead: true } : item)); } setOpen(false); if (row.link) navigate(row.link); };
+  if (!enabled) return null;
+  return <div ref={root} className="relative"><NotificationButton icon={<Bell size={16} className="mx-auto"/>} badge={unread > 0} onClick={() => setOpen((old) => !old)} ariaLabel={`${unread} unread notifications`}/>{unread > 0 && <span className="pointer-events-none absolute -right-1 -top-1 min-w-5 rounded-full bg-rose-600 px-1 text-center text-[10px] font-bold leading-5 text-white">{unread > 99 ? '99+' : unread}</span>}{open && <div className="absolute right-0 z-50 mt-2 w-[min(92vw,380px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"><div className="flex items-center justify-between border-b p-4 dark:border-slate-800"><div><p className="font-bold">Notifications</p><p className="text-xs text-slate-500">{unread} unread</p></div><CheckCheck size={18} className="text-slate-400"/></div><div className="max-h-96 overflow-auto">{loading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin"/></div> : rows.length === 0 ? <p className="p-8 text-center text-sm text-slate-500">You’re all caught up.</p> : rows.map((row) => <button key={row.id} type="button" onClick={() => select(row)} className={`block w-full border-b p-4 text-left hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 ${row.isRead ? 'opacity-70' : 'bg-blue-50/60 dark:bg-blue-950/20'}`}><div className="flex gap-3"><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${row.isRead ? 'bg-slate-300' : 'bg-blue-600'}`}/><div><p className="text-sm font-bold">{row.title}</p><p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">{row.body}</p><p className="mt-2 text-[10px] text-slate-400">{new Date(row.createdAt).toLocaleString()}</p></div></div></button>)}</div></div>}</div>;
+}

@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { WelcomeCard, SummaryCard } from '../../components/DashboardCards';
 import { Users, BookOpen, Users2, GraduationCap } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../../services/dashboardService';
 
 export default function SchoolOwnerDashboard() {
   const [user] = useState(() => {
@@ -13,12 +15,8 @@ export default function SchoolOwnerDashboard() {
     }
   });
 
-  const stats = {
-    totalStudents: 1250,
-    totalTeachers: 85,
-    totalClasses: 45,
-    avgAttendance: 94,
-  };
+  const { data, isLoading } = useQuery({ queryKey: ['dashboard-summary', 'school-owner'], queryFn: dashboardService.summary });
+  const stats = data?.stats || {};
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -52,9 +50,8 @@ export default function SchoolOwnerDashboard() {
             <SummaryCard
               icon={<GraduationCap className="w-8 h-8" />}
               label="Total Students"
-              value={stats.totalStudents}
+              value={isLoading ? '…' : stats.totalStudents || 0}
               color="blue"
-              trend={5}
             />
           </motion.div>
 
@@ -62,9 +59,8 @@ export default function SchoolOwnerDashboard() {
             <SummaryCard
               icon={<Users2 className="w-8 h-8" />}
               label="Total Teachers"
-              value={stats.totalTeachers}
+              value={isLoading ? '…' : stats.totalTeachers || 0}
               color="purple"
-              trend={2}
             />
           </motion.div>
 
@@ -72,7 +68,7 @@ export default function SchoolOwnerDashboard() {
             <SummaryCard
               icon={<BookOpen className="w-8 h-8" />}
               label="Total Classes"
-              value={stats.totalClasses}
+              value={isLoading ? '…' : stats.totalClasses || 0}
               color="green"
             />
           </motion.div>
@@ -80,8 +76,8 @@ export default function SchoolOwnerDashboard() {
           <motion.div variants={itemVariants}>
             <SummaryCard
               icon={<Users className="w-8 h-8" />}
-              label="Avg Attendance"
-              value={`${stats.avgAttendance}%`}
+              label="Today's Attendance"
+              value={isLoading ? '…' : `${stats.attendanceRate || 0}%`}
               color="orange"
             />
           </motion.div>
@@ -95,19 +91,19 @@ export default function SchoolOwnerDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">School Name</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{user.school?.schoolName || user.school?.name || 'Your School'}</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.schoolName || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Address</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{user.school?.address || 'Address'}</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.address || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{user.school?.email || 'email@school.com'}</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.email || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Phone</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{user.school?.phone || '+1-555-0000'}</p>
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.phone || '—'}</p>
             </div>
           </div>
         </motion.div>

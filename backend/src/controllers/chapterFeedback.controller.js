@@ -78,6 +78,20 @@ const notifyUsers = async ({ schoolId, where, title, body, type = 'INFO', link =
   });
 };
 
+const notifyPollAudience = async (poll, { notifyStudents = false, notifyTeacher = true } = {}) => {
+  const context = await prisma.chapterPoll.findUnique({ where: { id: poll.id }, include: { subject: { select: { subjectName: true } }, chapter: { select: { chapterName: true } }, teacher: { select: { email: true, employeeId: true } } } });
+  if (!context) return;
+  const body = `${context.subject.subjectName}: ${context.chapter.chapterName}`;
+  if (notifyTeacher && context.teacher) {
+    await notifyUsers({ schoolId: context.schoolId, where: { role: 'TEACHER', OR: [{ email: context.teacher.email }, { contactEmail: context.teacher.email }, { employeeId: context.teacher.employeeId }] }, title: 'Chapter poll assigned', body: `${body} needs your student evaluations.`, type: 'CHAPTER_POLL', link: '/dashboard/teacher' });
+  }
+  if (notifyStudents) {
+    const students = await getSectionStudents(context);
+    const loginIds = students.map((student) => student.studentUserId).filter(Boolean);
+    if (loginIds.length) await notifyUsers({ schoolId: context.schoolId, where: { role: 'STUDENT', email: { in: loginIds } }, title: 'New chapter feedback poll', body: `${body}. Share your understanding feedback.`, type: 'CHAPTER_POLL', link: '/dashboard/student' });
+  }
+};
+
 const summarizePoll = async (poll, user = null) => {
   const [studentCount, voteCount, evaluationCount] = await Promise.all([
     getSectionStudents(poll).then((students) => students.length),
@@ -463,13 +477,7 @@ export const createAdminChapterPoll = async (req, res) => {
       include: pollInclude,
     });
 
-    await notifyUsers({
-      schoolId: req.user.schoolId,
-      where: { role: 'TEACHER' },
-      title: 'Chapter poll created',
-      body: 'A chapter feedback poll needs student evaluations.',
-      type: 'CHAPTER_POLL',
-    });
+    await notifyPollAudience(poll, { notifyStudents: poll.status === 'ACTIVE', notifyTeacher: true });
 
     return res.status(201).json({ success: true, data: await summarizePoll(poll, req.user) });
   } catch (error) {
@@ -507,13 +515,7 @@ export const updateAdminChapterPollStatus = async (req, res) => {
     };
     const updated = await prisma.chapterPoll.update({ where: { id: poll.id }, data, include: pollInclude });
     if (status === 'ACTIVE') {
-      await notifyUsers({
-        schoolId: poll.schoolId,
-        where: { role: 'STUDENT', classId: poll.classId, sectionId: poll.sectionId },
-        title: 'Chapter feedback poll active',
-        body: 'Please submit your chapter understanding feedback.',
-        type: 'CHAPTER_POLL',
-      });
+      await notifyPollAudience(updated, { notifyStudents: true, notifyTeacher: poll.status !== 'ACTIVE' });
     }
     if (status === 'PUBLISHED') {
       await prisma.chapterAnalysisSummary.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, data: { isPublished: true } });

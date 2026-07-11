@@ -8,6 +8,8 @@ import { BarChart3, Calendar, CheckCircle, Loader2, Play, Send, Users, Users2 } 
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { SummaryCard, WelcomeCard } from '../../components/DashboardCards';
 import { chapterFeedbackService } from '../../services/chapterFeedbackService';
+import { useQuery } from '@tanstack/react-query';
+import { dashboardService } from '../../services/dashboardService';
 
 export default function AdminDashboard() {
   const [user] = useState(() => {
@@ -21,6 +23,7 @@ export default function AdminDashboard() {
   const [polls, setPolls] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const dashboardQuery = useQuery({ queryKey: ['dashboard-summary', 'admin'], queryFn: dashboardService.summary });
 
   const loadFeedback = useCallback(async () => {
     setFeedbackLoading(true);
@@ -42,12 +45,7 @@ export default function AdminDashboard() {
     loadFeedback();
   }, [loadFeedback]);
 
-  const stats = {
-    totalStudents: 1250,
-    totalStaff: 120,
-    todayAttendance: 1180,
-    attendanceRate: 94.4,
-  };
+  const stats = dashboardQuery.data?.stats || {};
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -128,9 +126,8 @@ export default function AdminDashboard() {
             <SummaryCard
               icon={<Users className="w-8 h-8" />}
               label="Total Students"
-              value={stats.totalStudents}
+              value={dashboardQuery.isLoading ? '…' : stats.totalStudents || 0}
               color="blue"
-              trend={3}
             />
           </motion.div>
 
@@ -138,7 +135,7 @@ export default function AdminDashboard() {
             <SummaryCard
               icon={<Users2 className="w-8 h-8" />}
               label="Total Staff"
-              value={stats.totalStaff}
+              value={dashboardQuery.isLoading ? '…' : stats.totalStaff || 0}
               color="purple"
             />
           </motion.div>
@@ -147,7 +144,7 @@ export default function AdminDashboard() {
             <SummaryCard
               icon={<Calendar className="w-8 h-8" />}
               label="Today's Attendance"
-              value={stats.todayAttendance}
+              value={dashboardQuery.isLoading ? '…' : stats.todayPresent || 0}
               color="green"
             />
           </motion.div>
@@ -156,7 +153,7 @@ export default function AdminDashboard() {
             <SummaryCard
               icon={<CheckCircle className="w-8 h-8" />}
               label="Attendance Rate"
-              value={`${stats.attendanceRate}%`}
+              value={dashboardQuery.isLoading ? '…' : `${stats.attendanceRate || 0}%`}
               color="orange"
             />
           </motion.div>
@@ -171,7 +168,7 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <div>
                 <p className="font-semibold text-green-900 dark:text-green-100">Present</p>
-                <p className="text-sm text-green-600 dark:text-green-300">{stats.todayAttendance} students</p>
+                <p className="text-sm text-green-600 dark:text-green-300">{stats.todayPresent || 0} of {stats.todayMarked || 0} marked students</p>
               </div>
               <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.attendanceRate}%</span>
             </div>
@@ -180,7 +177,7 @@ export default function AdminDashboard() {
                 <p className="font-semibold text-blue-900 dark:text-blue-100">Classes Today</p>
                 <p className="text-sm text-blue-600 dark:text-blue-300">All classes in session</p>
               </div>
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">45</span>
+              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.totalClasses || 0}</span>
             </div>
           </div>
         </motion.div>

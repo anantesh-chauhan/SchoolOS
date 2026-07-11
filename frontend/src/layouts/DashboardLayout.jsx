@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Bell,
   BookOpen,
   BookOpenCheck,
   ClipboardCheck,
@@ -28,7 +27,7 @@ import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
 import { useBranding } from '../contexts/BrandingContext';
 import Sidebar from '../components/Sidebar/Sidebar';
-import NotificationButton from '../components/ui/NotificationButton';
+import NotificationCenter from '../components/ui/NotificationCenter';
 import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -375,11 +374,7 @@ const DashboardLayout = ({ children, role }) => {
           <div className="flex items-center gap-3">
             <ThemeToggle />
 
-            <NotificationButton
-              icon={<Bell size={16} className="mx-auto" />}
-              badge
-              ariaLabel="Notifications"
-            />
+            <NotificationCenter enabled={role !== 'PLATFORM_OWNER'} />
 
             <div className="relative">
               <button
