@@ -101,9 +101,13 @@ export default function TeacherDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [uploadingResource, setUploadingResource] = useState(false);
   const [submittingEvaluationId, setSubmittingEvaluationId] = useState(null);
+  const [submittingAssessmentId, setSubmittingAssessmentId] = useState(null);
+  const [masteryLoadingId, setMasteryLoadingId] = useState(null);
   const [activeTab, setActiveTab] = useState('Overview');
   const [remarksByChapter, setRemarksByChapter] = useState({});
   const [evaluationForms, setEvaluationForms] = useState({});
+  const [assessmentForms, setAssessmentForms] = useState({});
+  const [masteryMatrices, setMasteryMatrices] = useState({});
   const [resourceForm, setResourceForm] = useState({
     title: '',
     description: '',
@@ -116,6 +120,14 @@ export default function TeacherDashboard() {
   });
 
   const assignments = useMemo(() => flattenAssignments(assignmentGroups), [assignmentGroups]);
+  const selectedPolls = useMemo(() => {
+    if (!selected) return polls;
+    return polls.filter((poll) => (
+      poll.class?.id === selected.classId
+      && poll.section?.id === selected.sectionId
+      && poll.subject?.id === selected.subjectId
+    ));
+  }, [polls, selected]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -295,6 +307,105 @@ export default function TeacherDashboard() {
     }
   };
 
+  const setAssessmentField = (pollId, field, value) => {
+    setAssessmentForms((prev) => ({
+      ...prev,
+      [pollId]: {
+        title: 'Chapter Quiz',
+        maxScore: 20,
+        assessmentType: 'CHAPTER_QUIZ',
+        results: {},
+        ...(prev[pollId] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const setAssessmentScore = (pollId, studentId, value) => {
+    setAssessmentForms((prev) => ({
+      ...prev,
+      [pollId]: {
+        title: 'Chapter Quiz',
+        maxScore: 20,
+        assessmentType: 'CHAPTER_QUIZ',
+        ...(prev[pollId] || {}),
+        results: {
+          ...((prev[pollId] || {}).results || {}),
+          [studentId]: value,
+        },
+      },
+    }));
+  };
+
+  const submitAssessment = async (poll) => {
+    const form = assessmentForms[poll.id] || {};
+    const maxScore = Number(form.maxScore || 20);
+    const results = (poll.students || [])
+      .map((student) => ({ studentId: student.id, rawScore: Number((form.results || {})[student.id]) }))
+      .filter((row) => Number.isFinite(row.rawScore));
+
+    if (!results.length) {
+      toast.error('Enter at least one assessment score');
+      return;
+    }
+
+    setSubmittingAssessmentId(poll.id);
+    try {
+      await chapterFeedbackService.createTeacherAssessment(poll.id, {
+        title: form.title || 'Chapter Quiz',
+        assessmentType: form.assessmentType || 'CHAPTER_QUIZ',
+        maxScore,
+        results,
+      });
+      toast.success('Assessment saved and mastery recalculated');
+      await loadMasteryMatrix(poll.id);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to save assessment');
+    } finally {
+      setSubmittingAssessmentId(null);
+    }
+  };
+
+  const loadMasteryMatrix = async (pollId) => {
+    setMasteryLoadingId(pollId);
+    try {
+      const matrix = await chapterFeedbackService.getTeacherMasteryMatrix(pollId);
+      setMasteryMatrices((prev) => ({ ...prev, [pollId]: matrix }));
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to load mastery matrix');
+    } finally {
+      setMasteryLoadingId(null);
+    }
+  };
+
+  const createIntervention = async (mastery) => {
+    if (!mastery?.id) {
+      toast.error('Calculate mastery before creating an intervention');
+      return;
+    }
+    try {
+      await chapterFeedbackService.createIntervention({
+        masteryId: mastery.id,
+        reason: mastery.summary,
+        recommendedAction: 'Targeted revision and reassessment',
+      });
+      toast.success('Intervention created');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Unable to create intervention');
+    }
+  };
+
+  const masteryTone = (level) => {
+    const tones = {
+      CRITICAL: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200',
+      NEEDS_ATTENTION: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200',
+      DEVELOPING: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200',
+      PROFICIENT: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200',
+      MASTERED: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200',
+    };
+    return tones[level] || 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+  };
+
   const today = new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date());
 
   if (loading) {
@@ -391,7 +502,7 @@ export default function TeacherDashboard() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       <span className="rounded-xl bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-200">View Chapters</span>
                       <span className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200">Share Resource</span>
-                      <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">View Resources</span>
+                      <span className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">Learning Intelligence</span>
                     </div>
                   </button>
                 ))}
@@ -550,12 +661,31 @@ export default function TeacherDashboard() {
                   </div>
                 ) : activeTab === 'Feedback' ? (
                   <div className="space-y-4">
-                    {polls.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
-                        No chapter feedback polls assigned yet.
+                    <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/30">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-black uppercase text-cyan-700 dark:text-cyan-200">Learning Intelligence</p>
+                          <h3 className="mt-1 text-base font-black text-slate-950 dark:text-slate-100">
+                            {selected?.className} · Section {selected?.sectionName} · {selected?.subjectName}
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            Capture student feedback, teacher evaluation, assessment marks, mastery, and interventions in one flow.
+                          </p>
+                        </div>
+                        <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-black text-cyan-700 shadow-sm dark:bg-slate-900 dark:text-cyan-200">
+                          {selectedPolls.length} polls
+                        </span>
+                      </div>
+                    </div>
+                    {selectedPolls.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center dark:border-slate-700 dark:bg-slate-950">
+                        <p className="text-sm font-black text-slate-800 dark:text-slate-100">No chapter feedback polls for this selected subject yet.</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                          Mark a chapter completed, then an admin can activate the feedback poll for this section.
+                        </p>
                       </div>
                     )}
-                    {polls.map((poll) => (
+                    {selectedPolls.map((poll) => (
                       <div key={poll.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
@@ -617,6 +747,110 @@ export default function TeacherDashboard() {
                               {submittingEvaluationId === poll.id ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                               Submit Evaluations
                             </button>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                                <div>
+                                  <h4 className="text-sm font-black text-slate-950 dark:text-slate-100">Assessment Results</h4>
+                                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Raw marks are preserved and normalized for mastery.</p>
+                                </div>
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                  <input
+                                    value={(assessmentForms[poll.id] || {}).title || 'Chapter Quiz'}
+                                    onChange={(event) => setAssessmentField(poll.id, 'title', event.target.value)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                    placeholder="Assessment title"
+                                  />
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={(assessmentForms[poll.id] || {}).maxScore || 20}
+                                    onChange={(event) => setAssessmentField(poll.id, 'maxScore', event.target.value)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                    placeholder="Max score"
+                                  />
+                                  <select
+                                    value={(assessmentForms[poll.id] || {}).assessmentType || 'CHAPTER_QUIZ'}
+                                    onChange={(event) => setAssessmentField(poll.id, 'assessmentType', event.target.value)}
+                                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                  >
+                                    {['CHAPTER_QUIZ', 'CLASS_TEST', 'ASSIGNMENT', 'HOMEWORK', 'PRACTICAL', 'REASSESSMENT'].map((type) => <option key={type}>{type}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                {(poll.students || []).map((student) => (
+                                  <label key={student.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                                    <span className="min-w-0 truncate">{student.rollNumber || '-'} · {student.name}</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={Number((assessmentForms[poll.id] || {}).maxScore || 20)}
+                                      value={((assessmentForms[poll.id] || {}).results || {})[student.id] || ''}
+                                      onChange={(event) => setAssessmentScore(poll.id, student.id, event.target.value)}
+                                      className="h-9 w-24 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                                      aria-label={`Score for ${student.name}`}
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button type="button" onClick={() => submitAssessment(poll)} disabled={submittingAssessmentId === poll.id} className="inline-flex h-10 items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white">
+                                  {submittingAssessmentId === poll.id ? <Loader2 size={16} className="animate-spin" /> : <ClipboardList size={16} />}
+                                  Save Results
+                                </button>
+                                <button type="button" onClick={() => loadMasteryMatrix(poll.id)} disabled={masteryLoadingId === poll.id} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-800">
+                                  {masteryLoadingId === poll.id ? <Loader2 size={16} className="animate-spin" /> : <Layers size={16} />}
+                                  View Mastery Matrix
+                                </button>
+                              </div>
+                            </div>
+                            {masteryMatrices[poll.id] && (
+                              <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div>
+                                    <h4 className="text-sm font-black text-slate-950 dark:text-slate-100">Student × Chapter Mastery</h4>
+                                    <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">{masteryMatrices[poll.id].poll?.chapter?.chapterName}</p>
+                                  </div>
+                                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{masteryMatrices[poll.id].students?.length || 0} students</span>
+                                </div>
+                                <div className="mt-4 overflow-x-auto">
+                                  <table className="min-w-full text-left text-sm">
+                                    <thead>
+                                      <tr className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                                        <th className="py-2 pr-3">Student</th>
+                                        <th className="px-3 py-2">Score</th>
+                                        <th className="px-3 py-2">Level</th>
+                                        <th className="px-3 py-2">Confidence</th>
+                                        <th className="px-3 py-2">Next Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {(masteryMatrices[poll.id].students || []).map((student) => (
+                                        <tr key={student.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                                          <td className="py-3 pr-3 font-bold text-slate-900 dark:text-slate-100">{student.rollNumber || '-'} · {student.name}</td>
+                                          <td className="px-3 py-3">
+                                            <span className={`inline-flex min-w-16 justify-center rounded-xl border px-3 py-1 text-xs font-black ${masteryTone(student.mastery?.masteryLevel)}`}>
+                                              {Number.isFinite(student.mastery?.score) ? `${Math.round(student.mastery.score)}%` : 'No data'}
+                                            </span>
+                                          </td>
+                                          <td className="px-3 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">{student.mastery?.masteryLevel?.replace(/_/g, ' ') || 'INSUFFICIENT DATA'}</td>
+                                          <td className="px-3 py-3 text-xs font-bold text-slate-600 dark:text-slate-300">{student.mastery?.confidence?.replace(/_/g, ' ') || 'INSUFFICIENT DATA'}</td>
+                                          <td className="px-3 py-3">
+                                            {['CRITICAL', 'NEEDS_ATTENTION'].includes(student.mastery?.masteryLevel) ? (
+                                              <button type="button" onClick={() => createIntervention(student.mastery)} className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700">
+                                                Create Intervention
+                                              </button>
+                                            ) : (
+                                              <span className="text-xs font-semibold text-slate-500">Monitor</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <p className="mt-4 rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">

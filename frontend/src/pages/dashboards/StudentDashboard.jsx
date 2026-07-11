@@ -33,15 +33,21 @@ function Stat({ icon: Icon, label: text, value }) {
 export default function StudentDashboard() {
   const [payload, setPayload] = useState(null);
   const [polls, setPolls] = useState([]);
+  const [masteryRows, setMasteryRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submittingPollId, setSubmittingPollId] = useState(null);
   const [voteForms, setVoteForms] = useState({});
 
   useEffect(() => {
-    Promise.all([studentAcademicsService.getMyAcademics(), chapterFeedbackService.getStudentPolls()])
-      .then(([academics, pollRows]) => {
+    Promise.all([
+      studentAcademicsService.getMyAcademics(),
+      chapterFeedbackService.getStudentPolls(),
+      chapterFeedbackService.getStudentMastery(),
+    ])
+      .then(([academics, pollRows, mastery]) => {
         setPayload(academics);
         setPolls(pollRows);
+        setMasteryRows(mastery);
       })
       .catch((error) => toast.error(error.response?.data?.message || 'Unable to load student dashboard'))
       .finally(() => setLoading(false));
@@ -51,6 +57,10 @@ export default function StudentDashboard() {
   const completed = chapters.filter((chapter) => chapter.status === 'COMPLETED').length;
   const ongoing = chapters.filter((chapter) => chapter.status === 'ONGOING').length;
   const pendingPolls = polls.filter((poll) => poll.status === 'ACTIVE' && !poll.submitted);
+  const reliableMastery = masteryRows.filter((row) => Number.isFinite(row.score));
+  const averageMastery = reliableMastery.length
+    ? Math.round(reliableMastery.reduce((sum, row) => sum + row.score, 0) / reliableMastery.length)
+    : null;
 
   const setVoteField = (pollId, field, value) => {
     setVoteForms((prev) => ({
@@ -113,6 +123,44 @@ export default function StudentDashboard() {
             <Stat icon={FileText} label="Chapters" value={chapters.length} />
             <Stat icon={CheckCircle2} label="Completed" value={completed} />
             <Stat icon={Bell} label="Pending Polls" value={pendingPolls.length} />
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">My Chapter Mastery</h2>
+                <p className="mt-1 text-sm text-slate-500">Scores appear only when enough chapter evidence has been collected.</p>
+              </div>
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                {averageMastery === null ? 'Insufficient data' : `${averageMastery}% average`}
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {masteryRows.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-600">
+                  No mastery summaries have been published for your chapters yet.
+                </div>
+              )}
+              {masteryRows.map((row) => (
+                <div key={row.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-black text-slate-950">{row.subject?.subjectName} · {row.chapter?.chapterName}</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">
+                        {row.masteryLevel?.replace(/_/g, ' ') || 'INSUFFICIENT DATA'} · {row.confidence?.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                    <span className="rounded-xl border border-indigo-100 bg-white px-3 py-1 text-sm font-black text-indigo-700">
+                      {Number.isFinite(row.score) ? `${Math.round(row.score)}%` : '--'}
+                    </span>
+                  </div>
+                  {row.summary && <p className="mt-3 text-sm leading-6 text-slate-700">{row.summary}</p>}
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                    <div className="h-full rounded-full bg-indigo-600" style={{ width: `${Math.max(0, Math.min(100, row.score || 0))}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

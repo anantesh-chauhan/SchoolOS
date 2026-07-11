@@ -41,6 +41,18 @@ export const chapterFeedbackService = {
     const response = await apiClient.post(`/teacher/polls/${pollId}/student-evaluations`, { evaluations });
     return response.data.data;
   },
+  createTeacherAssessment: async (pollId, payload) => {
+    const response = await apiClient.post(`/teacher/polls/${pollId}/assessments`, payload);
+    return response.data.data;
+  },
+  recalculateTeacherMastery: async (pollId) => {
+    const response = await apiClient.post(`/teacher/polls/${pollId}/recalculate-mastery`);
+    return response.data.data;
+  },
+  getTeacherMasteryMatrix: async (pollId) => {
+    const response = await apiClient.get(`/teacher/polls/${pollId}/mastery-matrix`);
+    return response.data.data;
+  },
   getStudentNotifications: async () => {
     const response = await apiClient.get('/student/notifications');
     return response.data.data;
@@ -49,12 +61,20 @@ export const chapterFeedbackService = {
     const response = await apiClient.get('/student/polls');
     return response.data.data;
   },
+  getStudentMastery: async () => {
+    const response = await apiClient.get('/student/mastery');
+    return response.data.data;
+  },
   submitStudentVote: async (pollId, payload) => {
     const response = await apiClient.post(`/student/polls/${pollId}/vote`, payload);
     return response.data.data;
   },
   getChapterAnalysis: async (chapterId) => {
     const response = await apiClient.get(`/chapters/${chapterId}/analysis`);
+    return response.data.data;
+  },
+  createIntervention: async (payload) => {
+    const response = await apiClient.post('/interventions', payload);
     return response.data.data;
   },
 };

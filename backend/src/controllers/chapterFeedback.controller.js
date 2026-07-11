@@ -1,6 +1,11 @@
 import prisma from '../config/prisma.client.js';
 import { buildChapterAnalysisSummary } from '../services/chapterAnalysis.service.js';
 import {
+  getSectionStudentsForContext,
+  recalculateMasteryForPoll,
+  saveAssessmentWithResults,
+} from '../services/masteryCalculation.service.js';
+import {
   assertSameSchool,
   assertTeacherAssignedToSectionSubject,
   getTeacherForUser,
@@ -578,10 +583,172 @@ export const compileAdminChapterPoll = async (req, res) => {
       update: { ...summaryData, compiledAt: new Date() },
     });
     await prisma.chapterPoll.update({ where: { id: poll.id }, data: { status: 'COMPILED', compiledAt: new Date() } });
+    await recalculateMasteryForPoll(poll);
 
     return res.json({ success: true, data: summary });
   } catch (error) {
     return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to compile analysis' });
+  }
+};
+
+export const createPollAssessment = async (req, res) => {
+  try {
+    const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
+    if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
+
+    let teacherId = null;
+    if (req.user.role === 'TEACHER') {
+      const { teacher } = await assertTeacherAssignedToSectionSubject(req.user, poll);
+      teacherId = teacher.id;
+      if (poll.teacherId && poll.teacherId !== teacher.id) {
+        return res.status(403).json({ success: false, message: 'This poll belongs to another assigned teacher.' });
+      }
+    } else {
+      assertAdmin(req.user);
+    }
+
+    const assessment = await saveAssessmentWithResults({ poll, teacherId, payload: req.body });
+    return res.status(201).json({ success: true, data: assessment });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to save assessment results' });
+  }
+};
+
+export const recalculatePollMastery = async (req, res) => {
+  try {
+    const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
+    if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
+    await requireSchoolAdminOrAssignedTeacher(req.user, poll);
+    const rows = await recalculateMasteryForPoll(poll);
+    return res.json({ success: true, data: { calculated: rows.length } });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to recalculate mastery' });
+  }
+};
+
+export const getPollMasteryMatrix = async (req, res) => {
+  try {
+    const poll = await prisma.chapterPoll.findFirst({
+      where: { id: req.params.pollId, schoolId: req.user.schoolId },
+      include: {
+        class: { select: { id: true, className: true } },
+        section: { select: { id: true, sectionName: true } },
+        subject: { select: { id: true, subjectName: true } },
+        chapter: { select: { id: true, chapterName: true, chapterNumber: true } },
+      },
+    });
+    if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
+    await requireSchoolAdminOrAssignedTeacher(req.user, poll);
+
+    const students = await getSectionStudentsForContext(poll);
+    const masteries = await prisma.studentChapterMastery.findMany({
+      where: { schoolId: poll.schoolId, classId: poll.classId, sectionId: poll.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId },
+    });
+    const masteryByStudent = new Map(masteries.map((mastery) => [mastery.studentId, mastery]));
+
+    return res.json({
+      success: true,
+      data: {
+        poll: {
+          id: poll.id,
+          status: poll.status,
+          class: poll.class,
+          section: poll.section,
+          subject: poll.subject,
+          chapter: poll.chapter,
+        },
+        students: students.map((student) => {
+          const mastery = masteryByStudent.get(student.id);
+          return {
+            id: student.id,
+            name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '),
+            rollNumber: student.rollNumber,
+            mastery: mastery
+              ? {
+                  id: mastery.id,
+                  score: mastery.score,
+                  masteryLevel: mastery.masteryLevel,
+                  confidence: mastery.confidence,
+                  componentBreakdown: mastery.componentBreakdown,
+                  dataCompleteness: mastery.dataCompleteness,
+                  summary: mastery.summary,
+                }
+              : null,
+          };
+        }),
+      },
+    });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load mastery matrix' });
+  }
+};
+
+export const getMyStudentMastery = async (req, res) => {
+  try {
+    const student = await getStudentForUser(req.user);
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    const rows = await prisma.studentChapterMastery.findMany({
+      where: { schoolId: student.schoolId, studentId: student.id },
+      include: {
+        subject: { select: { id: true, subjectName: true } },
+        chapter: { select: { id: true, chapterName: true, chapterNumber: true } },
+      },
+      orderBy: [{ calculatedAt: 'desc' }],
+    });
+    return res.json({
+      success: true,
+      data: rows.map((row) => ({
+        id: row.id,
+        subject: row.subject,
+        chapter: row.chapter,
+        score: row.score,
+        masteryLevel: row.masteryLevel,
+        confidence: row.confidence,
+        componentBreakdown: row.componentBreakdown,
+        dataCompleteness: row.dataCompleteness,
+        summary: row.summary,
+        calculatedAt: row.calculatedAt,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to load student mastery' });
+  }
+};
+
+export const createIntervention = async (req, res) => {
+  try {
+    const mastery = await prisma.studentChapterMastery.findFirst({
+      where: { id: req.body.masteryId, schoolId: req.user.schoolId },
+    });
+    if (!mastery) return res.status(404).json({ success: false, message: 'Mastery row not found' });
+    const permission = await requireSchoolAdminOrAssignedTeacher(req.user, mastery);
+
+    const intervention = await prisma.learningIntervention.create({
+      data: {
+        schoolId: mastery.schoolId,
+        classId: mastery.classId,
+        sectionId: mastery.sectionId,
+        subjectId: mastery.subjectId,
+        chapterId: mastery.chapterId,
+        studentId: mastery.studentId,
+        assignedTeacherId: permission.teacher?.id || null,
+        reason: req.body.reason?.trim() || mastery.summary || 'Additional support recommended.',
+        recommendedAction: req.body.recommendedAction?.trim() || 'Targeted revision and reassessment',
+        status: req.body.status || 'PLANNED',
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+        notes: req.body.notes?.trim() || null,
+        beforeScore: mastery.score,
+      },
+    });
+
+    return res.status(201).json({ success: true, data: intervention });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to create intervention' });
   }
 };
 
