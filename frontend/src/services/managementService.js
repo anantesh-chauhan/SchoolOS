@@ -168,6 +168,34 @@ export const attendanceService = {
     const response = await apiClient.post('/attendance/teachers', payload);
     return response.data;
   },
+  classMonth: async (params) => {
+    const response = await apiClient.get('/attendance/class-month', { params });
+    return response.data;
+  },
+  myAttendance: async (params = {}) => {
+    const response = await apiClient.get('/attendance/me', { params });
+    return response.data;
+  },
+  saveCalendarDay: async (payload) => {
+    const response = await apiClient.put('/attendance/calendar-day', payload);
+    return response.data;
+  },
+  calendar: async (params) => {
+    const response = await apiClient.get('/attendance/calendar', { params });
+    return response.data;
+  },
+  deleteCalendarDay: async (id) => {
+    const response = await apiClient.delete(`/attendance/calendar-day/${id}`);
+    return response.data;
+  },
+  classRegister: async (params) => {
+    const response = await apiClient.get('/attendance/class-register', { params });
+    return response.data;
+  },
+  teacherRegister: async (params) => {
+    const response = await apiClient.get('/attendance/teacher-register', { params });
+    return response.data;
+  },
 };
 
 export const userService = {

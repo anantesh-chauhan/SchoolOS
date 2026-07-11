@@ -146,6 +146,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
+          { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
         ],
       },
       {
@@ -188,6 +189,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
+          { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
         ],
       },
       {
@@ -210,6 +212,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'My Profile', icon: UserRound, href: '/dashboard/teacher/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/teacher' },
           { label: 'Daily Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/attendance' },
+          { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -222,6 +225,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'My Profile', icon: UserRound, href: '/dashboard/parent/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
+          { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -233,6 +237,7 @@ const DashboardLayout = ({ children, role }) => {
         icon: Settings,
         items: [
           { label: 'My Profile', icon: UserRound, href: '/dashboard/student/profile' },
+          { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/student/attendance' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/student' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },

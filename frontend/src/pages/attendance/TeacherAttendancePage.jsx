@@ -19,11 +19,17 @@ export default function TeacherAttendancePage() {
   const queryClient = useQueryClient();
   const [date, setDate] = useState(todayInputValue());
   const [recordsByTeacher, setRecordsByTeacher] = useState({});
+  const month = date.slice(0, 7);
 
   const rosterQuery = useQuery({
     queryKey: ['teacher-attendance-roster', date],
     queryFn: () => attendanceService.teacherRoster({ date }),
     enabled: Boolean(date),
+  });
+  const registerQuery = useQuery({
+    queryKey: ['teacher-month-register', month],
+    queryFn: () => attendanceService.teacherRegister({ month }),
+    enabled: Boolean(month),
   });
 
   useEffect(() => {
@@ -157,6 +163,7 @@ export default function TeacherAttendancePage() {
             )}
           </CardContent>
         </Card>
+        <Card><CardHeader><CardTitle>Monthly teacher summary</CardTitle></CardHeader><CardContent><div className="overflow-auto"><table className="min-w-full text-sm"><thead className="bg-slate-100 dark:bg-slate-800"><tr>{['Teacher','Present','Absent','Late','Half day','Leave','Marked','Attendance'].map((label) => <th key={label} className="px-3 py-2 text-left">{label}</th>)}</tr></thead><tbody>{(registerQuery.data?.data?.teachers || []).map((teacher) => <tr key={teacher.id} className="border-b dark:border-slate-800"><td className="px-3 py-2"><p className="font-semibold">{teacher.teacherName}</p><p className="text-xs text-slate-500">{teacher.employeeId}</p></td><td className="px-3 py-2 text-emerald-700">{teacher.PRESENT}</td><td className="px-3 py-2 text-rose-700">{teacher.ABSENT}</td><td className="px-3 py-2">{teacher.LATE}</td><td className="px-3 py-2">{teacher.HALF_DAY}</td><td className="px-3 py-2">{teacher.LEAVE}</td><td className="px-3 py-2">{teacher.markedDays}</td><td className="px-3 py-2 font-bold">{teacher.percentage}%</td></tr>)}</tbody></table></div></CardContent></Card>
       </div>
     </DashboardLayout>
   );

@@ -85,6 +85,23 @@ export const login = async (req, res) => {
       });
     }
 
+    const linkedStudent = ['STUDENT', 'PARENT'].includes(user.role)
+      ? await prisma.student.findFirst({
+          where: {
+            schoolId: user.schoolId,
+            isActive: true,
+            ...(user.role === 'STUDENT' ? { studentUserId: user.email } : { parentUserId: user.email }),
+          },
+          select: {
+            id: true,
+            studentFirstName: true,
+            studentLastName: true,
+            className: true,
+            section: true,
+          },
+        })
+      : null;
+
     // Generate JWT token
     const tokenPayload = {
       id: user.id,
@@ -92,6 +109,7 @@ export const login = async (req, res) => {
       name: user.name,
       role: user.role,
       schoolId: user.schoolId,
+      ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
 
     const token = generateToken(tokenPayload);
@@ -111,6 +129,8 @@ export const login = async (req, res) => {
           name: user.name,
           role: user.role,
           schoolId: user.schoolId,
+          studentId: linkedStudent?.id || null,
+          linkedStudent,
           classId: user.classId,
           sectionId: user.sectionId,
           contactEmail: user.contactEmail,
@@ -203,6 +223,23 @@ export const getMe = async (req, res) => {
       });
     }
 
+    const linkedStudent = ['STUDENT', 'PARENT'].includes(user.role)
+      ? await prisma.student.findFirst({
+          where: {
+            schoolId: user.schoolId,
+            isActive: true,
+            ...(user.role === 'STUDENT' ? { studentUserId: user.email } : { parentUserId: user.email }),
+          },
+          select: {
+            id: true,
+            studentFirstName: true,
+            studentLastName: true,
+            className: true,
+            section: true,
+          },
+        })
+      : null;
+
     res.json({
       success: true,
       data: {
@@ -211,6 +248,8 @@ export const getMe = async (req, res) => {
         name: user.name,
         role: user.role,
         schoolId: user.schoolId,
+        studentId: linkedStudent?.id || null,
+        linkedStudent,
         classId: user.classId,
         sectionId: user.sectionId,
         contactEmail: user.contactEmail,
@@ -481,12 +520,24 @@ export const refreshSession = async (req, res) => {
       });
     }
 
+    const linkedStudent = ['STUDENT', 'PARENT'].includes(user.role)
+      ? await prisma.student.findFirst({
+          where: {
+            schoolId: user.schoolId,
+            isActive: true,
+            ...(user.role === 'STUDENT' ? { studentUserId: user.email } : { parentUserId: user.email }),
+          },
+          select: { id: true },
+        })
+      : null;
+
     const payload = {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       schoolId: user.schoolId,
+      ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
 
     const accessToken = generateToken(payload);
@@ -505,6 +556,7 @@ export const refreshSession = async (req, res) => {
           name: user.name,
           role: user.role,
           schoolId: user.schoolId,
+          studentId: linkedStudent?.id || null,
           school: user.school,
         },
       },
@@ -523,7 +575,7 @@ export const getDemoAccounts = async (req, res) => {
     const users = await prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT'] },
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
       },
       select: {
         id: true,
@@ -584,9 +636,10 @@ export const getDemoAccounts = async (req, res) => {
       TEACHER: 'Teachers',
       STUDENT: 'Students',
       PARENT: 'Parents',
+      STAFF: 'Staff',
     };
 
-    const groups = ['Platform Owner', 'School Admins', 'Teachers', 'Students', 'Parents'].map((role) => ({ role, users: [] }));
+    const groups = ['Platform Owner', 'School Admins', 'Teachers', 'Staff', 'Students', 'Parents'].map((role) => ({ role, users: [] }));
     const groupByLabel = new Map(groups.map((group) => [group.role, group]));
 
     users.forEach((user) => {
@@ -609,8 +662,8 @@ export const getDemoAccounts = async (req, res) => {
         email: user.email,
         role: user.role,
         schoolName: user.school?.schoolName || teacher?.school?.schoolName || 'Platform',
-        className: user.class?.className || null,
-        sectionName: user.section?.sectionName || null,
+        className: user.class?.className || teacher?.teacherAssignments?.[0]?.class?.className || null,
+        sectionName: user.section?.sectionName || teacher?.teacherAssignments?.[0]?.section?.sectionName || null,
         assignmentPreview,
       });
     });

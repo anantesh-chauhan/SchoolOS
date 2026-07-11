@@ -64,6 +64,8 @@ export default function LoginPage() {
   const [errors, setErrors] = useState({});
   const [branding, setBranding] = useState(null);
   const [demoAccounts, setDemoAccounts] = useState(demoAccountsByRole);
+  const [demoSearch, setDemoSearch] = useState('');
+  const [instantFilters, setInstantFilters] = useState({ role: '', school: '', className: '', section: '' });
 
 
   useEffect(() => {
@@ -147,6 +149,41 @@ export default function LoginPage() {
     ],
     []
   );
+
+  const filteredDemoAccounts = useMemo(() => {
+    const query = demoSearch.trim().toLowerCase();
+    return demoAccounts.map((group) => {
+      const matches = group.users.filter((user) => {
+        if (instantFilters.role && user.role !== instantFilters.role) return false;
+        if (instantFilters.school && user.schoolName !== instantFilters.school) return false;
+        if (instantFilters.className && user.className !== instantFilters.className) return false;
+        if (instantFilters.section && user.sectionName !== instantFilters.section) return false;
+        if (!query) return true;
+        return [
+          user.name,
+          user.email,
+          user.role,
+          user.schoolName,
+          user.className,
+          user.sectionName,
+          user.assignmentPreview,
+        ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
+      });
+      return {
+        ...group,
+        totalUsers: group.users.length,
+        users: matches,
+        matchedUsers: matches.length,
+        hiddenUsers: 0,
+      };
+    });
+  }, [demoAccounts, demoSearch, instantFilters]);
+
+  const instantFilterOptions = useMemo(() => {
+    const users = demoAccounts.flatMap((group) => group.users);
+    const unique = (field) => [...new Set(users.map((user) => user[field]).filter(Boolean))].sort();
+    return { roles: unique('role'), schools: unique('schoolName'), classes: unique('className'), sections: unique('sectionName') };
+  }, [demoAccounts]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -438,14 +475,36 @@ export default function LoginPage() {
               </form>
 
               <div className="mt-10">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Demo Users</p>
-                  <p className="text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 font-medium uppercase">Password: admin123</p>
+                <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Instant Login</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Search by school, class, section, name, or email.</p>
+                  </div>
+                  <p className="w-fit text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 font-medium uppercase">Password: admin123</p>
                 </div>
+                <input
+                  value={demoSearch}
+                  onChange={(event) => setDemoSearch(event.target.value)}
+                  placeholder="Search instant accounts..."
+                  className="mb-3 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                />
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  {[['role', 'All roles', instantFilterOptions.roles], ['school', 'All schools', instantFilterOptions.schools], ['className', 'All classes', instantFilterOptions.classes], ['section', 'All sections', instantFilterOptions.sections]].map(([field, placeholder, options]) => (
+                    <select key={field} value={instantFilters[field]} onChange={(event) => setInstantFilters((old) => ({ ...old, [field]: event.target.value, ...(field === 'className' ? { section: '' } : {}) }))} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-blue-500">
+                      <option value="">{placeholder}</option>{options.map((option) => <option key={option} value={option}>{option.replace(/_/g, ' ')}</option>)}
+                    </select>
+                  ))}
+                </div>
+                <div className="mb-3 flex items-center justify-between text-[11px] text-slate-500"><span>{filteredDemoAccounts.reduce((sum, group) => sum + group.matchedUsers, 0)} database users shown</span><button type="button" className="font-semibold text-blue-600" onClick={() => { setDemoSearch(''); setInstantFilters({ role: '', school: '', className: '', section: '' }); }}>Clear filters</button></div>
                 <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-2 space-y-3 custom-scrollbar">
-                  {demoAccounts.map((group) => (
+                  {filteredDemoAccounts.map((group) => (
                     <div key={group.role} className="p-1">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group.role}</p>
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{group.role}</p>
+                        <p className="text-[10px] font-bold text-slate-400">
+                          {group.matchedUsers}/{group.totalUsers}
+                        </p>
+                      </div>
                       <div className="space-y-2">
                         {group.users.length === 0 && (
                           <div className="rounded-xl border border-dashed border-slate-200 bg-white/70 p-3 text-[11px] font-medium text-slate-400">
@@ -475,6 +534,11 @@ export default function LoginPage() {
                             </button>
                           </div>
                         ))}
+                        {group.hiddenUsers > 0 && (
+                          <div className="rounded-xl border border-dashed border-blue-100 bg-blue-50/60 p-3 text-[11px] font-semibold text-blue-700">
+                            {group.hiddenUsers} more accounts hidden. Refine the search to find a specific class, section, student, parent, or teacher.
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

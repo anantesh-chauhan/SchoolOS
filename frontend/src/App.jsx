@@ -28,6 +28,8 @@ const ClassTeacherAssignmentPage = lazy(() => import('./pages/admin/ClassTeacher
 const TeacherAssignmentSummaryPage = lazy(() => import('./pages/admin/TeacherAssignmentSummaryPage'));
 const StudentAttendancePage = lazy(() => import('./pages/attendance/StudentAttendancePage'));
 const TeacherAttendancePage = lazy(() => import('./pages/attendance/TeacherAttendancePage'));
+const MyAttendancePage = lazy(() => import('./pages/attendance/MyAttendancePage'));
+const AcademicCalendarPage = lazy(() => import('./pages/attendance/AcademicCalendarPage'));
 const WeeklySlotManagementPage = lazy(() => import('./pages/admin/WeeklySlotManagementPage'));
 const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPage'));
 const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
@@ -323,6 +325,7 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/admin/attendance/calendar" element={<ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}><AcademicCalendarPage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/admin/teacher-assignment-summary"
@@ -404,6 +407,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/teacher/my-attendance" element={<ProtectedRoute allowedRoles={['TEACHER']}><MyAttendancePage /></ProtectedRoute>} />
+          <Route path="/dashboard/student/attendance" element={<ProtectedRoute allowedRoles={['STUDENT']}><MyAttendancePage /></ProtectedRoute>} />
+          <Route path="/dashboard/parent/attendance" element={<ProtectedRoute allowedRoles={['PARENT']}><MyAttendancePage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/parent"

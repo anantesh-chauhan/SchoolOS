@@ -7,6 +7,7 @@ import {
 } from '../utils/teacherAuthorization.util.js';
 
 const VALID_ATTENDANCE_STATUSES = new Set(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE']);
+const VALID_DAY_TYPES = new Set(['WORKING_DAY', 'HOLIDAY', 'WEEKLY_OFF', 'EXAM', 'EVENT', 'VACATION']);
 
 const normalizeDate = (value) => {
   const source = value ? new Date(value) : new Date();
@@ -17,6 +18,21 @@ const normalizeDate = (value) => {
 const normalizeStatus = (value) => {
   const normalized = String(value || 'PRESENT').trim().toUpperCase().replace(/\s+/g, '_');
   return VALID_ATTENDANCE_STATUSES.has(normalized) ? normalized : null;
+};
+
+const sessionForDate = (date) => {
+  const year = date.getUTCFullYear();
+  const startYear = date.getUTCMonth() >= 3 ? year : year - 1;
+  return `${startYear}-${String(startYear + 1).slice(-2)}`;
+};
+
+const monthRange = (value) => {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  if (month < 0 || month > 11) return null;
+  return { start: new Date(Date.UTC(year, month, 1)), end: new Date(Date.UTC(year, month + 1, 1)) };
 };
 
 const getSectionOr404 = async ({ schoolId, classId, sectionId }) => {
@@ -151,6 +167,7 @@ export const markStudentAttendance = async (req, res) => {
           sectionId,
           studentId: record.studentId,
           attendanceDate,
+          academicSession: students.find((student) => student.id === record.studentId)?.session || sessionForDate(attendanceDate),
           status: record.status,
           remarks: record.remarks,
           markedById: req.user.id,
@@ -265,6 +282,7 @@ export const markTeacherAttendance = async (req, res) => {
           schoolId,
           teacherId: record.teacherId,
           attendanceDate,
+          academicSession: String(req.body.academicSession || sessionForDate(attendanceDate)),
           status: record.status,
           remarks: record.remarks,
           markedById: req.user.id,
@@ -279,5 +297,181 @@ export const markTeacherAttendance = async (req, res) => {
       message: error.message || 'Failed to save teacher attendance',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+};
+
+export const getClassAttendanceMonth = async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const { classId, sectionId } = req.query;
+    const range = monthRange(req.query.month);
+    if (!schoolId || !classId || !sectionId || !range) {
+      return res.status(400).json({ success: false, message: 'classId, sectionId and month (YYYY-MM) are required' });
+    }
+    const section = await getSectionOr404({ schoolId, classId, sectionId });
+    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    const [students, rows, calendar] = await Promise.all([
+      getSectionStudents(section),
+      prisma.studentAttendance.findMany({
+        where: { schoolId, classId, sectionId, attendanceDate: { gte: range.start, lt: range.end } },
+        select: { studentId: true, attendanceDate: true, status: true },
+      }),
+      prisma.academicCalendarDay.findMany({
+        where: { schoolId, calendarDate: { gte: range.start, lt: range.end } }, orderBy: { calendarDate: 'asc' },
+      }),
+    ]);
+    const daysInMonth = Math.round((range.end - range.start) / 86400000);
+    const byDay = new Map();
+    rows.forEach((row) => {
+      const key = row.attendanceDate.toISOString().slice(0, 10);
+      const counts = byDay.get(key) || { PRESENT: 0, ABSENT: 0, LATE: 0, HALF_DAY: 0, LEAVE: 0, marked: 0 };
+      counts[row.status] += 1; counts.marked += 1; byDay.set(key, counts);
+    });
+    const calendarByDay = new Map(calendar.map((day) => [day.calendarDate.toISOString().slice(0, 10), day]));
+    const days = Array.from({ length: daysInMonth }, (_, index) => {
+      const date = new Date(range.start.getTime() + index * 86400000);
+      const key = date.toISOString().slice(0, 10);
+      const marker = calendarByDay.get(key);
+      const weekend = date.getUTCDay() === 0;
+      return { date: key, dayType: marker?.dayType || (weekend ? 'WEEKLY_OFF' : 'WORKING_DAY'), title: marker?.title || (weekend ? 'Sunday' : null), counts: { ...(byDay.get(key) || { PRESENT: 0, ABSENT: 0, LATE: 0, HALF_DAY: 0, LEAVE: 0, marked: 0 }), total: students.length } };
+    });
+    return res.json({ success: true, data: { month: req.query.month, academicSession: String(req.query.academicSession || sessionForDate(range.start)), class: section.class, section: { id: section.id, sectionName: section.sectionName }, totalStudents: students.length, days } });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load monthly attendance' });
+  }
+};
+
+const summarizeRows = (rows, idKey) => {
+  const summary = new Map();
+  rows.forEach((row) => {
+    const id = row[idKey];
+    const counts = summary.get(id) || { PRESENT: 0, ABSENT: 0, LATE: 0, HALF_DAY: 0, LEAVE: 0, markedDays: 0 };
+    counts[row.status] += 1;
+    counts.markedDays += 1;
+    summary.set(id, counts);
+  });
+  return summary;
+};
+
+const withPercentage = (counts = {}) => {
+  const markedDays = counts.markedDays || 0;
+  const attended = (counts.PRESENT || 0) + (counts.LATE || 0) + (counts.HALF_DAY || 0) * 0.5;
+  return { PRESENT: 0, ABSENT: 0, LATE: 0, HALF_DAY: 0, LEAVE: 0, markedDays: 0, ...counts, percentage: markedDays ? Math.round((attended / markedDays) * 1000) / 10 : 0 };
+};
+
+export const getClassMonthlyRegister = async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const { classId, sectionId } = req.query;
+    const range = monthRange(req.query.month);
+    if (!schoolId || !classId || !sectionId || !range) return res.status(400).json({ success: false, message: 'classId, sectionId and month are required' });
+    const section = await getSectionOr404({ schoolId, classId, sectionId });
+    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    const [students, rows] = await Promise.all([
+      getSectionStudents(section),
+      prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate: { gte: range.start, lt: range.end } }, select: { studentId: true, status: true } }),
+    ]);
+    const summary = summarizeRows(rows, 'studentId');
+    return res.json({ success: true, data: { month: req.query.month, class: section.class, section: { id: section.id, sectionName: section.sectionName }, students: students.map((student) => ({ id: student.id, admissionNo: student.admissionNo, rollNumber: student.rollNumber, name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '), ...withPercentage(summary.get(student.id)) })) } });
+  } catch (error) {
+    if (sendAuthorizationError(res, error)) return;
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load class register' });
+  }
+};
+
+export const getTeacherMonthlyRegister = async (req, res) => {
+  try {
+    if (!isSchoolAdmin(req.user)) return res.status(403).json({ success: false, message: 'Only admins can view the teacher register' });
+    const range = monthRange(req.query.month);
+    if (!range) return res.status(400).json({ success: false, message: 'month (YYYY-MM) is required' });
+    const [teachers, rows] = await Promise.all([
+      prisma.teacher.findMany({ where: { schoolId: req.user.schoolId, deletedAt: null }, orderBy: { teacherName: 'asc' } }),
+      prisma.teacherAttendance.findMany({ where: { schoolId: req.user.schoolId, attendanceDate: { gte: range.start, lt: range.end } }, select: { teacherId: true, status: true } }),
+    ]);
+    const summary = summarizeRows(rows, 'teacherId');
+    return res.json({ success: true, data: { month: req.query.month, teachers: teachers.map((teacher) => ({ id: teacher.id, teacherName: teacher.teacherName, employeeId: teacher.employeeId, specialization: teacher.specialization, ...withPercentage(summary.get(teacher.id)) })) } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to load teacher register' });
+  }
+};
+
+export const getMyAttendance = async (req, res) => {
+  try {
+    const schoolId = req.user.schoolId;
+    const academicSession = String(req.query.academicSession || sessionForDate(new Date()));
+    if (['STUDENT', 'PARENT'].includes(req.user.role)) {
+      const student = await prisma.student.findFirst({ where: { schoolId, isActive: true, ...(req.user.role === 'STUDENT' ? { studentUserId: req.user.email } : { parentUserId: req.user.email }) } });
+      if (!student) return res.status(404).json({ success: false, message: 'Linked student profile not found' });
+      const records = await prisma.studentAttendance.findMany({ where: { schoolId, studentId: student.id, academicSession }, orderBy: { attendanceDate: 'asc' } });
+      return res.json({ success: true, data: buildPersonalHistory('STUDENT', student, academicSession, records) });
+    }
+    const teacher = await prisma.teacher.findFirst({ where: { schoolId, deletedAt: null, OR: [{ email: req.user.email }, ...(req.user.employeeId ? [{ employeeId: req.user.employeeId }] : [])] } });
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher profile not found' });
+    const records = await prisma.teacherAttendance.findMany({ where: { schoolId, teacherId: teacher.id, academicSession }, orderBy: { attendanceDate: 'asc' } });
+    return res.json({ success: true, data: buildPersonalHistory('TEACHER', teacher, academicSession, records) });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to load attendance history' });
+  }
+};
+
+const buildPersonalHistory = (personType, person, academicSession, records) => {
+  const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, HALF_DAY: 0, LEAVE: 0 };
+  records.forEach((row) => { counts[row.status] += 1; });
+  const attended = counts.PRESENT + counts.LATE + counts.HALF_DAY * 0.5;
+  const workingDays = records.length;
+  return { personType, person: { id: person.id, name: person.teacherName || [person.studentFirstName, person.studentLastName].filter(Boolean).join(' ') }, academicSession, counts, workingDays, percentage: workingDays ? Math.round((attended / workingDays) * 1000) / 10 : 0, records: records.map((row) => ({ date: row.attendanceDate.toISOString().slice(0, 10), status: row.status, remarks: row.remarks })) };
+};
+
+export const saveCalendarDay = async (req, res) => {
+  try {
+    if (!isSchoolAdmin(req.user)) return res.status(403).json({ success: false, message: 'Only admins can manage the academic calendar' });
+    const calendarDate = normalizeDate(req.body.date);
+    const dayType = String(req.body.dayType || '').toUpperCase();
+    if (!calendarDate || !VALID_DAY_TYPES.has(dayType)) return res.status(400).json({ success: false, message: 'Valid date and dayType are required' });
+    const data = { academicSession: String(req.body.academicSession || sessionForDate(calendarDate)), dayType, title: String(req.body.title || '').trim() || null, description: String(req.body.description || '').trim() || null };
+    const day = await prisma.academicCalendarDay.upsert({ where: { schoolId_calendarDate: { schoolId: req.user.schoolId, calendarDate } }, update: data, create: { schoolId: req.user.schoolId, calendarDate, ...data } });
+    return res.json({ success: true, data: day, message: 'Calendar day saved' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to save calendar day' });
+  }
+};
+
+export const listCalendarDays = async (req, res) => {
+  try {
+    const range = monthRange(req.query.month);
+    const where = { schoolId: req.user.schoolId, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) };
+    if (!range && !req.query.academicSession) return res.status(400).json({ success: false, message: 'month or academicSession is required' });
+    const days = await prisma.academicCalendarDay.findMany({ where, orderBy: { calendarDate: 'asc' } });
+    return res.json({ success: true, data: { month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ id: day.id, date: day.calendarDate.toISOString().slice(0, 10), dayType: day.dayType, title: day.title, description: day.description, academicSession: day.academicSession, updatedAt: day.updatedAt })) } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to load academic calendar' });
+  }
+};
+
+export const listPublicCalendarDays = async (req, res) => {
+  try {
+    const schoolId = String(req.query.schoolId || '');
+    const range = monthRange(req.query.month);
+    if (!schoolId || (!range && !req.query.academicSession)) return res.status(400).json({ success: false, message: 'schoolId and month or academicSession are required' });
+    const school = await prisma.school.findFirst({ where: { id: schoolId, status: 'ACTIVE' }, select: { id: true, schoolName: true, schoolCode: true } });
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+    const days = await prisma.academicCalendarDay.findMany({ where: { schoolId, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) }, orderBy: { calendarDate: 'asc' } });
+    res.set('Cache-Control', 'public, max-age=300');
+    return res.json({ success: true, data: { school, month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ id: day.id, date: day.calendarDate.toISOString().slice(0, 10), dayType: day.dayType, title: day.title, description: day.description, academicSession: day.academicSession, updatedAt: day.updatedAt })) } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to load public academic calendar' });
+  }
+};
+
+export const deleteCalendarDay = async (req, res) => {
+  try {
+    if (!isSchoolAdmin(req.user)) return res.status(403).json({ success: false, message: 'Only admins can manage the academic calendar' });
+    const day = await prisma.academicCalendarDay.findFirst({ where: { id: req.params.id, schoolId: req.user.schoolId } });
+    if (!day) return res.status(404).json({ success: false, message: 'Calendar day not found' });
+    await prisma.academicCalendarDay.delete({ where: { id: day.id } });
+    return res.json({ success: true, message: 'Calendar marker removed' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || 'Failed to remove calendar day' });
   }
 };

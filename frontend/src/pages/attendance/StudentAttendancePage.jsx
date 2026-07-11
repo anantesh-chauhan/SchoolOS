@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Save } from 'lucide-react';
+import { Check, Save, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/button';
@@ -9,6 +9,7 @@ import { attendanceService } from '../../services/managementService';
 import { teacherDashboardService } from '../../services/teacherDashboardService';
 import { authService } from '../../services/authService';
 import { useAcademicStructure } from '../../hooks/useAcademicStructure';
+import AttendanceCalendar from '../../components/attendance/AttendanceCalendar';
 
 const STATUS_OPTIONS = ['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE'];
 
@@ -27,6 +28,7 @@ export default function StudentAttendancePage() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [date, setDate] = useState(todayInputValue());
   const [recordsByStudent, setRecordsByStudent] = useState({});
+  const month = date.slice(0, 7);
 
   const teacherAssignmentsQuery = useQuery({
     queryKey: ['teacher-class-attendance-sections'],
@@ -66,6 +68,16 @@ export default function StudentAttendancePage() {
     queryFn: () => attendanceService.studentRoster({ classId: selectedClassId, sectionId: selectedSectionId, date }),
     enabled: Boolean(selectedClassId && selectedSectionId && date),
   });
+  const monthQuery = useQuery({
+    queryKey: ['student-attendance-month', selectedClassId, selectedSectionId, month],
+    queryFn: () => attendanceService.classMonth({ classId: selectedClassId, sectionId: selectedSectionId, month }),
+    enabled: Boolean(selectedClassId && selectedSectionId && month),
+  });
+  const registerQuery = useQuery({
+    queryKey: ['student-month-register', selectedClassId, selectedSectionId, month],
+    queryFn: () => attendanceService.classRegister({ classId: selectedClassId, sectionId: selectedSectionId, month }),
+    enabled: Boolean(selectedClassId && selectedSectionId && month),
+  });
 
   useEffect(() => {
     const students = attendanceQuery.data?.data?.students || [];
@@ -81,6 +93,7 @@ export default function StudentAttendancePage() {
     onSuccess: () => {
       toast.success('Attendance saved');
       queryClient.invalidateQueries({ queryKey: ['student-attendance-roster', selectedClassId, selectedSectionId, date] });
+      queryClient.invalidateQueries({ queryKey: ['student-attendance-month', selectedClassId, selectedSectionId, month] });
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to save attendance'),
   });
@@ -110,6 +123,7 @@ export default function StudentAttendancePage() {
       })),
     });
   };
+  const markAll = (status) => setRecordsByStudent(Object.fromEntries(students.map((student) => [student.id, { ...(recordsByStudent[student.id] || {}), status }])));
 
   return (
     <DashboardLayout role={user?.role || 'TEACHER'}>
@@ -117,7 +131,8 @@ export default function StudentAttendancePage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase text-slate-500 dark:text-slate-400">Attendance</p>
-            <h1 className="text-2xl font-bold text-slate-950 dark:text-white">Daily Student Attendance</h1>
+            <h1 className="text-2xl font-bold text-slate-950 dark:text-white">Class attendance register</h1>
+            <p className="text-sm text-slate-500">Monthly overview and fast daily marking in one place.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {STATUS_OPTIONS.map((status) => (
@@ -128,6 +143,10 @@ export default function StudentAttendancePage() {
             ))}
           </div>
         </div>
+
+        {selectedSectionId && <Card><CardHeader><CardTitle>Monthly class calendar</CardTitle></CardHeader><CardContent className="space-y-4"><AttendanceCalendar month={month} days={monthQuery.data?.data?.days || []} onSelectDay={(day) => setDate(day.date)} />{isAdmin && <p className="text-xs text-slate-500">Manage holidays, exams and events from the Academic Calendar page.</p>}</CardContent></Card>}
+
+        {selectedSectionId && <Card><CardHeader><CardTitle>Whole-class monthly summary</CardTitle></CardHeader><CardContent><div className="overflow-auto"><table className="min-w-full text-sm"><thead className="bg-slate-100 dark:bg-slate-800"><tr>{['Roll','Student','Present','Absent','Late','Half day','Leave','Marked','Attendance'].map((label) => <th key={label} className="px-3 py-2 text-left">{label}</th>)}</tr></thead><tbody>{(registerQuery.data?.data?.students || []).map((student) => <tr key={student.id} className="border-b dark:border-slate-800"><td className="px-3 py-2">{student.rollNumber || '-'}</td><td className="px-3 py-2"><p className="font-semibold">{student.name}</p><p className="text-xs text-slate-500">{student.admissionNo}</p></td><td className="px-3 py-2 text-emerald-700">{student.PRESENT}</td><td className="px-3 py-2 text-rose-700">{student.ABSENT}</td><td className="px-3 py-2">{student.LATE}</td><td className="px-3 py-2">{student.HALF_DAY}</td><td className="px-3 py-2">{student.LEAVE}</td><td className="px-3 py-2">{student.markedDays}</td><td className="px-3 py-2 font-bold">{student.percentage}%</td></tr>)}</tbody></table></div></CardContent></Card>}
 
         <Card>
           <CardHeader>
@@ -194,6 +213,8 @@ export default function StudentAttendancePage() {
             {isAdmin && selectedSectionId && (
               <p className="text-xs font-medium text-slate-500">Admins can view student attendance. Student daily marking is reserved for the section class teacher.</p>
             )}
+
+            {canMark && students.length > 0 && <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60"><span className="mr-1 flex items-center gap-1 text-sm font-semibold"><Users size={16}/> Quick marking</span><Button variant="outline" leftIcon={Check} onClick={() => markAll('PRESENT')}>All present</Button><Button variant="outline" onClick={() => markAll('ABSENT')}>All absent</Button><span className="text-xs text-slate-500">Tap a status below only for exceptions.</span></div>}
 
             {!selectedSectionId ? (
               <p className="text-sm text-slate-500">Select a section to load attendance.</p>

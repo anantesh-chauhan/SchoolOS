@@ -523,8 +523,8 @@ export const seedTeacherDashboardDemoDataForSchool = async (school) => {
 export const seedAcademicDataForSchool = async (schoolId) => {
   const stats = {
     schoolId,
-    created: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0 },
-    existing: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0 },
+    created: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0, parentUsers: 0 },
+    existing: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0, parentUsers: 0 },
   };
 
   const tx = prisma;
@@ -668,6 +668,32 @@ const seedDemoStudentsForSchool = async (tx, schoolId, stats) => {
       });
       if (existingUser) stats.existing.studentUsers += 1;
       else stats.created.studentUsers += 1;
+
+      const existingParentUser = await tx.user.findUnique({ where: { email: parentUserId } });
+      await tx.user.upsert({
+        where: { email: parentUserId },
+        update: {
+          password: passwordHash,
+          name: `${studentData.fatherName} (${firstName} ${lastName})`,
+          role: 'PARENT',
+          schoolId,
+          classId: section.classId,
+          sectionId: section.id,
+          isActive: true,
+        },
+        create: {
+          email: parentUserId,
+          password: passwordHash,
+          name: `${studentData.fatherName} (${firstName} ${lastName})`,
+          role: 'PARENT',
+          schoolId,
+          classId: section.classId,
+          sectionId: section.id,
+          isActive: true,
+        },
+      });
+      if (existingParentUser) stats.existing.parentUsers += 1;
+      else stats.created.parentUsers += 1;
 
       const history = await tx.studentAcademicHistory.findFirst({ where: { studentId: student.id, session: '2026-27' } });
       if (!history) {
