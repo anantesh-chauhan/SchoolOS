@@ -40,6 +40,10 @@ model User {
   compiledChapterSummaries ChapterAnalysisSummary[] @relation("ChapterAnalysisCompiledByAdmin")
   markedStudentAttendances StudentAttendance[]      @relation("StudentAttendanceMarkedBy")
   markedTeacherAttendances TeacherAttendance[]      @relation("TeacherAttendanceMarkedBy")
+  reportedIssues           IssueReport[]            @relation("IssueReporter")
+  assignedIssues           IssueReport[]            @relation("IssueAssignee")
+  issueMessages            IssueReportMessage[]
+  issueAuditActions        IssueReportAudit[]       @relation("IssueAuditActor")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -119,11 +123,91 @@ model School {
   studentAttendances        StudentAttendance[]
   teacherAttendances        TeacherAttendance[]
   academicCalendarDays      AcademicCalendarDay[]
+  issueReports              IssueReport[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
   @@index([schoolName])
   @@index([city, state])
+}
+
+model IssueReport {
+  id                 String        @id @default(cuid())
+  title              String
+  description        String
+  category           IssueCategory
+  priority           IssuePriority @default(MEDIUM)
+  status             IssueStatus   @default(OPEN)
+  stepsToReproduce   String?
+  expectedResult     String?
+  actualResult       String?
+  additionalComment  String?
+  currentRoute       String?
+  moduleName         String?
+  browser            String?
+  operatingSystem    String?
+  deviceType         String?
+  screenResolution   String?
+  applicationVersion String?
+  screenshotUrl      String?
+  screenshotPublicId String?
+  reporterId         String
+  reporterRole       String
+  reporterName       String?
+  reporterEmail      String?
+  schoolId           String?
+  schoolName         String?
+  assignedToId       String?
+  platformNote       String?
+  resolutionNote     String?
+  firstResponseAt    DateTime?
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  reopenedCount      Int           @default(0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  reporter User                 @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  assignee User?                @relation("IssueAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  school   School?              @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  messages IssueReportMessage[]
+  audits   IssueReportAudit[]
+
+  @@index([reporterId, createdAt])
+  @@index([schoolId])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model IssueReportMessage {
+  id         String      @id @default(cuid())
+  issueId    String
+  senderId   String
+  senderRole String
+  message    String
+  isInternal Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  issue      IssueReport @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  sender     User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([issueId, createdAt])
+  @@index([senderId])
+}
+
+model IssueReportAudit {
+  id        String      @id @default(cuid())
+  issueId   String
+  actorId   String
+  action    String
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  issue     IssueReport @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  actor     User        @relation("IssueAuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([issueId, createdAt])
+  @@index([actorId])
 }
 
 model GalleryGroup {
@@ -1422,6 +1506,47 @@ enum Role {
   PARENT
   STUDENT
   STAFF
+}
+
+enum IssuePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IssueStatus {
+  OPEN
+  UNDER_REVIEW
+  IN_PROGRESS
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
+  REJECTED
+}
+
+enum IssueCategory {
+  AUTHENTICATION
+  DASHBOARD
+  STUDENT_MANAGEMENT
+  TEACHER_MANAGEMENT
+  PARENT_PORTAL
+  CLASS_MANAGEMENT
+  SUBJECT_MANAGEMENT
+  CHAPTER_MANAGEMENT
+  TIMETABLE
+  ATTENDANCE
+  ANALYTICS
+  FEES
+  NOTIFICATIONS
+  PUBLIC_WEBSITE
+  MEDIA_UPLOAD
+  PERFORMANCE
+  UI_UX
+  INCORRECT_DATA
+  FEATURE_REQUEST
+  GENERAL_FEEDBACK
+  OTHER
 }
 
 enum SchoolStatus {

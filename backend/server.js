@@ -22,6 +22,7 @@ import usersRoutes from './src/routes/users.js';
 import chapterFeedbackRoutes from './src/routes/chapterFeedback.js';
 import attendanceRoutes from './src/routes/attendance.js';
 import dashboardRoutes from './src/routes/dashboard.js';
+import issueReportRoutes from './src/modules/issue-report/issueReport.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -99,6 +100,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api', chapterFeedbackRoutes);
+app.use('/api', issueReportRoutes);
 
 
 // 404 Handler

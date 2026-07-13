@@ -131,3 +131,12 @@ export const getSectionResourceUploadSignature = async (req, res) => {
     });
   }
 };
+
+export const getIssueScreenshotUploadSignature = async (req, res) => {
+  try {
+    const timestamp = generateTimestamp();
+    const folder = `schoolos/${req.user.schoolId || 'platform'}/issue-reports/${req.user.id}`;
+    const paramsToSign = { folder, timestamp };
+    return res.json({ success:true, data:{ cloudName:process.env.CLOUDINARY_CLOUD_NAME, apiKey:process.env.CLOUDINARY_API_KEY, timestamp, folder, signature:signCloudinaryParams(paramsToSign) } });
+  } catch (error) { return res.status(503).json({ success:false, message:'Screenshot upload is currently unavailable' }); }
+};

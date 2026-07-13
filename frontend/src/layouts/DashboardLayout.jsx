@@ -21,6 +21,7 @@ import {
   Users,
   UsersRound,
   X,
+  MessageSquare,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -30,6 +31,7 @@ import Sidebar from '../components/Sidebar/Sidebar';
 import NotificationCenter from '../components/ui/NotificationCenter';
 import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
+import ReportIssueButton from '../components/issue-report/ReportIssueButton';
 
 
 const themeOptions = [
@@ -116,6 +118,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
+      { group:'Support & Quality', icon:MessageSquare, items:[{label:'Issue Reports',icon:MessageSquare,href:'/platform/issues'},{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] },
     ],
     SCHOOL_OWNER: [
       {
@@ -258,6 +261,7 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   const groupedItems = roleMenuConfig[role] || [];
+  if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
   const profileRouteByRole = {
     PLATFORM_OWNER: '/dashboard/platform/profile',
     SCHOOL_OWNER: '/dashboard/school/profile',
@@ -448,6 +452,7 @@ const DashboardLayout = ({ children, role }) => {
         <footer className="border-t border-slate-200/70 bg-white/60 px-4 py-2 text-center text-[11px] text-slate-500 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-400">
           © {new Date().getFullYear()} SchoolOS
         </footer>
+        <ReportIssueButton />
       </div>
     </div>
 

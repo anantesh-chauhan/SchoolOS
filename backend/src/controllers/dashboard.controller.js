@@ -6,18 +6,36 @@ const currentSession = () => { const now = new Date(); const year = now.getUTCMo
 const schoolOverview = async (schoolId) => {
   const today = startOfToday();
   const [students, teachers, classes, sections, staff, attendance, school, upcomingEvents] = await Promise.all([
-    prisma.student.count({ where: { schoolId, isActive: true } }), prisma.teacher.count({ where: { schoolId, deletedAt: null } }),
-    prisma.class.count({ where: { schoolId, deletedAt: null } }), prisma.section.count({ where: { schoolId, deletedAt: null } }),
+    prisma.student.count({ where: { schoolId, isActive: true } }),
+    prisma.teacher.count({ where: { schoolId, deletedAt: null } }),
+    prisma.class.count({ where: { schoolId, deletedAt: null } }),
+    prisma.section.count({ where: { schoolId, deletedAt: null } }),
     prisma.user.count({ where: { schoolId, role: 'STAFF', isActive: true } }),
     prisma.studentAttendance.groupBy({ by: ['status'], where: { schoolId, attendanceDate: today }, _count: true }),
     prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, schoolName: true, address: true, email: true, phone: true, city: true, state: true } }),
     prisma.academicCalendarDay.findMany({ where: { schoolId, calendarDate: { gte: today }, dayType: { in: ['HOLIDAY', 'EXAM', 'EVENT', 'VACATION'] } }, orderBy: { calendarDate: 'asc' }, take: 5 }),
   ]);
+
   const attendanceCounts = Object.fromEntries(attendance.map((row) => [row.status, row._count]));
   const marked = Object.values(attendanceCounts).reduce((sum, value) => sum + value, 0);
   const attended = (attendanceCounts.PRESENT || 0) + (attendanceCounts.LATE || 0) + (attendanceCounts.HALF_DAY || 0) * 0.5;
-  return { school, stats: { totalStudents: students, totalTeachers: teachers, totalStaff: teachers + staff, totalClasses: classes, totalSections: sections, todayPresent: attendanceCounts.PRESENT || 0, todayMarked: marked, attendanceRate: marked ? Math.round(attended / marked * 1000) / 10 : 0 }, upcomingEvents: upcomingEvents.map((row) => ({ id: row.id, date: row.calendarDate.toISOString().slice(0, 10), type: row.dayType, title: row.title })) };
+
+  return {
+    school,
+    stats: {
+      totalStudents: students,
+      totalTeachers: teachers,
+      totalStaff: teachers + staff,
+      totalClasses: classes,
+      totalSections: sections,
+      todayPresent: attendanceCounts.PRESENT || 0,
+      todayMarked: marked,
+      attendanceRate: marked ? Math.round((attended / marked) * 1000) / 10 : 0,
+    },
+    upcomingEvents: upcomingEvents.map((row) => ({ id: row.id, date: row.calendarDate.toISOString().slice(0, 10), type: row.dayType, title: row.title })),
+  };
 };
+
 
 export const getDashboardSummary = async (req, res) => {
   try {

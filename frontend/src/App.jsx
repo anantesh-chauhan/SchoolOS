@@ -45,6 +45,8 @@ const ParentProfilePage = lazy(() => import('./pages/profile/ParentProfilePage')
 const StudentProfilePage = lazy(() => import('./pages/profile/StudentProfilePage'));
 const StaffProfilePage = lazy(() => import('./pages/profile/StaffProfilePage'));
 const WidgetHubPage = lazy(() => import('./pages/widgets/WidgetHubPage'));
+const MyReportsPage = lazy(() => import('./pages/support/MyReportsPage'));
+const IssueManagementPage = lazy(() => import('./pages/platform/IssueManagementPage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -72,6 +74,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/student-login" element={<StudentLoginPage />} />
           <Route path="/parent-login" element={<StudentLoginPage />} />
+          <Route path="/support/my-reports" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','TEACHER','PARENT','STUDENT','STAFF']}><MyReportsPage /></ProtectedRoute>} />
+          <Route path="/platform/issues" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><IssueManagementPage /></ProtectedRoute>} />
 
         {/* Dashboard Routes */}
 
