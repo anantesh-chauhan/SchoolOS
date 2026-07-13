@@ -178,10 +178,18 @@ export const updateSchoolSettingsBySchoolId = async (req, res) => {
     const payload = req.body || {};
     const updated = await upsertSchoolSettings(schoolId, payload);
 
-    if (payload.schoolName?.trim()) {
+    if (payload.schoolName?.trim() || payload.logoUrl !== undefined || payload.email !== undefined || payload.phone !== undefined || payload.addressLine1 !== undefined || payload.city !== undefined || payload.state !== undefined) {
       await prisma.school.update({
         where: { id: schoolId },
-        data: { schoolName: payload.schoolName.trim() },
+        data: {
+          ...(payload.schoolName?.trim() ? { schoolName: payload.schoolName.trim() } : {}),
+          ...(payload.logoUrl !== undefined ? { logoUrl: sanitizeString(payload.logoUrl) } : {}),
+          ...(sanitizeString(payload.email) ? { email: sanitizeString(payload.email) } : {}),
+          ...(sanitizeString(payload.phone) ? { phone: sanitizeString(payload.phone) } : {}),
+          ...(sanitizeString(payload.addressLine1) ? { address: sanitizeString(payload.addressLine1) } : {}),
+          ...(sanitizeString(payload.city) ? { city: sanitizeString(payload.city) } : {}),
+          ...(sanitizeString(payload.state) ? { state: sanitizeString(payload.state) } : {}),
+        },
       });
     }
 

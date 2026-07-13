@@ -15,7 +15,8 @@
     "seed:teacher-dashboard": "node prisma/seedTeacherDashboardData.js",
     "seed:class-teachers": "node prisma/seedClassTeachers.js",
     "seed:official-resources": "node prisma/seedOfficialChapterResources.js",
-    "seed:cbse-weekly-slots": "node prisma/seedCbseWeeklySlots.js"
+    "seed:cbse-weekly-slots": "node prisma/seedCbseWeeklySlots.js",
+    "school:initialize": "node prisma/initializeNewSchool.js"
   },
   "keywords": [
     "schoolos",

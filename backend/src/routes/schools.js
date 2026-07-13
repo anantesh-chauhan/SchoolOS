@@ -9,6 +9,7 @@ import {
 	listSchools,
 	updateSchoolProfile,
 	updateMySchoolBasicDetails,
+	initializeSchoolAcademicDefaults,
 } from '../controllers/school.controller.js';
 
 const router = express.Router();
@@ -24,6 +25,7 @@ router.put('/profile', requireRole('SCHOOL_OWNER'), updateSchoolProfile);
 
 router.get('/', requireRole('PLATFORM_OWNER'), listSchools);
 router.post('/', requireRole('PLATFORM_OWNER'), createSchool);
+router.post('/:id/initialize-academics', requireRole('PLATFORM_OWNER'), initializeSchoolAcademicDefaults);
 router.delete('/:id', requireRole('PLATFORM_OWNER'), deleteSchool);
 
 export default router;

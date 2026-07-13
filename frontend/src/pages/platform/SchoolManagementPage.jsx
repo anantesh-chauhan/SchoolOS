@@ -19,6 +19,12 @@ const initialSchool = {
   state: '',
   phone: '',
   email: '',
+  ownerName: '',
+  ownerEmail: '',
+  ownerPassword: '',
+  adminName: '',
+  adminEmail: '',
+  adminPassword: '',
 };
 
 export default function SchoolManagementPage() {
@@ -26,6 +32,7 @@ export default function SchoolManagementPage() {
   const [form, setForm] = useState(initialSchool);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [credentials, setCredentials] = useState(null);
   const limit = 8;
   const queryClient = useQueryClient();
 
@@ -34,15 +41,53 @@ export default function SchoolManagementPage() {
     queryFn: () => schoolService.list({ page, limit, search }),
   });
 
+  const initializeMutation = useMutation({
+    mutationFn: async ({ schoolId }) => {
+      const toastId = toast.loading('Creating CBSE classes, sections, subjects and chapters…');
+      try {
+        const response = await schoolService.initializeAcademics(schoolId);
+        toast.success('CBSE academic structure created', { id: toastId });
+        return response;
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Academic setup failed', { id: toastId, duration: 7000 });
+        throw error;
+      }
+    },
+    onSuccess: (response) => {
+      const setup = response.data?.academicSetup;
+      toast.success(`${setup?.classes || 14} classes and ${setup?.sections || 42} sections added`);
+      toast.success(`${setup?.subjects || 0} subjects and ${setup?.chapters || 0} chapters added`);
+      toast.success(`${setup?.resources || 0} default learning resources added`);
+      setCredentials((current) => current ? { ...current, setupStatus: 'READY', academicSetup: setup } : current);
+      queryClient.invalidateQueries({ queryKey: ['schools'] });
+    },
+    onError: () => setCredentials((current) => current ? { ...current, setupStatus: 'FAILED' } : current),
+  });
+
   const createMutation = useMutation({
-    mutationFn: schoolService.create,
-    onSuccess: () => {
-      toast.success('School added successfully');
+    mutationFn: async (payload) => {
+      const toastId = toast.loading('Creating school tenant and login accounts…');
+      try {
+        const response = await schoolService.create(payload);
+        toast.success('School tenant created successfully', { id: toastId });
+        return response;
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'School tenant creation failed', { id: toastId, duration: 7000 });
+        throw error;
+      }
+    },
+    onSuccess: (response) => {
+      const schoolId = response.data?.school?.id;
+      toast.success('School branding and default settings created');
+      toast.success('School Owner login credentials created');
+      toast.success('School Admin login credentials created');
+      setCredentials({ ...(response.data?.credentials || {}), schoolId, setupStatus: 'INITIALIZING' });
       setOpen(false);
       setForm(initialSchool);
       queryClient.invalidateQueries({ queryKey: ['schools'] });
+      initializeMutation.mutate({ schoolId });
     },
-    onError: (error) => toast.error(error.response?.data?.message || 'Failed to add school'),
+    onError: () => undefined,
   });
 
   const deleteMutation = useMutation({
@@ -211,6 +256,19 @@ export default function SchoolManagementPage() {
               value={form.email}
               onChange={(event) => setForm({ ...form, email: event.target.value })}
             />
+            <div className="sm:col-span-2 mt-2 border-t border-slate-200 pt-4">
+              <p className="font-bold text-slate-900 dark:text-slate-100">School owner login</p>
+              <p className="text-xs text-slate-500">Leave password empty to generate a secure temporary password.</p>
+            </div>
+            <Input required placeholder="Owner full name" value={form.ownerName} onChange={(event) => setForm({ ...form, ownerName: event.target.value })} />
+            <Input required type="email" placeholder="Owner login email" value={form.ownerEmail} onChange={(event) => setForm({ ...form, ownerEmail: event.target.value })} />
+            <Input type="password" placeholder="Temporary password (optional)" value={form.ownerPassword} onChange={(event) => setForm({ ...form, ownerPassword: event.target.value })} className="sm:col-span-2" />
+            <div className="sm:col-span-2 mt-2 border-t border-slate-200 pt-4">
+              <p className="font-bold text-slate-900 dark:text-slate-100">School administrator login</p>
+            </div>
+            <Input required placeholder="Admin full name" value={form.adminName} onChange={(event) => setForm({ ...form, adminName: event.target.value })} />
+            <Input required type="email" placeholder="Admin login email" value={form.adminEmail} onChange={(event) => setForm({ ...form, adminEmail: event.target.value })} />
+            <Input type="password" placeholder="Temporary password (optional)" value={form.adminPassword} onChange={(event) => setForm({ ...form, adminPassword: event.target.value })} className="sm:col-span-2" />
             <div className="sm:col-span-2 flex justify-end gap-3 pt-1">
               <Button variant="secondary" onClick={() => setOpen(false)}>
                 Cancel
@@ -220,6 +278,16 @@ export default function SchoolManagementPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+        <Modal open={Boolean(credentials)} onClose={() => setCredentials(null)} title="Tenant credentials created">
+          {credentials && <div className="space-y-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Copy these credentials now. Temporary passwords are returned only once and both users must change them after login.</div>
+            <div className={`rounded-xl border p-4 text-sm font-bold ${credentials.setupStatus === 'READY' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : credentials.setupStatus === 'FAILED' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}>
+              {credentials.setupStatus === 'READY' ? 'Academic setup complete: LKG to Class 12, three sections per class, CBSE subjects, chapters and resources are ready.' : credentials.setupStatus === 'FAILED' ? 'Accounts were created, but academic setup failed. Your credentials are safe; use Retry Academic Setup.' : 'Academic setup is running. Keep this dialog open to follow progress.'}
+            </div>
+            {[['School Owner', credentials.schoolOwner], ['Administrator', credentials.admin]].map(([label, account]) => <div key={label} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><p className="font-black">{label}</p><p className="mt-2 text-sm">Name: {account.name}</p><p className="text-sm">Login ID: <span className="font-mono font-bold">{account.loginId}</span></p><p className="text-sm">Temporary password: <span className="font-mono font-bold">{account.temporaryPassword}</span></p></div>)}
+            <div className="flex flex-wrap justify-end gap-2">{credentials.setupStatus === 'FAILED' && <Button variant="secondary" onClick={() => initializeMutation.mutate({ schoolId: credentials.schoolId })} disabled={initializeMutation.isPending}>Retry Academic Setup</Button>}<Button onClick={() => setCredentials(null)} disabled={initializeMutation.isPending}>I have copied them</Button></div>
+          </div>}
         </Modal>
       </motion.div>
     </DashboardLayout>

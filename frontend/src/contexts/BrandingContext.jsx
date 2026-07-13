@@ -13,7 +13,7 @@ import { schoolSettingsService } from "../services/schoolSettingsService";
 const DEFAULT_BRANDING = {
   primaryColor: "#0f766e",
   secondaryColor: "#0f172a",
-  schoolName: "SchoolOS",
+  schoolName: "SchoolOS an Analytic Platform of your School",
 };
 
 const BrandingContext = createContext({
@@ -67,6 +67,17 @@ export function BrandingProvider({ children }) {
       branding.secondaryColor ||
         DEFAULT_BRANDING.secondaryColor
     );
+
+    document.title = branding.schoolName || DEFAULT_BRANDING.schoolName;
+    if (branding.logoUrl) {
+      let favicon = document.querySelector("link[rel='icon']");
+      if (!favicon) {
+        favicon = document.createElement('link');
+        favicon.rel = 'icon';
+        document.head.appendChild(favicon);
+      }
+      favicon.href = branding.logoUrl;
+    }
 
   }, [branding]);
 

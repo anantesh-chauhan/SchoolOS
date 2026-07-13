@@ -1,6 +1,8 @@
 import prisma from '../config/prisma.client.js';
 import { buildDefaultSchoolConfig, buildSchoolTheme, deriveSchoolSlug, normalizeSchoolPayload } from '../utils/publicSchool.util.js';
-import { seedAcademicDataForSchool } from '../../prisma/seedAcademicData.js';
+import { initializeNewSchoolAcademicSetup } from '../services/newSchoolAcademicSetup.service.js';
+import bcryptjs from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
 
 
 const toInt = (value, fallback) => {
@@ -20,19 +22,39 @@ export const createSchool = async (req, res) => {
       phone,
       email,
       status,
+      ownerName,
+      ownerEmail,
+      ownerPassword,
+      adminName,
+      adminEmail,
+      adminPassword,
     } = req.body;
 
-    if (!schoolName || !schoolCode || !address || !city || !state || !phone || !email) {
+    if (!schoolName || !schoolCode || !address || !city || !state || !phone || !email || !ownerName || !ownerEmail || !adminName || !adminEmail) {
       return res.status(400).json({
         success: false,
-        message: 'All school fields are required',
+        message: 'School details, school-owner details and admin details are required',
       });
     }
 
     const resolvedSlug = deriveSchoolSlug({ slug, schoolCode, schoolName });
 
-    const school = await prisma.school.create({
-      data: {
+    const generatedPassword = () => `Sch!${randomBytes(6).toString('base64url')}9`;
+    const plainOwnerPassword = String(ownerPassword || generatedPassword());
+    const plainAdminPassword = String(adminPassword || generatedPassword());
+    if (plainOwnerPassword.length < 8 || plainAdminPassword.length < 8) {
+      return res.status(400).json({ success: false, message: 'Initial passwords must contain at least 8 characters' });
+    }
+    const normalizedOwnerEmail = String(ownerEmail).trim().toLowerCase();
+    const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
+    if (normalizedOwnerEmail === normalizedAdminEmail) {
+      return res.status(400).json({ success: false, message: 'School owner and admin must use different login IDs' });
+    }
+    const [ownerHash, adminHash] = await Promise.all([bcryptjs.hash(plainOwnerPassword, 10), bcryptjs.hash(plainAdminPassword, 10)]);
+    const theme = buildSchoolTheme({ slug: resolvedSlug, schoolCode, schoolName });
+    let school;
+    school = await prisma.$transaction(async (tx) => {
+        const created = await tx.school.create({ data: {
         schoolName: schoolName.trim(),
         schoolCode: schoolCode.trim().toUpperCase(),
         slug: resolvedSlug,
@@ -43,7 +65,7 @@ export const createSchool = async (req, res) => {
         phone: phone.trim(),
         email: email.trim().toLowerCase(),
         status: status || 'ACTIVE',
-        theme: buildSchoolTheme({ slug: resolvedSlug, schoolCode, schoolName }),
+        theme,
         config: buildDefaultSchoolConfig({
           slug: resolvedSlug,
           schoolCode,
@@ -54,20 +76,32 @@ export const createSchool = async (req, res) => {
           phone,
           email,
         }),
-      },
-    });
-
-    await seedAcademicDataForSchool(school.id);
+        } });
+        await tx.schoolSettings.create({ data: { schoolId: created.id, schoolName: created.schoolName, logoUrl: created.logoUrl, email: created.email, phone: created.phone, addressLine1: created.address, city: created.city, state: created.state, country: 'India', primaryColor: theme.primaryColor, secondaryColor: theme.secondaryColor } });
+        await tx.user.createMany({ data: [
+          { email: normalizedOwnerEmail, password: ownerHash, name: String(ownerName).trim(), role: 'SCHOOL_OWNER', schoolId: created.id, contactEmail: normalizedOwnerEmail, mustChangePassword: true },
+          { email: normalizedAdminEmail, password: adminHash, name: String(adminName).trim(), role: 'ADMIN', schoolId: created.id, contactEmail: normalizedAdminEmail, mustChangePassword: true },
+        ] });
+        return created;
+      });
 
     return res.status(201).json({
       success: true,
-      data: normalizeSchoolPayload(school),
+      data: {
+        school: normalizeSchoolPayload(school),
+        credentials: {
+          schoolOwner: { name: String(ownerName).trim(), loginId: normalizedOwnerEmail, temporaryPassword: plainOwnerPassword },
+          admin: { name: String(adminName).trim(), loginId: normalizedAdminEmail, temporaryPassword: plainAdminPassword },
+          mustChangePassword: true,
+        },
+        defaults: { academicStructureSeeded: false, settingsCreated: true, brandingCreated: true },
+      },
     });
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(409).json({
         success: false,
-        message: 'School code must be unique',
+        message: 'School code, slug, or login ID already exists',
       });
     }
 
@@ -76,6 +110,17 @@ export const createSchool = async (req, res) => {
       message: 'Failed to create school',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+};
+
+export const initializeSchoolAcademicDefaults = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({ where: { id: req.params.id }, select: { id: true, schoolName: true } });
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+    const academicSetup = await initializeNewSchoolAcademicSetup(school.id);
+    return res.json({ success: true, message: 'CBSE academic foundation initialized', data: { school, academicSetup } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: `Academic initialization failed: ${error.message}`, code: error.code || 'ACADEMIC_SETUP_FAILED' });
   }
 };
 
@@ -249,6 +294,8 @@ export const updateMySchoolBasicDetails = async (req, res) => {
       });
     }
 
+    const primaryColor = /^#[0-9a-fA-F]{6}$/.test(String(req.body.primaryColor || '')) ? req.body.primaryColor : undefined;
+    const secondaryColor = /^#[0-9a-fA-F]{6}$/.test(String(req.body.secondaryColor || '')) ? req.body.secondaryColor : undefined;
     const payload = {
       schoolName: req.body.schoolName,
       logoUrl: req.body.logoUrl,
@@ -265,7 +312,7 @@ export const updateMySchoolBasicDetails = async (req, res) => {
         .map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value])
     );
 
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0 && !primaryColor && !secondaryColor) {
       return res.status(400).json({
         success: false,
         message: 'No fields provided for update',
@@ -280,10 +327,11 @@ export const updateMySchoolBasicDetails = async (req, res) => {
       });
     }
 
+    const mergedSchool = { ...school, ...updates };
     const [updatedSchool] = await prisma.$transaction([
       prisma.school.update({
         where: { id: schoolId },
-        data: updates,
+        data: { ...updates, config: buildDefaultSchoolConfig(mergedSchool), ...((primaryColor || secondaryColor) ? { theme: { ...(school.theme || {}), ...(primaryColor ? { primaryColor } : {}), ...(secondaryColor ? { secondaryColor } : {}) } } : {}) },
       }),
       prisma.schoolSettings.upsert({
         where: { schoolId },
@@ -297,8 +345,8 @@ export const updateMySchoolBasicDetails = async (req, res) => {
           city: updates.city || school.city,
           state: updates.state || school.state,
           country: 'India',
-          primaryColor: '#0f766e',
-          secondaryColor: '#0f172a',
+          primaryColor: primaryColor || '#0f766e',
+          secondaryColor: secondaryColor || '#0f172a',
         },
         update: {
           ...(updates.schoolName ? { schoolName: updates.schoolName } : {}),
@@ -308,6 +356,8 @@ export const updateMySchoolBasicDetails = async (req, res) => {
           ...(updates.address ? { addressLine1: updates.address } : {}),
           ...(updates.city ? { city: updates.city } : {}),
           ...(updates.state ? { state: updates.state } : {}),
+          ...(primaryColor ? { primaryColor } : {}),
+          ...(secondaryColor ? { secondaryColor } : {}),
         },
       }),
     ]);

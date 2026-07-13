@@ -520,7 +520,7 @@ export const seedTeacherDashboardDemoDataForSchool = async (school) => {
   }
 };
 
-export const seedAcademicDataForSchool = async (schoolId) => {
+export const seedAcademicDataForSchool = async (schoolId, { includeDemoStudents = true } = {}) => {
   const stats = {
     schoolId,
     created: { classes: 0, sections: 0, subjects: 0, streams: 0, assignments: 0, chapters: 0, students: 0, studentUsers: 0, parentUsers: 0 },
@@ -574,7 +574,9 @@ export const seedAcademicDataForSchool = async (schoolId) => {
     }
   }
 
-  await seedDemoStudentsForSchool(tx, schoolId, stats);
+  if (includeDemoStudents) {
+    await seedDemoStudentsForSchool(tx, schoolId, stats);
+  }
 
   return stats;
 };

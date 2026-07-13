@@ -1,113 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
-
-import { Users, Building2, TrendingUp, ArrowUpRight } from 'lucide-react';
-import DashboardLayout from '../../layouts/DashboardLayout';
-import { SummaryCard, WelcomeCard } from '../../components/DashboardCards';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Building2, CheckCircle2, Settings, ShieldCheck, TrendingUp, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import DashboardLayout from '../../layouts/DashboardLayout';
 import { dashboardService } from '../../services/dashboardService';
+import { schoolService } from '../../services/managementService';
+import { Empty, ErrorState, Loading, Panel } from '../../components/student/StudentUI';
 
 export default function PlatformOwnerDashboard() {
-  const [user] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch (error) {
-      return {};
-    }
-  });
-
-  const { data, isLoading } = useQuery({ queryKey: ['dashboard-summary', 'platform'], queryFn: dashboardService.summary });
-  const stats = data?.stats || {};
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
-  };
-
-  return (
-    <DashboardLayout role="PLATFORM_OWNER">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        {/* Welcome Card */}
-        <WelcomeCard name={user.name} role="PLATFORM_OWNER" />
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Building2 className="w-8 h-8" />}
-              label="Total Schools"
-              value={isLoading ? '…' : stats.totalSchools || 0}
-              color="blue"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Users className="w-8 h-8" />}
-              label="Total Users"
-              value={isLoading ? '…' : stats.totalUsers || 0}
-              color="purple"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<TrendingUp className="w-8 h-8" />}
-              label="Active Schools"
-              value={isLoading ? '…' : stats.activeSchools || 0}
-              color="green"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<ArrowUpRight className="w-8 h-8" />}
-              label="New Schools (30 days)"
-              value={isLoading ? '…' : stats.newSchools || 0}
-              color="orange"
-            />
-          </motion.div>
-        </div>
-
-        {/* Recent Activity */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link to="/dashboard/platform/schools" className="block p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-blue-900 dark:text-blue-100">View All Schools</p>
-              <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">Manage all schools</p>
-            </Link>
-            <Link to="/dashboard/platform/schools" className="block p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-purple-900 dark:text-purple-100">Add New School</p>
-              <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">Register new school</p>
-            </Link>
-            <button className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-green-900 dark:text-green-100">System Analytics</p>
-              <p className="text-sm text-green-600 dark:text-green-300 mt-1">View analytics</p>
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </DashboardLayout>
-  );
+  const summary = useQuery({ queryKey: ['dashboard-summary', 'platform'], queryFn: dashboardService.summary });
+  const schools = useQuery({ queryKey: ['schools', 1, 'dashboard'], queryFn: () => schoolService.list({ page: 1, limit: 5, search: '' }) });
+  if (summary.isLoading || schools.isLoading) return <DashboardLayout role="PLATFORM_OWNER"><Loading /></DashboardLayout>;
+  if (summary.isError || schools.isError) return <DashboardLayout role="PLATFORM_OWNER"><ErrorState error={summary.error || schools.error} retry={() => { summary.refetch(); schools.refetch(); }} /></DashboardLayout>;
+  const stats = summary.data?.stats || {}; const rows = schools.data?.data || [];
+  return <DashboardLayout role="PLATFORM_OWNER"><motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6"><section className="rounded-3xl bg-slate-950 p-7 text-white shadow-xl dark:bg-slate-900"><div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center"><div><p className="text-sm font-bold text-violet-300">SchoolOS control center</p><h1 className="mt-2 text-3xl font-black">Platform overview</h1><p className="mt-2 max-w-2xl text-sm text-slate-300">Provision isolated school tenants, issue initial credentials, and manage each institution’s branding and configuration.</p></div><Link to="/dashboard/platform/schools" className="inline-flex h-12 items-center justify-center rounded-xl bg-white px-5 font-bold text-slate-950">Add or manage schools</Link></div></section><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[[Building2,'Total schools',stats.totalSchools],[CheckCircle2,'Active schools',stats.activeSchools],[Users,'Platform users',stats.totalUsers],[TrendingUp,'Added in 30 days',stats.newSchools]].map(([Icon,label,value])=><Panel key={label}><Icon className="text-violet-600"/><p className="mt-3 text-3xl font-black">{value||0}</p><p className="text-sm text-slate-500">{label}</p></Panel>)}</div><div className="grid gap-5 xl:grid-cols-[1.25fr_.75fr]"><Panel><div className="flex justify-between"><div><h2 className="text-lg font-black">Recently provisioned schools</h2><p className="text-sm text-slate-500">Each school operates within its own tenant and branding context.</p></div><Link to="/dashboard/platform/schools" className="text-sm font-bold text-violet-700">View all →</Link></div><div className="mt-4 space-y-3">{rows.length?rows.map((school)=><div key={school.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 font-black text-violet-800 dark:bg-violet-950">{school.schoolName?.[0]}</span><div><p className="font-bold">{school.schoolName}</p><p className="text-xs text-slate-500">{school.schoolCode} · {school.city}, {school.state}</p></div></div><span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">{school.status}</span></div>):<Empty>No schools have been provisioned.</Empty>}</div></Panel><Panel><h2 className="text-lg font-black">Platform actions</h2><div className="mt-4 space-y-3">{[[Building2,'Tenant provisioning','/dashboard/platform/schools'],[Settings,'Branding & settings','/dashboard/platform/school-settings'],[ShieldCheck,'Issue oversight','/platform/issues']].map(([Icon,label,to])=><Link key={label} to={to} className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 hover:border-violet-400 dark:border-slate-700"><span className="rounded-xl bg-violet-50 p-2 text-violet-700 dark:bg-violet-950"><Icon size={18}/></span><span className="font-bold">{label}</span><span className="ml-auto">→</span></Link>)}</div></Panel></div></motion.div></DashboardLayout>;
 }

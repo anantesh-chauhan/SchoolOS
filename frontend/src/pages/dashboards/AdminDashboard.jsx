@@ -6,12 +6,14 @@ import toast from 'react-hot-toast';
 
 import { BarChart3, Calendar, CheckCircle, Loader2, Play, Send, Users, Users2 } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
-import { SummaryCard, WelcomeCard } from '../../components/DashboardCards';
+import { SummaryCard } from '../../components/DashboardCards';
 import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '../../services/dashboardService';
+import { useBranding } from '../../contexts/BrandingContext';
 
 export default function AdminDashboard() {
+  const { branding } = useBranding();
   const [user] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('user') || '{}');
@@ -119,7 +121,16 @@ export default function AdminDashboard() {
         animate="visible"
         className="space-y-6"
       >
-        <WelcomeCard name={user.name} role="ADMIN" />
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="h-2 brand-bg-primary" />
+          <div className="flex flex-col justify-between gap-5 p-6 lg:flex-row lg:items-center">
+            <div className="flex items-center gap-4">
+              {branding.logoUrl ? <img src={branding.logoUrl} alt="School logo" className="h-14 w-14 rounded-2xl object-cover" /> : <span className="flex h-14 w-14 items-center justify-center rounded-2xl brand-bg-primary text-xl font-black text-white">{branding.schoolName?.[0] || 'S'}</span>}
+              <div><p className="text-sm font-bold brand-text-primary">School administration</p><h1 className="text-3xl font-black text-slate-950 dark:text-white">Welcome, {user.name}</h1><p className="mt-1 text-sm text-slate-500">{branding.schoolName} · Daily academic and operational control</p></div>
+            </div>
+            <Link to="/dashboard/admin/students/add" className="inline-flex h-11 items-center justify-center rounded-xl brand-bg-primary px-5 text-sm font-bold text-white">Add student</Link>
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <motion.div variants={itemVariants}>

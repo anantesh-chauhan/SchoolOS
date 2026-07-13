@@ -101,19 +101,22 @@ const DashboardLayout = ({ children, role }) => {
   const roleMenuConfig = {
     PLATFORM_OWNER: [
       {
-        group: 'System',
-        icon: Settings,
+        group: 'Overview',
+        icon: Home,
         items: [
-          { label: 'My Profile', icon: UserRound, href: '/dashboard/platform/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/platform' },
-          { label: 'School Management', icon: School, href: '/dashboard/platform/schools' },
-          { label: 'School Settings', icon: Settings, href: '/dashboard/platform/school-settings' },
         ],
       },
       {
-        group: 'Experience',
-        icon: Image,
+        group: 'Tenant Management', icon: School, items: [
+          { label: 'School Management', icon: School, href: '/dashboard/platform/schools' },
+          { label: 'Branding & Settings', icon: Settings, href: '/dashboard/platform/school-settings' },
+        ],
+      },
+      {
+        group: 'Platform', icon: Settings,
         items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/platform/profile' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -141,10 +144,8 @@ const DashboardLayout = ({ children, role }) => {
         group: 'School Management',
         icon: Users,
         items: [
-          { label: 'Students', icon: Users, href: '/dashboard/school' },
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
-          { label: 'Parents', icon: UserRound, href: '/dashboard/school' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
@@ -159,16 +160,19 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
-          { label: 'School Profile', icon: Settings, href: '/dashboard/school/profile' },
+          { label: 'School Branding', icon: Settings, href: '/dashboard/school/settings' },
         ],
       },
     ],
     ADMIN: [
+      { group: 'Overview', icon: Home, items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
+        ],
+      },
       {
         group: 'Academic Setup',
         icon: BookOpen,
         items: [
-          { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
           { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
           { label: 'Sections', icon: Shapes, href: '/dashboard/admin/sections' },
           { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
@@ -184,10 +188,8 @@ const DashboardLayout = ({ children, role }) => {
         group: 'School Management',
         icon: Users,
         items: [
-          { label: 'Students', icon: Users, href: '/dashboard/admin' },
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
-          { label: 'Parents', icon: UserRound, href: '/dashboard/admin' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
@@ -202,7 +204,6 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
-          { label: 'Settings', icon: Settings, href: '/dashboard/admin' },
         ],
       },
     ],

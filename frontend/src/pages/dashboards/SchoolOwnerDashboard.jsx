@@ -1,134 +1,17 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import DashboardLayout from '../../layouts/DashboardLayout';
-import { WelcomeCard, SummaryCard } from '../../components/DashboardCards';
-import { Users, BookOpen, Users2, GraduationCap } from 'lucide-react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { BookOpen, CalendarCheck, GraduationCap, Palette, Settings, UserPlus, Users } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import DashboardLayout from '../../layouts/DashboardLayout';
 import { dashboardService } from '../../services/dashboardService';
+import { useBranding } from '../../contexts/BrandingContext';
+import { ErrorState, Loading, Panel } from '../../components/student/StudentUI';
 
 export default function SchoolOwnerDashboard() {
-  const [user] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('user') || '{}');
-    } catch (error) {
-      return {};
-    }
-  });
-
-  const { data, isLoading } = useQuery({ queryKey: ['dashboard-summary', 'school-owner'], queryFn: dashboardService.summary });
-  const stats = data?.stats || {};
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
-  };
-
-  return (
-    <DashboardLayout role="SCHOOL_OWNER">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="space-y-6"
-      >
-        <WelcomeCard name={user.name} role="SCHOOL_OWNER" />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<GraduationCap className="w-8 h-8" />}
-              label="Total Students"
-              value={isLoading ? '…' : stats.totalStudents || 0}
-              color="blue"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Users2 className="w-8 h-8" />}
-              label="Total Teachers"
-              value={isLoading ? '…' : stats.totalTeachers || 0}
-              color="purple"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<BookOpen className="w-8 h-8" />}
-              label="Total Classes"
-              value={isLoading ? '…' : stats.totalClasses || 0}
-              color="green"
-            />
-          </motion.div>
-
-          <motion.div variants={itemVariants}>
-            <SummaryCard
-              icon={<Users className="w-8 h-8" />}
-              label="Today's Attendance"
-              value={isLoading ? '…' : `${stats.attendanceRate || 0}%`}
-              color="orange"
-            />
-          </motion.div>
-        </div>
-
-        {/* School Info Card */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            School Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">School Name</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.schoolName || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Address</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.address || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Email</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.email || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Phone</p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">{data?.school?.phone || '—'}</p>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Quick Links */}
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <button className="p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-blue-900 dark:text-blue-100">Manage Students</p>
-              <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">View and edit students</p>
-            </button>
-            <button className="p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-purple-900 dark:text-purple-100">Manage Teachers</p>
-              <p className="text-sm text-purple-600 dark:text-purple-300 mt-1">View and edit teachers</p>
-            </button>
-            <button className="p-4 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition text-left">
-              <p className="font-semibold text-green-900 dark:text-green-100">View Classes</p>
-              <p className="text-sm text-green-600 dark:text-green-300 mt-1">View all classes</p>
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </DashboardLayout>
-  );
+  const query = useQuery({ queryKey: ['dashboard-summary', 'school-owner'], queryFn: dashboardService.summary }); const { branding } = useBranding();
+  if (query.isLoading) return <DashboardLayout role="SCHOOL_OWNER"><Loading /></DashboardLayout>;
+  if (query.isError) return <DashboardLayout role="SCHOOL_OWNER"><ErrorState error={query.error} retry={query.refetch} /></DashboardLayout>;
+  const stats=query.data?.stats||{}; const school=query.data?.school||{};
+  return <DashboardLayout role="SCHOOL_OWNER"><motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} className="space-y-6"><section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"><div className="h-2 brand-bg-primary"/><div className="flex flex-col justify-between gap-6 p-7 lg:flex-row lg:items-center"><div className="flex items-center gap-4">{branding.logoUrl?<img src={branding.logoUrl} alt="School logo" className="h-16 w-16 rounded-2xl object-cover"/>:<span className="flex h-16 w-16 items-center justify-center rounded-2xl brand-bg-primary text-2xl font-black text-white">{school.schoolName?.[0]||'S'}</span>}<div><p className="text-sm font-bold brand-text-primary">School administration</p><h1 className="text-3xl font-black">{school.schoolName||branding.schoolName}</h1><p className="mt-1 text-sm text-slate-500">{school.address} · {school.city}, {school.state}</p></div></div><Link to="/dashboard/school/settings" className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><Palette size={17}/>Edit school identity</Link></div></section><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[[GraduationCap,'Students',stats.totalStudents],[Users,'Teachers',stats.totalTeachers],[BookOpen,'Classes',stats.totalClasses],[CalendarCheck,'Attendance',`${stats.attendanceRate||0}%`]].map(([Icon,label,value])=><Panel key={label}><Icon className="brand-text-primary"/><p className="mt-3 text-3xl font-black">{value||0}</p><p className="text-sm text-slate-500">{label}</p></Panel>)}</div><Panel><h2 className="text-lg font-black">School operations</h2><p className="text-sm text-slate-500">Manage your institution from one branded workspace.</p><div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[[UserPlus,'Add student','/dashboard/admin/students/add'],[Users,'Manage teachers','/dashboard/admin/teachers'],[BookOpen,'Academic structure','/dashboard/admin/classes'],[Settings,'School branding','/dashboard/school/settings']].map(([Icon,label,to])=><Link key={label} to={to} className="rounded-2xl border border-slate-200 p-4 hover:border-[var(--school-primary)] dark:border-slate-700"><Icon className="brand-text-primary"/><p className="mt-3 font-bold">{label}</p><p className="mt-1 text-xs text-slate-500">Open workspace →</p></Link>)}</div></Panel><div className="grid gap-5 lg:grid-cols-2"><Panel><h2 className="font-black">Contact identity</h2><dl className="mt-4 space-y-3 text-sm"><div><dt className="text-slate-500">Email</dt><dd className="font-semibold">{school.email||'Not configured'}</dd></div><div><dt className="text-slate-500">Phone</dt><dd className="font-semibold">{school.phone||'Not configured'}</dd></div><div><dt className="text-slate-500">Address</dt><dd className="font-semibold">{school.address||'Not configured'}</dd></div></dl></Panel><Panel><h2 className="font-black">Tenant identity</h2><p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">Every user in this school sees your name, logo and brand colors. Data, assignments, attendance and academic records remain scoped to this school.</p><Link to="/dashboard/school/settings" className="mt-4 inline-flex font-bold brand-text-primary">Review branding →</Link></Panel></div></motion.div></DashboardLayout>;
 }

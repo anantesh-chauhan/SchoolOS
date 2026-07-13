@@ -6,7 +6,11 @@ export const schoolService = {
     return response.data;
   },
   create: async (payload) => {
-    const response = await apiClient.post('/schools', payload);
+    const response = await apiClient.post('/schools', payload, { timeout: 60000 });
+    return response.data;
+  },
+  initializeAcademics: async (id) => {
+    const response = await apiClient.post(`/schools/${id}/initialize-academics`, {}, { timeout: 120000 });
     return response.data;
   },
   remove: async (id) => {
