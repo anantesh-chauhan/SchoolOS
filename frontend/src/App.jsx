@@ -9,8 +9,28 @@ const PlatformOwnerDashboard = lazy(() => import('./pages/dashboards/PlatformOwn
 const SchoolOwnerDashboard = lazy(() => import('./pages/dashboards/SchoolOwnerDashboard'));
 const AdminDashboard = lazy(() => import('./pages/dashboards/AdminDashboard'));
 const TeacherDashboard = lazy(() => import('./pages/dashboards/TeacherDashboard'));
+const TeacherAssignmentsPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.AssignmentsPage})));
+const TeacherAssignmentDetailPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.AssignmentPage})));
+const TeacherChapterPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherChapterPage})));
+const TeacherAssignmentStudentsPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.AssignmentStudentsPage})));
+const TeacherStudentPerformancePage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherStudentPage})));
+const TeacherPollsPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPollsPage})));
+const TeacherPollPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPollPage})));
+const TeacherPerformancePage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPerformancePage})));
+const TeacherMyClassPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.MyClassPage})));
 const ParentDashboard = lazy(() => import('./pages/dashboards/ParentDashboard'));
 const StudentDashboard = lazy(() => import('./pages/dashboards/StudentDashboard'));
+const StudentSubjectsPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.SubjectsPage })));
+const StudentSubjectPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.SubjectPage })));
+const StudentChapterPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.ChapterPage })));
+const StudentAttendanceSummaryPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.AttendancePage })));
+const StudentAttendanceMonthPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.AttendanceMonthPage })));
+const StudentPendingPollsPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollsPage /> })));
+const StudentSubmittedPollsPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollsPage submitted /> })));
+const StudentPollPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollPage /> })));
+const StudentSubmittedPollPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollPage submitted /> })));
+const StudentResourcesPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.ResourcesPage })));
+const StudentPerformancePage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.PerformancePage })));
 const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard'));
 const SchoolManagementPage = lazy(() => import('./pages/platform/SchoolManagementPage'));
 const SchoolSettingsPage = lazy(() => import('./pages/platform/SchoolSettingsPage'));
@@ -402,6 +422,17 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherDashboard /></ProtectedRoute>} />
+          <Route path="/teacher/assignments" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherAssignmentsPage /></ProtectedRoute>} />
+          <Route path="/teacher/assignments/:assignmentId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherAssignmentDetailPage /></ProtectedRoute>} />
+          <Route path="/teacher/assignments/:assignmentId/chapters/:chapterId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherChapterPage /></ProtectedRoute>} />
+          <Route path="/teacher/assignments/:assignmentId/students" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherAssignmentStudentsPage /></ProtectedRoute>} />
+          <Route path="/teacher/assignments/:assignmentId/students/:studentId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherStudentPerformancePage /></ProtectedRoute>} />
+          <Route path="/teacher/polls" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollsPage /></ProtectedRoute>} />
+          <Route path="/teacher/polls/:pollId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollPage /></ProtectedRoute>} />
+          <Route path="/teacher/performance" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPerformancePage /></ProtectedRoute>} />
+          <Route path="/teacher/my-class" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherMyClassPage /></ProtectedRoute>} />
+          <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['TEACHER']}><StudentAttendancePage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/teacher/attendance"
@@ -432,6 +463,18 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/student/dashboard" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student/attendance" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentAttendanceSummaryPage /></ProtectedRoute>} />
+          <Route path="/student/attendance/:year/:month" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentAttendanceMonthPage /></ProtectedRoute>} />
+          <Route path="/student/subjects" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubjectsPage /></ProtectedRoute>} />
+          <Route path="/student/subjects/:subjectId" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubjectPage /></ProtectedRoute>} />
+          <Route path="/student/subjects/:subjectId/chapters/:chapterId" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentChapterPage /></ProtectedRoute>} />
+          <Route path="/student/polls/pending" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentPendingPollsPage /></ProtectedRoute>} />
+          <Route path="/student/polls/submitted" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubmittedPollsPage /></ProtectedRoute>} />
+          <Route path="/student/polls/submitted/:submissionId" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentSubmittedPollPage /></ProtectedRoute>} />
+          <Route path="/student/polls/:pollId" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentPollPage /></ProtectedRoute>} />
+          <Route path="/student/performance" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentPerformancePage /></ProtectedRoute>} />
+          <Route path="/student/resources" element={<ProtectedRoute allowedRoles={['STUDENT']}><StudentResourcesPage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/staff"

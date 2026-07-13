@@ -10,6 +10,9 @@ export const teacherDashboardService = {
     const response = await apiClient.get('/teacher/assignments');
     return response.data.data;
   },
+  getAssignment: async (assignmentId) => (await apiClient.get(`/teacher/assignments/${assignmentId}`)).data.data,
+  getAssignmentChapter: async (assignmentId, chapterId) => (await apiClient.get(`/teacher/assignments/${assignmentId}/chapters/${chapterId}`)).data.data,
+  getAssignmentStudent: async (assignmentId, studentId) => (await apiClient.get(`/teacher/assignments/${assignmentId}/students/${studentId}`)).data.data,
 
   getChapters: async ({ sectionId, subjectId }) => {
     const response = await apiClient.get(`/teacher/sections/${sectionId}/subjects/${subjectId}/chapters`);

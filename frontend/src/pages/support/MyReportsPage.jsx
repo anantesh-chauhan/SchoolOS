@@ -1,6 +1,6 @@
 import React, { useState } from 'react'; 
 import { useQuery } from '@tanstack/react-query'; 
-import { MessageSquareWarning, Plus } from 'lucide-react';
+import { MessageSquare as MessageSquareWarning, Plus } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout'; 
 import { authService } from '../../services/authService'; 
 import { issueReportService } from '../../services/issueReportService'; 

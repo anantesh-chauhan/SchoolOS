@@ -149,6 +149,7 @@ export const getTeacherDashboard = async (req, res) => {
           pendingChapters,
           totalSharedResources: resourceCount,
           untouchedChapters: Math.max(0, totalChapters - started),
+          isClassTeacher: assignments.some((item) => ['CLASS_TEACHER', 'BOTH'].includes(item.roleType)),
         },
         recentActivity: [
           ...recentProgress,
@@ -204,6 +205,7 @@ export const getTeacherAssignments = async (req, res) => {
       }
 
       classGroup.sections.get(assignment.sectionId).subjects.push({
+        assignmentId: assignment.id,
         subjectId: assignment.subjectId,
         subjectName: assignment.subject.subjectName,
         roleType: assignment.roleType,
@@ -227,6 +229,38 @@ export const getTeacherAssignments = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to load teacher assignments', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 };
+
+const requireOwnedAssignment = async (user, assignmentId) => {
+  const { rows } = await getAccessibleAssignments(user);
+  const assignment = rows.find((row) => row.id === assignmentId);
+  if (!assignment) throw Object.assign(new Error('Assignment not found or no longer assigned to you'), { statusCode: 403 });
+  return assignment;
+};
+
+export const getTeacherAssignmentDetail = async (req, res) => {
+  try {
+    const assignment = await requireOwnedAssignment(req.user, req.params.assignmentId);
+    const [chapterPayload, students, resources, polls, mastery] = await Promise.all([
+      Promise.all([
+        prisma.chapter.findMany({ where: { schoolId: assignment.schoolId, classId: assignment.classId, subjectId: assignment.subjectId, deletedAt: null, OR: [{ sectionId: assignment.sectionId }, { sectionId: null }] }, orderBy: { chapterNumber: 'asc' } }),
+        prisma.chapterProgress.findMany({ where: { schoolId: assignment.schoolId, classId: assignment.classId, sectionId: assignment.sectionId, subjectId: assignment.subjectId } }),
+      ]),
+      prisma.student.findMany({ where: { schoolId: assignment.schoolId, className: assignment.class.className, section: assignment.section.sectionName, isActive: true }, select: { id: true, studentFirstName: true, studentLastName: true, rollNumber: true }, orderBy: [{ rollNumber: 'asc' }, { studentFirstName: 'asc' }] }),
+      prisma.sectionResource.findMany({ where: { schoolId: assignment.schoolId, classId: assignment.classId, sectionId: assignment.sectionId, subjectId: assignment.subjectId }, orderBy: { updatedAt: 'desc' } }),
+      prisma.chapterPoll.findMany({ where: { schoolId: assignment.schoolId, classId: assignment.classId, sectionId: assignment.sectionId, subjectId: assignment.subjectId }, include: { votes: { select: { studentId: true } }, chapter: { select: { chapterName: true, chapterNumber: true } } }, orderBy: { updatedAt: 'desc' } }),
+      prisma.studentChapterMastery.findMany({ where: { schoolId: assignment.schoolId, classId: assignment.classId, sectionId: assignment.sectionId, subjectId: assignment.subjectId } }),
+    ]);
+    const [chapters, progress] = chapterPayload; const progressMap = new Map(progress.map((row) => [row.chapterId, row]));
+    const scores = mastery.map((row) => row.score).filter(Number.isFinite); const average = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10 : null;
+    return res.json({ success: true, data: { assignment: { id: assignment.id, roleType: assignment.roleType, class: { id: assignment.classId, name: assignment.class.className }, section: { id: assignment.sectionId, name: assignment.section.sectionName }, subject: { id: assignment.subjectId, name: assignment.subject.subjectName }, effectiveFrom: assignment.effectiveFrom, effectiveTo: assignment.effectiveTo }, summary: { students: students.length, chapters: chapters.length, completed: progress.filter((p)=>p.status==='COMPLETED').length, ongoing: progress.filter((p)=>p.status==='ONGOING').length, classAverage: average, resources: resources.length, polls: polls.length }, chapters: chapters.map((chapter)=>({ id:chapter.id,chapterNumber:chapter.chapterNumber,chapterName:chapter.chapterName,status:progressMap.get(chapter.id)?.status||'NOT_STARTED',remarks:progressMap.get(chapter.id)?.remarks||null,completedAt:progressMap.get(chapter.id)?.completedAt||null,updatedAt:progressMap.get(chapter.id)?.updatedAt||chapter.updatedAt,resources:resources.filter((r)=>r.chapterId===chapter.id).length,poll:polls.find((p)=>p.chapterId===chapter.id)||null,studentsNeedingAttention:mastery.filter((m)=>m.chapterId===chapter.id&&Number.isFinite(m.score)&&m.score<60).length })), students: students.map((student)=>{const rows=mastery.filter((m)=>m.studentId===student.id);const values=rows.map(r=>r.score).filter(Number.isFinite);return {id:student.id,name:[student.studentFirstName,student.studentLastName].filter(Boolean).join(' '),rollNumber:student.rollNumber,score:values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length*10)/10:null,evaluatedChapters:values.length};}), resources, polls } });
+  } catch (error) { return res.status(error.statusCode || 500).json({ success:false, message:error.message || 'Failed to load assignment' }); }
+};
+
+export const getTeacherAssignmentChapter = async (req,res) => {
+  try { const assignment=await requireOwnedAssignment(req.user,req.params.assignmentId); const chapter=await prisma.chapter.findFirst({where:{id:req.params.chapterId,schoolId:assignment.schoolId,classId:assignment.classId,subjectId:assignment.subjectId,deletedAt:null,OR:[{sectionId:assignment.sectionId},{sectionId:null}]}}); if(!chapter)return res.status(404).json({success:false,message:'Chapter not found in this assignment'}); const detail=await Promise.all([prisma.chapterProgress.findFirst({where:{schoolId:assignment.schoolId,classId:assignment.classId,sectionId:assignment.sectionId,subjectId:assignment.subjectId,chapterId:chapter.id}}),prisma.sectionResource.findMany({where:{schoolId:assignment.schoolId,classId:assignment.classId,sectionId:assignment.sectionId,subjectId:assignment.subjectId,chapterId:chapter.id},orderBy:{updatedAt:'desc'}}),prisma.chapterPoll.findFirst({where:{schoolId:assignment.schoolId,classId:assignment.classId,sectionId:assignment.sectionId,subjectId:assignment.subjectId,chapterId:chapter.id},include:{votes:true}}),prisma.studentChapterMastery.findMany({where:{schoolId:assignment.schoolId,classId:assignment.classId,sectionId:assignment.sectionId,subjectId:assignment.subjectId,chapterId:chapter.id},include:{student:{select:{id:true,studentFirstName:true,studentLastName:true,rollNumber:true}}}})]); return res.json({success:true,data:{assignment:{id:assignment.id,className:assignment.class.className,sectionName:assignment.section.sectionName,subjectName:assignment.subject.subjectName},chapter,progress:detail[0],resources:detail[1],poll:detail[2],performance:detail[3]}}); } catch(error){return res.status(error.statusCode||500).json({success:false,message:error.message||'Failed to load chapter'});}
+};
+
+export const getTeacherAssignmentStudent = async (req,res) => { try { const assignment=await requireOwnedAssignment(req.user,req.params.assignmentId); const student=await prisma.student.findFirst({where:{id:req.params.studentId,schoolId:assignment.schoolId,className:assignment.class.className,section:assignment.section.sectionName,isActive:true},select:{id:true,studentFirstName:true,studentLastName:true,rollNumber:true}}); if(!student)return res.status(404).json({success:false,message:'Student is outside this assignment'}); const mastery=await prisma.studentChapterMastery.findMany({where:{schoolId:assignment.schoolId,classId:assignment.classId,sectionId:assignment.sectionId,subjectId:assignment.subjectId,studentId:student.id},include:{chapter:{select:{chapterName:true,chapterNumber:true}}},orderBy:{chapter:{chapterNumber:'asc'}}}); return res.json({success:true,data:{student:{...student,name:[student.studentFirstName,student.studentLastName].filter(Boolean).join(' ')},assignment:{id:assignment.id,className:assignment.class.className,sectionName:assignment.section.sectionName,subjectName:assignment.subject.subjectName},mastery}}); }catch(error){return res.status(error.statusCode||500).json({success:false,message:error.message||'Failed to load student performance'});} };
 
 export const getTeacherChapters = async (req, res) => {
   try {

@@ -208,13 +208,25 @@ const DashboardLayout = ({ children, role }) => {
     ],
     TEACHER: [
       {
-        group: 'System',
-        icon: Settings,
+        group: 'Overview', icon: Home,
         items: [
-          { label: 'My Profile', icon: UserRound, href: '/dashboard/teacher/profile' },
-          { label: 'Dashboard', icon: Home, href: '/dashboard/teacher' },
-          { label: 'Daily Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/attendance' },
+          { label: 'Dashboard', icon: Home, href: '/teacher/dashboard' },
+        ],
+      },
+      { group: 'Teaching', icon: BookOpen, items: [
+          { label: 'My Classes & Subjects', icon: School, href: '/teacher/assignments' },
+          { label: 'Poll Management', icon: MessageSquare, href: '/teacher/polls' },
+          { label: 'Student Performance', icon: Users, href: '/teacher/performance' },
+        ],
+      },
+      { group: 'Class Management', icon: Users, items: [
+          { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
+          { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
           { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
+        ],
+      },
+      { group: 'Account', icon: Settings, items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/teacher/profile' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -235,12 +247,29 @@ const DashboardLayout = ({ children, role }) => {
     ],
     STUDENT: [
       {
-        group: 'System',
-        icon: Settings,
+        group: 'Overview',
+        icon: Home,
         items: [
+          { label: 'Dashboard', icon: Home, href: '/student/dashboard' },
+        ],
+      },
+      {
+        group: 'Academics', icon: BookOpen, items: [
+          { label: 'My Subjects', icon: BookOpen, href: '/student/subjects' },
+          { label: 'My Performance', icon: BookOpenCheck, href: '/student/performance' },
+        ],
+      },
+      { group: 'Attendance', icon: ClipboardCheck, items: [
+          { label: 'Attendance Summary', icon: ClipboardCheck, href: '/student/attendance' },
+        ],
+      },
+      { group: 'Polls & Feedback', icon: MessageSquare, items: [
+          { label: 'Pending Polls', icon: MessageSquare, href: '/student/polls/pending' },
+          { label: 'Submitted Polls', icon: BookOpenCheck, href: '/student/polls/submitted' },
+        ],
+      },
+      { group: 'Account', icon: Settings, items: [
           { label: 'My Profile', icon: UserRound, href: '/dashboard/student/profile' },
-          { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/student/attendance' },
-          { label: 'Dashboard', icon: Home, href: '/dashboard/student' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],

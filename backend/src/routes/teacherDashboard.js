@@ -9,6 +9,9 @@ import {
   getTeacherResources,
   patchTeacherProgress,
   updateTeacherResource,
+  getTeacherAssignmentDetail,
+  getTeacherAssignmentChapter,
+  getTeacherAssignmentStudent,
 } from '../controllers/teacherDashboard.controller.js';
 
 const router = express.Router();
@@ -18,6 +21,9 @@ router.use(requireRole('TEACHER', 'ADMIN', 'SCHOOL_OWNER'));
 
 router.get('/dashboard', getTeacherDashboard);
 router.get('/assignments', getTeacherAssignments);
+router.get('/assignments/:assignmentId', getTeacherAssignmentDetail);
+router.get('/assignments/:assignmentId/chapters/:chapterId', getTeacherAssignmentChapter);
+router.get('/assignments/:assignmentId/students/:studentId', getTeacherAssignmentStudent);
 router.get('/sections/:sectionId/subjects/:subjectId/chapters', getTeacherChapters);
 router.patch('/progress', patchTeacherProgress);
 router.get('/resources', getTeacherResources);
