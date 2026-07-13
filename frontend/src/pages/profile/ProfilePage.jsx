@@ -20,6 +20,8 @@ import {
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import profileService from '../../services/profileService';
+import PasswordInput from '../../components/ui/PasswordInput';
+import SecuritySettingsCard from '../../components/security/SecuritySettingsCard';
 
 const roleMeta = {
   PLATFORM_OWNER: {
@@ -36,6 +38,11 @@ const roleMeta = {
     title: 'Admin Profile',
     subtitle: 'Administrative identity and academic assignment overview.',
     accent: 'from-emerald-600 via-lime-600 to-green-600',
+  },
+  CURRICULUM_MANAGER: {
+    title: 'Curriculum Manager Profile',
+    subtitle: 'Academic planning identity, permissions, and account security.',
+    accent: 'from-violet-700 via-indigo-600 to-cyan-600',
   },
   TEACHER: {
     title: 'Teacher Profile',
@@ -79,7 +86,7 @@ const initialsFromName = (name) => {
   return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
 };
 
-const InfoRow = ({ icon: Icon, label, value }) => (
+const InfoRow = ({ icon: Icon, label, value = null }) => (
   <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
     <div className="mt-0.5 rounded-xl bg-white p-2 text-slate-600 shadow-sm">
       <Icon size={16} />
@@ -95,10 +102,6 @@ InfoRow.propTypes = {
   icon: PropTypes.elementType.isRequired,
   label: PropTypes.string.isRequired,
   value: PropTypes.node,
-};
-
-InfoRow.defaultProps = {
-  value: null,
 };
 
 const ProfilePage = ({ role }) => {
@@ -271,6 +274,12 @@ const ProfilePage = ({ role }) => {
           </div>
         )}
 
+        {profile?.mustChangePassword && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <strong>Temporary password in use.</strong> Change it below before opening the rest of SchoolOS. All current sessions will be signed out after the update.
+          </div>
+        )}
+
         {profile && (
           <>
             <section className="grid gap-6 xl:grid-cols-3">
@@ -369,8 +378,9 @@ const ProfilePage = ({ role }) => {
               </section>
             )}
 
-            {profile.canEdit !== false && (
+            {(
               <section className="grid gap-6 xl:grid-cols-2">
+              {profile.canEdit !== false && (
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
@@ -426,6 +436,7 @@ const ProfilePage = ({ role }) => {
                   </div>
                 </form>
               </div>
+              )}
 
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -439,33 +450,26 @@ const ProfilePage = ({ role }) => {
                 </div>
 
                 <form onSubmit={onPasswordSubmit} className="mt-5 space-y-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Current Password</label>
-                    <input
-                      type="password"
-                      className={fieldClassName}
+                  <PasswordInput
+                      label="Current Password"
                       value={passwordForm.currentPassword}
                       onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))}
+                      autoComplete="current-password"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">New Password</label>
-                    <input
-                      type="password"
-                      className={fieldClassName}
+                  <PasswordInput
+                      label="New Password"
+                      showStrength
                       value={passwordForm.newPassword}
                       onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))}
+                      autoComplete="new-password"
                     />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700">Confirm New Password</label>
-                    <input
-                      type="password"
-                      className={fieldClassName}
+                  <PasswordInput
+                      label="Confirm New Password"
+                      error={passwordForm.confirmPassword && passwordForm.confirmPassword !== passwordForm.newPassword ? 'Passwords do not match' : ''}
                       value={passwordForm.confirmPassword}
                       onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))}
+                      autoComplete="new-password"
                     />
-                  </div>
                   <div className="flex justify-end">
                     <button
                       type="submit"
@@ -479,6 +483,7 @@ const ProfilePage = ({ role }) => {
               </div>
               </section>
             )}
+            {role !== 'PLATFORM_OWNER' && <SecuritySettingsCard />}
           </>
         )}
       </div>
@@ -487,7 +492,7 @@ const ProfilePage = ({ role }) => {
 };
 
 ProfilePage.propTypes = {
-  role: PropTypes.oneOf(['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']).isRequired,
+  role: PropTypes.oneOf(['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']).isRequired,
 };
 
 export default ProfilePage;

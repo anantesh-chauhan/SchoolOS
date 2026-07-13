@@ -1,5 +1,7 @@
 import express from 'express';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware.js';
+import { requirePermission } from '../middleware/permission.middleware.js';
+import { PERMISSIONS } from '../config/permissions.js';
 import {
   assignSlot,
   createTimetable,
@@ -16,20 +18,18 @@ import {
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRole('ADMIN', 'SCHOOL_OWNER'));
+router.get('/', requireRole('ADMIN', 'SCHOOL_OWNER'), listTimetables);
+router.post('/', requireRole('ADMIN', 'SCHOOL_OWNER'), createTimetable);
 
-router.get('/', listTimetables);
-router.post('/', createTimetable);
+router.get('/weekly-requirements', requirePermission(PERMISSIONS.WEEKLY_SLOTS_VIEW), listWeeklyRequirements);
+router.put('/weekly-requirements', requirePermission(PERMISSIONS.WEEKLY_SLOTS_MANAGE), upsertWeeklyRequirements);
+router.post('/weekly-requirements/propagate', requirePermission(PERMISSIONS.WEEKLY_SLOTS_MANAGE), propagateWeeklyRequirements);
+router.get('/reconciliation/report', requireRole('ADMIN', 'SCHOOL_OWNER'), getReconciliationReport);
 
-router.get('/weekly-requirements', listWeeklyRequirements);
-router.put('/weekly-requirements', upsertWeeklyRequirements);
-router.post('/weekly-requirements/propagate', propagateWeeklyRequirements);
-router.get('/reconciliation/report', getReconciliationReport);
+router.get('/:id', requireRole('ADMIN', 'SCHOOL_OWNER'), getTimetableBody);
+router.get('/:id/validate', requireRole('ADMIN', 'SCHOOL_OWNER'), validateTimetable);
 
-router.get('/:id', getTimetableBody);
-router.get('/:id/validate', validateTimetable);
-
-router.post('/slots/:slotId/assign', assignSlot);
-router.post('/slots/:slotId/reset', resetSlot);
+router.post('/slots/:slotId/assign', requireRole('ADMIN', 'SCHOOL_OWNER'), assignSlot);
+router.post('/slots/:slotId/reset', requireRole('ADMIN', 'SCHOOL_OWNER'), resetSlot);
 
 export default router;

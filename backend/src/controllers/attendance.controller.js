@@ -248,6 +248,9 @@ export const markTeacherAttendance = async (req, res) => {
     if (!schoolId || !attendanceDate) {
       return res.status(400).json({ success: false, message: 'A valid date is required' });
     }
+    if (records.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one teacher attendance record is required' });
+    }
 
     const teachers = await prisma.teacher.findMany({
       where: { schoolId, deletedAt: null },
@@ -259,9 +262,13 @@ export const markTeacherAttendance = async (req, res) => {
       status: normalizeStatus(record.status),
       remarks: String(record.remarks || '').trim() || null,
     }));
+    const submittedTeacherIds = normalizedRecords.map((record) => record.teacherId);
 
     if (normalizedRecords.some((record) => !teacherIds.has(record.teacherId) || !record.status)) {
       return res.status(409).json({ success: false, message: 'Attendance contains invalid teachers or statuses' });
+    }
+    if (new Set(submittedTeacherIds).size !== submittedTeacherIds.length) {
+      return res.status(409).json({ success: false, message: 'Attendance contains duplicate teacher records' });
     }
 
     await prisma.$transaction(
@@ -290,7 +297,11 @@ export const markTeacherAttendance = async (req, res) => {
       }))
     );
 
-    return res.json({ success: true, message: 'Teacher attendance saved' });
+    return res.json({
+      success: true,
+      message: `Attendance saved for ${normalizedRecords.length} teacher${normalizedRecords.length === 1 ? '' : 's'}`,
+      data: { date: attendanceDate.toISOString().slice(0, 10), savedCount: normalizedRecords.length },
+    });
   } catch (error) {
     return res.status(error.statusCode || 500).json({
       success: false,
@@ -425,11 +436,11 @@ const buildPersonalHistory = (personType, person, academicSession, records) => {
 
 export const saveCalendarDay = async (req, res) => {
   try {
-    if (!isSchoolAdmin(req.user)) return res.status(403).json({ success: false, message: 'Only admins can manage the academic calendar' });
+    if (!isSchoolAdmin(req.user) && req.user.role !== 'CURRICULUM_MANAGER') return res.status(403).json({ success: false, message: 'You cannot manage the academic calendar' });
     const calendarDate = normalizeDate(req.body.date);
     const dayType = String(req.body.dayType || '').toUpperCase();
     if (!calendarDate || !VALID_DAY_TYPES.has(dayType)) return res.status(400).json({ success: false, message: 'Valid date and dayType are required' });
-    const data = { academicSession: String(req.body.academicSession || sessionForDate(calendarDate)), dayType, title: String(req.body.title || '').trim() || null, description: String(req.body.description || '').trim() || null };
+    const data = { academicSession: String(req.body.academicSession || sessionForDate(calendarDate)), dayType, title: String(req.body.title || '').trim() || null, description: String(req.body.description || '').trim() || null, endDate: normalizeDate(req.body.endDate) || calendarDate, eventType: String(req.body.eventType || dayType), holidayType: req.body.holidayType || null, applicableClassIds: req.body.applicableClassIds || [], applicableSectionIds: req.body.applicableSectionIds || [], applicableRoles: req.body.applicableRoles || [], isFullDay: req.body.isFullDay !== false, isSchoolWide: req.body.isSchoolWide !== false, region: req.body.region || null, isVisible: req.body.isVisible !== false, colorCategory: req.body.colorCategory || null, isRecurring: Boolean(req.body.isRecurring), sourceNote: req.body.sourceNote || null, createdById: req.user.id };
     const day = await prisma.academicCalendarDay.upsert({ where: { schoolId_calendarDate: { schoolId: req.user.schoolId, calendarDate } }, update: data, create: { schoolId: req.user.schoolId, calendarDate, ...data } });
     return res.json({ success: true, data: day, message: 'Calendar day saved' });
   } catch (error) {
@@ -440,10 +451,13 @@ export const saveCalendarDay = async (req, res) => {
 export const listCalendarDays = async (req, res) => {
   try {
     const range = monthRange(req.query.month);
-    const where = { schoolId: req.user.schoolId, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) };
+    const where = { schoolId: req.user.schoolId, isVisible: true, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) };
     if (!range && !req.query.academicSession) return res.status(400).json({ success: false, message: 'month or academicSession is required' });
-    const days = await prisma.academicCalendarDay.findMany({ where, orderBy: { calendarDate: 'asc' } });
-    return res.json({ success: true, data: { month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ id: day.id, date: day.calendarDate.toISOString().slice(0, 10), dayType: day.dayType, title: day.title, description: day.description, academicSession: day.academicSession, updatedAt: day.updatedAt })) } });
+    let scope = { classId: req.user.classId, sectionId: req.user.sectionId };
+    if (['STUDENT', 'PARENT'].includes(req.user.role)) { const student = await prisma.student.findFirst({ where: { id: req.user.studentId, schoolId: req.user.schoolId, isActive: true } }); const cls = student ? await prisma.class.findFirst({ where: { schoolId: req.user.schoolId, className: student.className } }) : null; const section = cls && student?.section ? await prisma.section.findFirst({ where: { schoolId: req.user.schoolId, classId: cls.id, sectionName: student.section } }) : null; scope = { classId: cls?.id, sectionId: section?.id }; }
+    const allDays = await prisma.academicCalendarDay.findMany({ where, orderBy: { calendarDate: 'asc' } });
+    const days = allDays.filter((day) => isSchoolAdmin(req.user) || ((!day.applicableRoles.length || day.applicableRoles.includes(req.user.role)) && (day.isSchoolWide || ((!day.applicableClassIds.length || day.applicableClassIds.includes(scope.classId)) && (!day.applicableSectionIds.length || day.applicableSectionIds.includes(scope.sectionId))))));
+    return res.json({ success: true, data: { month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ ...day, date: day.calendarDate.toISOString().slice(0, 10), endDate: day.endDate?.toISOString().slice(0, 10) || null })) } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Failed to load academic calendar' });
   }
@@ -456,7 +470,7 @@ export const listPublicCalendarDays = async (req, res) => {
     if (!schoolId || (!range && !req.query.academicSession)) return res.status(400).json({ success: false, message: 'schoolId and month or academicSession are required' });
     const school = await prisma.school.findFirst({ where: { id: schoolId, status: 'ACTIVE' }, select: { id: true, schoolName: true, schoolCode: true } });
     if (!school) return res.status(404).json({ success: false, message: 'School not found' });
-    const days = await prisma.academicCalendarDay.findMany({ where: { schoolId, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) }, orderBy: { calendarDate: 'asc' } });
+    const days = await prisma.academicCalendarDay.findMany({ where: { schoolId, isVisible: true, isSchoolWide: true, applicableRoles: { isEmpty: true }, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) }, orderBy: { calendarDate: 'asc' } });
     res.set('Cache-Control', 'public, max-age=300');
     return res.json({ success: true, data: { school, month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ id: day.id, date: day.calendarDate.toISOString().slice(0, 10), dayType: day.dayType, title: day.title, description: day.description, academicSession: day.academicSession, updatedAt: day.updatedAt })) } });
   } catch (error) {
@@ -474,4 +488,11 @@ export const deleteCalendarDay = async (req, res) => {
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Failed to remove calendar day' });
   }
+};
+
+export const calendarDashboardSummary = async (req, res) => {
+  const now = new Date(); const week = new Date(now.getTime() + 7 * 86400000);
+  const rows = await prisma.academicCalendarDay.findMany({ where: { schoolId: req.user.schoolId, isVisible: true, calendarDate: { gte: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) } }, orderBy: { calendarDate: 'asc' }, take: 50 });
+  const visible = rows.filter((row) => row.isSchoolWide || !row.applicableRoles.length || row.applicableRoles.includes(req.user.role));
+  return res.json({ success: true, data: { today: now.toISOString().slice(0, 10), nextEvent: visible[0] || null, eventsThisWeek: visible.filter((row) => row.calendarDate < week).length, nearestHoliday: visible.find((row) => row.dayType === 'HOLIDAY') || null, nearestExam: visible.find((row) => row.dayType === 'EXAM' || row.eventType === 'EXAM') || null } });
 };

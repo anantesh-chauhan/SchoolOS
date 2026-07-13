@@ -1,5 +1,6 @@
 import bcryptjs from 'bcryptjs';
 import prisma from '../config/prisma.client.js';
+import { accountKeyForUser, resolveAccount, updateAccountPassword, validatePassword } from '../services/accountSecurity.service.js';
 
 
 const schoolSelect = {
@@ -174,7 +175,7 @@ const getUserProfile = async (userId) => {
 export const getMyProfile = async (req, res) => {
   try {
     let user = null;
-    const canEdit = ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'TEACHER', 'STAFF'].includes(req.user.role);
+    const canEdit = ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'TEACHER', 'STAFF'].includes(req.user.role);
 
     if (req.user.role === 'STUDENT') {
       user = await getStudentProfile(req.user.studentId || req.user.id);
@@ -267,23 +268,20 @@ export const changePassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Both currentPassword and newPassword are required' });
     }
 
-    if (typeof newPassword !== 'string' || newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
+    if (!validatePassword(newPassword)) {
+      return res.status(400).json({ success: false, message: 'Use at least 10 characters with uppercase, lowercase, number, and symbol' });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const account = await resolveAccount({ accountKey: accountKeyForUser(req.user), schoolId: req.user.schoolId });
+    if (!account) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const isMatch = await bcryptjs.compare(currentPassword, user.password);
+    const isMatch = await bcryptjs.compare(currentPassword, account.passwordHash);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Incorrect current password' });
     }
 
-    const hashed = await bcryptjs.hash(newPassword, 10);
-    await prisma.user.update({
-      where: { id: req.user.id },
-      data: { password: hashed, mustChangePassword: false, updatedAt: new Date() },
-    });
+    const hashed = await bcryptjs.hash(newPassword, 12);
+    await updateAccountPassword({ account, passwordHash: hashed, mustChangePassword: false });
 
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {

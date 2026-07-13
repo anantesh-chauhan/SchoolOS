@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../services/authService";
 
@@ -7,6 +7,7 @@ const ProtectedRoute = ({
   children,
   allowedRoles = null,
 }) => {
+  const location = useLocation();
   const [loading, setLoading] =
     useState(true);
 
@@ -61,6 +62,17 @@ const ProtectedRoute = ({
 
         }
 
+        if (user.mustChangePassword && !location.pathname.includes('/profile')) {
+          const profileRoutes = {
+            SCHOOL_OWNER: '/dashboard/school/profile', ADMIN: '/dashboard/admin/profile',
+            CURRICULUM_MANAGER: '/dashboard/curriculum/profile', TEACHER: '/dashboard/teacher/profile',
+            STUDENT: '/dashboard/student/profile', PARENT: '/dashboard/parent/profile', STAFF: '/dashboard/staff/profile',
+          };
+          setIsAuthorized(false);
+          setRedirectPath(profileRoutes[user.role] || '/login');
+          return;
+        }
+
         setIsAuthorized(true);
 
         setRedirectPath(null);
@@ -95,7 +107,7 @@ const ProtectedRoute = ({
 
     };
 
-  }, [allowedRoles]);
+  }, [allowedRoles, location.pathname]);
 
   /* ======================================
      Premium Loading Screen

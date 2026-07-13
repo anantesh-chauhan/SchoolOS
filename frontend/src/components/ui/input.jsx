@@ -138,6 +138,8 @@ export function Input({
               setShowPassword((p) => !p)
             }
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            aria-pressed={showPassword}
           >
 
             {showPassword ? (

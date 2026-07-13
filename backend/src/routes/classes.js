@@ -5,10 +5,8 @@ import { createClass, deleteClass, listClasses } from '../controllers/class.cont
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRole('ADMIN', 'SCHOOL_OWNER'));
-
-router.get('/', listClasses);
-router.post('/', createClass);
-router.delete('/:id', deleteClass);
+router.get('/', requireRole('ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER'), listClasses);
+router.post('/', requireRole('ADMIN', 'SCHOOL_OWNER'), createClass);
+router.delete('/:id', requireRole('ADMIN', 'SCHOOL_OWNER'), deleteClass);
 
 export default router;

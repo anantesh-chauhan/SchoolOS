@@ -25,7 +25,7 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/', requireRole('PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN'), listAcademicStructure);
+router.get('/', requireRole('PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER'), listAcademicStructure);
 router.get('/class-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getClassSectionDashboard);
 router.get('/subject-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getSubjectDashboard);
 router.get('/chapter-dashboard', requireRole('SCHOOL_OWNER', 'ADMIN'), getChapterDashboard);

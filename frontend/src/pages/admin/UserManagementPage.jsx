@@ -41,8 +41,10 @@ const CredentialBlock = ({ title, data }) => {
 export default function UserManagementPage() {
   const [teacherForm, setTeacherForm] = useState(emptyTeacherForm);
   const [staffForm, setStaffForm] = useState(emptyStaffForm);
+  const [curriculumForm, setCurriculumForm] = useState({ ...emptyStaffForm, lastName: '' });
   const [teacherResult, setTeacherResult] = useState(null);
   const [staffResult, setStaffResult] = useState(null);
+  const [curriculumResult, setCurriculumResult] = useState(null);
 
   const teacherMutation = useMutation({
     mutationFn: userService.createTeacher,
@@ -62,6 +64,16 @@ export default function UserManagementPage() {
       setStaffForm(emptyStaffForm);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to create staff account'),
+  });
+
+  const curriculumMutation = useMutation({
+    mutationFn: userService.createCurriculumManager,
+    onSuccess: (response) => {
+      toast.success('Curriculum Manager account created');
+      setCurriculumResult(response.data);
+      setCurriculumForm({ ...emptyStaffForm, lastName: '' });
+    },
+    onError: (error) => toast.error(error.response?.data?.message || 'Failed to create Curriculum Manager'),
   });
 
   const submitTeacher = (event) => {
@@ -117,6 +129,22 @@ export default function UserManagementPage() {
                 </div>
               </form>
               <CredentialBlock title="Staff Credentials" data={staffResult} />
+            </section>
+
+            <section className="space-y-4 rounded-2xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900 dark:bg-violet-950/20">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Curriculum Manager</h2>
+                <p className="text-sm text-slate-500">Grants school-scoped curriculum, chapter, resource and weekly-slot permissions without user credentials, fees, payroll or platform access.</p>
+              </div>
+              <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); curriculumMutation.mutate(curriculumForm); }}>
+                <Input required placeholder="First Name" value={curriculumForm.firstName} onChange={(event) => setCurriculumForm((prev) => ({ ...prev, firstName: event.target.value }))} />
+                <Input placeholder="Last Name" value={curriculumForm.lastName} onChange={(event) => setCurriculumForm((prev) => ({ ...prev, lastName: event.target.value }))} />
+                <Input required placeholder="Employee ID" value={curriculumForm.employeeId} onChange={(event) => setCurriculumForm((prev) => ({ ...prev, employeeId: event.target.value }))} />
+                <Input required type="email" placeholder="Contact Email" value={curriculumForm.email} onChange={(event) => setCurriculumForm((prev) => ({ ...prev, email: event.target.value }))} />
+                <Input required placeholder="Phone" value={curriculumForm.phone} onChange={(event) => setCurriculumForm((prev) => ({ ...prev, phone: event.target.value }))} />
+                <div className="flex justify-end sm:col-span-2"><Button type="submit" disabled={curriculumMutation.isPending}>{curriculumMutation.isPending ? 'Creating...' : 'Create Curriculum Manager'}</Button></div>
+              </form>
+              <CredentialBlock title="Curriculum Manager Credentials" data={curriculumResult} />
             </section>
           </CardContent>
         </Card>

@@ -52,6 +52,14 @@ model User {
   alternateMobile    String?
   isActive           Boolean @default(true)
   mustChangePassword Boolean @default(false)
+  passwordChangedAt          DateTime?
+  lastLoginAt                DateTime?
+  failedLoginAttempts        Int      @default(0)
+  lockedUntil                DateTime?
+  securityQuestionsConfigured Boolean @default(false)
+  securitySetupCompletedAt   DateTime?
+  recoveryEnabled            Boolean  @default(false)
+  sessionVersion             Int      @default(0)
 
   @@unique([schoolId, employeeId])
   @@index([email])
@@ -124,6 +132,15 @@ model School {
   teacherAttendances        TeacherAttendance[]
   academicCalendarDays      AcademicCalendarDay[]
   issueReports              IssueReport[]
+  securityQuestions         UserSecurityQuestion[]
+  passwordResetTokens       PasswordResetToken[]
+  securityAuditLogs         SecurityAuditLog[]
+  curricula                 Curriculum[]
+  curriculumVersions        CurriculumVersion[]
+  publishers                Publisher[]
+  books                     Book[]
+  curriculumUnits           CurriculumUnit[]
+  curriculumAuditLogs       CurriculumAuditLog[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -301,6 +318,8 @@ model Class {
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
   studentAttendances        StudentAttendance[]
+  books                     Book[]
+  curriculumUnits           CurriculumUnit[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -390,6 +409,8 @@ model Subject {
   studentChapterMasteries   StudentChapterMastery[]
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
+  books                     Book[]
+  curriculumUnits           CurriculumUnit[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -414,6 +435,18 @@ model Chapter {
   assignmentsCount Int       @default(0)
   completion       Int       @default(0)
   deletedAt        DateTime?
+  curriculumVersionId String?
+  bookId             String?
+  unitId             String?
+  academicSession    String?
+  description        String?
+  learningObjectives Json?
+  teachingOrder      Int?
+  difficultyLevel    String?
+  startDate           DateTime?
+  targetCompletionDate DateTime?
+  publicationStatus   String    @default("PUBLISHED")
+  resourcePreference  String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -432,12 +465,18 @@ model Chapter {
   studentChapterMasteries   StudentChapterMastery[]
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
+  curriculumVersion         CurriculumVersion?        @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
+  book                      Book?                      @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  unit                      CurriculumUnit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
 
   @@unique([schoolId, classId, sectionId, subjectId, chapterName])
   @@unique([schoolId, classId, sectionId, subjectId, chapterNumber])
   @@index([schoolId, classId, sectionId])
   @@index([schoolId, subjectId])
   @@index([schoolId, status])
+  @@index([schoolId, curriculumVersionId])
+  @@index([schoolId, bookId])
+  @@index([schoolId, unitId])
 }
 
 model ClassSubject {
@@ -1091,8 +1130,17 @@ model Student {
   // Password Fields
   studentPasswordHash     String?
   parentPasswordHash      String?
+  studentMustChangePassword Boolean @default(false)
+  parentMustChangePassword  Boolean @default(false)
   passwordGenerated       Boolean   @default(false)
   lastPasswordGeneratedAt DateTime?
+  passwordChangedAt       DateTime?
+  failedLoginAttempts     Int      @default(0)
+  lockedUntil             DateTime?
+  securityQuestionsConfigured Boolean @default(false)
+  securitySetupCompletedAt DateTime?
+  recoveryEnabled         Boolean  @default(false)
+  sessionVersion          Int      @default(0)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -1488,6 +1536,20 @@ model AcademicCalendarDay {
   dayType         CalendarDayType @default(WORKING_DAY)
   title           String?
   description     String?
+  endDate          DateTime?
+  eventType        String?
+  holidayType      String?
+  applicableClassIds String[] @default([])
+  applicableSectionIds String[] @default([])
+  applicableRoles  String[] @default([])
+  isFullDay        Boolean @default(true)
+  isSchoolWide     Boolean @default(true)
+  region           String?
+  isVisible        Boolean @default(true)
+  colorCategory    String?
+  isRecurring      Boolean @default(false)
+  sourceNote       String?
+  createdById      String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -1495,6 +1557,177 @@ model AcademicCalendarDay {
 
   @@unique([schoolId, calendarDate])
   @@index([schoolId, academicSession, calendarDate])
+}
+
+model UserSecurityQuestion {
+  id         String   @id @default(cuid())
+  schoolId   String
+  accountKey String
+  questionKey String
+  answerHash String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, accountKey, questionKey])
+  @@index([schoolId, accountKey])
+}
+
+model PasswordResetToken {
+  id              String   @id @default(cuid())
+  schoolId        String
+  accountKey      String
+  tokenHash       String   @unique
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime @default(now())
+  requestedIp     String?
+  requestMethod   String?
+  verificationState Json?
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, accountKey, expiresAt])
+}
+
+model SecurityAuditLog {
+  id           String   @id @default(cuid())
+  schoolId     String?
+  actorUserId  String?
+  targetUserId String?
+  action       String
+  status       String
+  metadata     Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  school       School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model Curriculum {
+  id              String   @id @default(cuid())
+  schoolId        String
+  name            String
+  curriculumType  String
+  academicSession String
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  versions        CurriculumVersion[]
+
+  @@unique([schoolId, name, academicSession])
+  @@index([schoolId, academicSession, isActive])
+}
+
+model CurriculumVersion {
+  id              String   @id @default(cuid())
+  schoolId        String
+  curriculumId    String
+  versionNumber   Int
+  status          String   @default("DRAFT")
+  changeSummary   String?
+  snapshot        Json?
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String?
+  publishedById   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculum      Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  chapters        Chapter[]
+  books           Book[]
+  units           CurriculumUnit[]
+
+  @@unique([curriculumId, versionNumber])
+  @@index([schoolId, status])
+}
+
+model Publisher {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  website   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  books     Book[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive])
+}
+
+model Book {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  curriculumVersionId String?
+  publisherId         String?
+  classId             String
+  subjectId           String
+  title               String
+  author              String?
+  edition             String?
+  isbn                String?
+  academicSession     String
+  coverImageUrl       String?
+  board               String?
+  resourceSource      String?
+  resourcePreference  String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculumVersion   CurriculumVersion? @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
+  publisher           Publisher? @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  class               Class    @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subject             Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapters            Chapter[]
+
+  @@unique([schoolId, academicSession, classId, subjectId, title])
+  @@index([schoolId, classId, subjectId])
+  @@index([publisherId])
+}
+
+model CurriculumUnit {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  curriculumVersionId String?
+  subjectId           String
+  classId             String?
+  name                String
+  displayOrder        Int      @default(0)
+  description         String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculumVersion   CurriculumVersion? @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
+  subject             Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  class               Class?   @relation(fields: [classId], references: [id], onDelete: SetNull)
+  chapters            Chapter[]
+
+  @@unique([schoolId, curriculumVersionId, subjectId, classId, name])
+  @@index([schoolId, subjectId, classId])
+}
+
+model CurriculumAuditLog {
+  id           String   @id @default(cuid())
+  schoolId     String
+  actorUserId  String?
+  action       String
+  entityType   String
+  entityId     String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
 }
 
 // Enums
@@ -1506,6 +1739,7 @@ enum Role {
   PARENT
   STUDENT
   STAFF
+  CURRICULUM_MANAGER
 }
 
 enum IssuePriority {

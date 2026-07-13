@@ -51,7 +51,7 @@ const validate = (values) => {
   return errors;
 };
 
-const Field = ({ label, children, error, hint }) => (
+const Field = ({ label, children, error = null, hint = null }) => (
   <div className="space-y-1.5">
     <label className="block text-sm font-medium text-slate-700">{label}</label>
     {children}
@@ -67,12 +67,7 @@ Field.propTypes = {
   hint: PropTypes.string,
 };
 
-Field.defaultProps = {
-  error: null,
-  hint: null,
-};
-
-const StudentForm = ({ onSave }) => {
+const StudentForm = ({ onSave = null }) => {
   const [values, setValues] = useState(createInitialState);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -433,10 +428,6 @@ const StudentForm = ({ onSave }) => {
 
 StudentForm.propTypes = {
   onSave: PropTypes.func,
-};
-
-StudentForm.defaultProps = {
-  onSave: null,
 };
 
 export default StudentForm;

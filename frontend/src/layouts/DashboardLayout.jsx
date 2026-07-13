@@ -3,6 +3,7 @@ import {
   BookOpen,
   BookOpenCheck,
   ClipboardCheck,
+  CalendarDays,
   ChevronDown,
   Home,
   Layers,
@@ -22,6 +23,7 @@ import {
   UsersRound,
   X,
   MessageSquare,
+  KeyRound,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -147,10 +149,12 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
+          { label: 'User Accounts', icon: Users, href: '/dashboard/school/users' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
           { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
+          { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
         ],
       },
       {
@@ -192,10 +196,12 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
           { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
+          { label: 'User Accounts', icon: Users, href: '/dashboard/admin/users' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
           { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
           { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
+          { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
         ],
       },
       {
@@ -208,6 +214,19 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
       },
+    ],
+    CURRICULUM_MANAGER: [
+      { group: 'Overview', icon: Home, items: [
+        { label: 'Curriculum Dashboard', icon: Home, href: '/dashboard/curriculum' },
+        { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
+      ] },
+      { group: 'Academic Planning', icon: BookOpen, items: [
+        { label: 'Books & Chapters', icon: BookOpenCheck, href: '/dashboard/curriculum/manage' },
+        { label: 'Weekly Slots', icon: Layers, href: '/dashboard/admin/weekly-slots' },
+      ] },
+      { group: 'Account', icon: Settings, items: [
+        { label: 'My Profile', icon: UserRound, href: '/dashboard/curriculum/profile' },
+      ] },
     ],
     TEACHER: [
       {
@@ -226,6 +245,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
           { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
           { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
+          { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
         ],
       },
       { group: 'Account', icon: Settings, items: [
@@ -242,6 +262,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
           { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
+          { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
         ],
       },
       {
@@ -270,6 +291,7 @@ const DashboardLayout = ({ children, role }) => {
       },
       { group: 'Attendance', icon: ClipboardCheck, items: [
           { label: 'Attendance Summary', icon: ClipboardCheck, href: '/student/attendance' },
+          { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
         ],
       },
       { group: 'Polls & Feedback', icon: MessageSquare, items: [
@@ -291,6 +313,7 @@ const DashboardLayout = ({ children, role }) => {
         items: [
           { label: 'My Profile', icon: UserRound, href: '/dashboard/staff/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
+          { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -308,6 +331,7 @@ const DashboardLayout = ({ children, role }) => {
     PARENT: '/dashboard/parent/profile',
     STUDENT: '/dashboard/student/profile',
     STAFF: '/dashboard/staff/profile',
+    CURRICULUM_MANAGER: '/dashboard/curriculum/profile',
   };
 
   const breadcrumb = useMemo(() => {
@@ -334,6 +358,7 @@ const DashboardLayout = ({ children, role }) => {
       PLATFORM_OWNER: 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/50 dark:text-fuchsia-200',
       SCHOOL_OWNER: 'bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200',
       ADMIN: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200',
+      CURRICULUM_MANAGER: 'bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-200',
       TEACHER: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200',
       PARENT: 'bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-200',
       STUDENT: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200',

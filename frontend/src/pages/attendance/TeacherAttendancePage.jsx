@@ -6,6 +6,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { attendanceService } from '../../services/managementService';
+import { authService } from '../../services/authService';
 
 const STATUS_OPTIONS = ['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE'];
 
@@ -17,6 +18,7 @@ const todayInputValue = () => {
 
 export default function TeacherAttendancePage() {
   const queryClient = useQueryClient();
+  const currentUser = authService.getCurrentUser();
   const [date, setDate] = useState(todayInputValue());
   const [recordsByTeacher, setRecordsByTeacher] = useState({});
   const month = date.slice(0, 7);
@@ -43,9 +45,12 @@ export default function TeacherAttendancePage() {
 
   const saveMutation = useMutation({
     mutationFn: attendanceService.saveTeacherAttendance,
-    onSuccess: () => {
-      toast.success('Teacher attendance saved');
-      queryClient.invalidateQueries({ queryKey: ['teacher-attendance-roster', date] });
+    onSuccess: async (response) => {
+      toast.success(response?.message || 'Teacher attendance saved');
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['teacher-attendance-roster', date] }),
+        queryClient.invalidateQueries({ queryKey: ['teacher-month-register', month] }),
+      ]);
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to save teacher attendance'),
   });
@@ -61,6 +66,14 @@ export default function TeacherAttendancePage() {
   }, [recordsByTeacher, teachers]);
 
   const save = () => {
+    if (rosterQuery.isError) {
+      toast.error(rosterQuery.error?.response?.data?.message || 'Reload the teacher list before saving');
+      return;
+    }
+    if (teachers.length === 0) {
+      toast.error('No active teachers are available for attendance');
+      return;
+    }
     saveMutation.mutate({
       date,
       records: teachers.map((teacher) => ({
@@ -72,7 +85,7 @@ export default function TeacherAttendancePage() {
   };
 
   return (
-    <DashboardLayout role="ADMIN">
+    <DashboardLayout role={currentUser?.role || 'ADMIN'}>
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
@@ -101,10 +114,16 @@ export default function TeacherAttendancePage() {
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
               />
-              <Button leftIcon={Save} onClick={save} loading={saveMutation.isPending} disabled={teachers.length === 0}>
+              <Button leftIcon={Save} onClick={save} loading={saveMutation.isPending} disabled={teachers.length === 0 || rosterQuery.isLoading || rosterQuery.isError}>
                 Save Attendance
               </Button>
             </div>
+
+            {rosterQuery.isError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                {rosterQuery.error?.response?.data?.message || 'Failed to load the teacher attendance roster.'}
+              </div>
+            )}
 
             {rosterQuery.isLoading ? (
               <div className="space-y-2">

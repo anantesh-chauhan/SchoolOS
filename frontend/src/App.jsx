@@ -66,9 +66,14 @@ const TeacherProfilePage = lazy(() => import('./pages/profile/TeacherProfilePage
 const ParentProfilePage = lazy(() => import('./pages/profile/ParentProfilePage'));
 const StudentProfilePage = lazy(() => import('./pages/profile/StudentProfilePage'));
 const StaffProfilePage = lazy(() => import('./pages/profile/StaffProfilePage'));
+const CurriculumManagerProfilePage = lazy(() => import('./pages/profile/CurriculumManagerProfilePage'));
 const WidgetHubPage = lazy(() => import('./pages/widgets/WidgetHubPage'));
 const MyReportsPage = lazy(() => import('./pages/support/MyReportsPage'));
 const IssueManagementPage = lazy(() => import('./pages/platform/IssueManagementPage'));
+const LoginCredentialsPage = lazy(() => import('./pages/admin/LoginCredentialsPage'));
+const AccountRecoveryPage = lazy(() => import('./pages/AccountRecoveryPage'));
+const CurriculumDashboardPage = lazy(() => import('./pages/curriculum/CurriculumDashboardPage'));
+const CurriculumManagePage = lazy(() => import('./pages/curriculum/CurriculumManagePage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -82,7 +87,7 @@ const AppFallback = () => (
 
 export default function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -96,7 +101,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/student-login" element={<StudentLoginPage />} />
           <Route path="/parent-login" element={<StudentLoginPage />} />
-          <Route path="/support/my-reports" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','TEACHER','PARENT','STUDENT','STAFF']}><MyReportsPage /></ProtectedRoute>} />
+          <Route path="/account-recovery" element={<AccountRecoveryPage />} />
+          <Route path="/support/my-reports" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><MyReportsPage /></ProtectedRoute>} />
           <Route path="/platform/issues" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><IssueManagementPage /></ProtectedRoute>} />
 
         {/* Dashboard Routes */}
@@ -332,6 +338,11 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/admin/credentials" element={<ProtectedRoute allowedRoles={['ADMIN','SCHOOL_OWNER']}><LoginCredentialsPage /></ProtectedRoute>} />
+          <Route path="/dashboard/curriculum" element={<ProtectedRoute allowedRoles={['CURRICULUM_MANAGER','ADMIN','SCHOOL_OWNER']}><CurriculumDashboardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/curriculum/manage" element={<ProtectedRoute allowedRoles={['CURRICULUM_MANAGER','ADMIN','SCHOOL_OWNER']}><CurriculumManagePage /></ProtectedRoute>} />
+          <Route path="/dashboard/curriculum/profile" element={<ProtectedRoute allowedRoles={['CURRICULUM_MANAGER']}><CurriculumManagerProfilePage /></ProtectedRoute>} />
+          <Route path="/dashboard/calendar" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><AcademicCalendarPage /></ProtectedRoute>} />
           <Route path="/dashboard/school/settings" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER']}><SchoolProfilePage /></ProtectedRoute>} />
 
           <Route
@@ -374,7 +385,7 @@ export default function App() {
           <Route
             path="/dashboard/admin/weekly-slots"
             element={
-              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+              <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER']}>
                 <WeeklySlotManagementPage />
               </ProtectedRoute>
             }

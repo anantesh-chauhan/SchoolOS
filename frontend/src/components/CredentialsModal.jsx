@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import toast from 'react-hot-toast';
 
-const CredentialsModal = ({ isOpen, credentials, onClose }) => {
+const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
   if (!isOpen || !credentials) return null;
 
   const handleCopyToClipboard = (text, label) => {
@@ -193,10 +193,6 @@ CredentialsModal.propTypes = {
     pdfUrl: PropTypes.string,
   }),
   onClose: PropTypes.func.isRequired,
-};
-
-CredentialsModal.defaultProps = {
-  credentials: null,
 };
 
 export default CredentialsModal;

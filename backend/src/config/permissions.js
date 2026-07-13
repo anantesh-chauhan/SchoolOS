@@ -1,0 +1,44 @@
+export const PERMISSIONS = Object.freeze({
+  USERS_CREDENTIALS_VIEW: 'users.credentials.view',
+  USERS_PASSWORD_RESET: 'users.password.reset',
+  CURRICULUM_VIEW: 'curriculum.view',
+  CURRICULUM_MANAGE: 'curriculum.manage',
+  SUBJECTS_VIEW: 'subjects.view',
+  SUBJECTS_CREATE: 'subjects.create',
+  SUBJECTS_UPDATE: 'subjects.update',
+  SUBJECTS_DELETE: 'subjects.delete',
+  CHAPTERS_VIEW: 'chapters.view',
+  CHAPTERS_MANAGE: 'chapters.manage',
+  RESOURCES_MANAGE: 'academicResources.manage',
+  WEEKLY_SLOTS_VIEW: 'weeklySlots.view',
+  WEEKLY_SLOTS_MANAGE: 'weeklySlots.manage',
+  CLASS_CURRICULUM_ASSIGN: 'classCurriculum.assign',
+  SECTION_CURRICULUM_OVERRIDE: 'sectionCurriculum.override',
+  CALENDAR_VIEW: 'academicCalendar.view',
+  CALENDAR_MANAGE: 'academicCalendar.manage',
+});
+
+const allCurriculum = [
+  PERMISSIONS.CURRICULUM_VIEW, PERMISSIONS.CURRICULUM_MANAGE,
+  PERMISSIONS.SUBJECTS_VIEW, PERMISSIONS.SUBJECTS_CREATE, PERMISSIONS.SUBJECTS_UPDATE, PERMISSIONS.SUBJECTS_DELETE,
+  PERMISSIONS.CHAPTERS_VIEW, PERMISSIONS.CHAPTERS_MANAGE, PERMISSIONS.RESOURCES_MANAGE,
+  PERMISSIONS.WEEKLY_SLOTS_VIEW, PERMISSIONS.WEEKLY_SLOTS_MANAGE,
+  PERMISSIONS.CLASS_CURRICULUM_ASSIGN, PERMISSIONS.SECTION_CURRICULUM_OVERRIDE,
+  PERMISSIONS.CALENDAR_VIEW,
+];
+
+export const ROLE_PERMISSIONS = Object.freeze({
+  PLATFORM_OWNER: ['*'],
+  SCHOOL_OWNER: ['*'],
+  ADMIN: ['*'],
+  CURRICULUM_MANAGER: allCurriculum,
+  TEACHER: [PERMISSIONS.CURRICULUM_VIEW, PERMISSIONS.SUBJECTS_VIEW, PERMISSIONS.CHAPTERS_VIEW, PERMISSIONS.CALENDAR_VIEW],
+  STUDENT: [PERMISSIONS.CALENDAR_VIEW],
+  PARENT: [PERMISSIONS.CALENDAR_VIEW],
+  STAFF: [PERMISSIONS.CALENDAR_VIEW],
+});
+
+export const hasPermission = (role, permission) => {
+  const granted = ROLE_PERMISSIONS[role] || [];
+  return granted.includes('*') || granted.includes(permission);
+};

@@ -6,6 +6,7 @@ import {
   OFFICIAL_RESOURCE_LINKS,
   getChapterEntries,
 } from '../constants/cbseAcademicSeed.js';
+import { ensureSchoolSecurityCurriculumDefaults } from './schoolSecurityCurriculumSeed.service.js';
 
 const SECTION_NAMES = ['A', 'B', 'C'];
 const seniorSubjects = [...new Set(SENIOR_STREAMS.flatMap((stream) => stream.subjects))];
@@ -77,5 +78,6 @@ export const initializeNewSchoolAcademicSetup = async (schoolId) => {
   }
   await prisma.sectionResource.createMany({ data: chapterResources });
 
-  return { schoolId, alreadyInitialized: existingClasses > 0, repaired: existingClasses > 0, classes: classes.length, sections: sections.length, sectionsPerClass: SECTION_NAMES.length, subjects: subjects.length, chapters: chapters.length, resources: commonResources.length + chapterResources.length };
+  const securityCurriculumCalendar = await ensureSchoolSecurityCurriculumDefaults(schoolId);
+  return { schoolId, alreadyInitialized: existingClasses > 0, repaired: existingClasses > 0, classes: classes.length, sections: sections.length, sectionsPerClass: SECTION_NAMES.length, subjects: subjects.length, chapters: chapters.length, resources: commonResources.length + chapterResources.length, securityCurriculumCalendar };
 };

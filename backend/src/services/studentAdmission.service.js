@@ -2,6 +2,7 @@ import prisma from '../config/prisma.client.js';
 import bcrypt from 'bcrypt';
 import PDFDocument from 'pdfkit';
 import { PassThrough } from 'stream';
+import { randomBytes } from 'crypto';
 import { formatParentUserId, formatStudentUserId } from './identity.service.js';
 
 
@@ -80,11 +81,11 @@ const buildParentUserId = ({ fatherName, studentFirstName, session, admissionNo,
   return formatParentUserId({ fatherName, studentFirstName, session, admissionNo, schoolCode });
 };
 
-const buildPlainPasswords = ({ firstName, fatherName, admissionNo }) => {
-  const last4 = admissionNo.slice(-4);
+const buildPlainPasswords = () => {
+  const generate = () => `${randomBytes(7).toString('base64url')}!aA7`;
   return {
-    studentPassword: `${trimRequired(firstName)}@${last4}`,
-    parentPassword: `${trimRequired(fatherName)}@${last4}`,
+    studentPassword: generate(),
+    parentPassword: generate(),
   };
 };
 
@@ -293,6 +294,8 @@ export const createStudentAdmission = async ({ schoolId, payload }) => {
             parentPasswordHash,
             passwordGenerated: true,
             lastPasswordGeneratedAt: new Date(),
+            studentMustChangePassword: true,
+            parentMustChangePassword: true,
             isActive: true,
           },
           include: {
@@ -540,6 +543,9 @@ export const generateStudentCredentials = async ({ id, schoolId, forceRegenerate
       parentPasswordHash,
       passwordGenerated: true,
       lastPasswordGeneratedAt: new Date(),
+      studentMustChangePassword: true,
+      parentMustChangePassword: true,
+      sessionVersion: { increment: 1 },
     },
     include: {
       school: {

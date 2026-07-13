@@ -18,41 +18,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { schoolSettingsService } from '../services/schoolSettingsService';
 
-const demoAccountsByRole = [
-  {
-    role: 'Platform Owner',
-    users: [{ name: 'Platform Owner', email: 'platform@schoolos.com' }],
-  },
-  {
-    role: 'School Owner',
-    users: [
-      { name: 'Green Valley Owner', email: 'owner@greenvalley.edu.in' },
-      { name: 'DPS Owner', email: 'owner@dps.edu.in' },
-    ],
-  },
-  {
-    role: 'Admin',
-    users: [
-      { name: 'Green Valley Admin', email: 'admin@greenvalley.edu.in' },
-      { name: 'DPS Admin', email: 'admin.dps@schoolos.com' },
-    ],
-  },
-  {
-    role: 'Teacher',
-    users: [
-      { name: 'GVS Teacher 1', email: 'teacher1.gvs001@schoolos.com' },
-      { name: 'DPS Teacher 1', email: 'teacher1.dps002@schoolos.com' },
-    ],
-  },
-  {
-    role: 'Student',
-    users: [
-      { name: 'GVS Student', email: 'student1.1A.gvs001@schoolos.com' },
-      { name: 'DPS Student', email: 'student1.1A.dps002@schoolos.com' },
-    ],
-  },
-];
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -63,7 +28,7 @@ export default function LoginPage() {
   const [instantLoginEmail, setInstantLoginEmail] = useState('');
   const [errors, setErrors] = useState({});
   const [branding, setBranding] = useState(null);
-  const [demoAccounts, setDemoAccounts] = useState(demoAccountsByRole);
+  const [demoAccounts, setDemoAccounts] = useState([]);
   const [demoSearch, setDemoSearch] = useState('');
   const [instantFilters, setInstantFilters] = useState({ role: '', school: '', className: '', section: '' });
 
@@ -131,7 +96,7 @@ export default function LoginPage() {
       })
       .catch(() => {
         if (mounted) {
-          setDemoAccounts(demoAccountsByRole);
+          setDemoAccounts([]);
         }
       });
 
@@ -265,12 +230,14 @@ export default function LoginPage() {
     }
   };
 
-  const handleInstantLogin = async (email) => {
+  const handleInstantLogin = async (account) => {
     setErrors({});
-    setInstantLoginEmail(email);
+    setInstantLoginEmail(account.accountKey);
 
     try {
-      await loginWithCredentials(email, 'admin123');
+      const { user } = await authService.instantLogin(account.accountKey);
+      toast.success(`Welcome, ${user.name}`);
+      redirectByRole(user.role);
     } catch (error) {
       const message = error?.message || 'Instant login failed.';
       setErrors({ submit: message });
@@ -449,7 +416,7 @@ export default function LoginPage() {
                     <span className="group-hover:text-slate-900 transition-colors">Remember me</span>
                   </label>
 
-                  <button type="button" className="text-sm font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors">
+                  <button type="button" onClick={() => navigate('/account-recovery')} className="text-sm font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1.5 transition-colors">
                     <KeyRound size={14} />
                     Forgot password
                   </button>
@@ -480,7 +447,7 @@ export default function LoginPage() {
                     <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Instant Login</p>
                     <p className="mt-1 text-[11px] text-slate-500">Search by school, class, section, name, or email.</p>
                   </div>
-                  <p className="w-fit text-[10px] bg-slate-100 px-2 py-0.5 rounded-full text-slate-600 font-medium uppercase">Password: admin123</p>
+                  <p className="w-fit text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700 font-medium uppercase">Development only</p>
                 </div>
                 <input
                   value={demoSearch}
@@ -512,7 +479,7 @@ export default function LoginPage() {
                           </div>
                         )}
                         {group.users.map((user) => (
-                          <div key={user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex items-start justify-between gap-3 shadow-sm hover:border-blue-200 transition-colors">
+                          <div key={user.accountKey || user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex items-start justify-between gap-3 shadow-sm hover:border-blue-200 transition-colors">
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
                               <p className="text-[11px] text-slate-400 truncate mt-0.5">{user.email}</p>
@@ -525,12 +492,12 @@ export default function LoginPage() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => handleInstantLogin(user.email)}
+                              onClick={() => handleInstantLogin(user)}
                               disabled={Boolean(instantLoginEmail)}
                               className="shrink-0 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] font-bold px-3 py-1.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                               aria-label={`Instant login as ${user.name}`}
                             >
-                              {instantLoginEmail === user.email ? 'Logging...' : 'Instant Login'}
+                              {instantLoginEmail === user.accountKey ? 'Logging...' : 'Instant Login'}
                             </button>
                           </div>
                         ))}

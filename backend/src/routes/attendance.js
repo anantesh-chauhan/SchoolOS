@@ -12,6 +12,7 @@ import {
   getClassMonthlyRegister,
   getTeacherMonthlyRegister,
   listPublicCalendarDays,
+  calendarDashboardSummary,
 } from '../controllers/attendance.controller.js';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware.js';
 
@@ -27,7 +28,8 @@ router.post('/teachers', requireRole('ADMIN', 'SCHOOL_OWNER'), markTeacherAttend
 router.get('/class-month', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER'), getClassAttendanceMonth);
 router.get('/me', requireRole('STUDENT', 'PARENT', 'TEACHER'), getMyAttendance);
 router.put('/calendar-day', requireRole('ADMIN', 'SCHOOL_OWNER'), saveCalendarDay);
-router.get('/calendar', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'STUDENT', 'PARENT'), listCalendarDays);
+router.get('/calendar', requireRole('ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'), listCalendarDays);
+router.get('/calendar/dashboard-summary', requireRole('ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'), calendarDashboardSummary);
 router.delete('/calendar-day/:id', requireRole('ADMIN', 'SCHOOL_OWNER'), deleteCalendarDay);
 router.get('/class-register', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER'), getClassMonthlyRegister);
 router.get('/teacher-register', requireRole('ADMIN', 'SCHOOL_OWNER'), getTeacherMonthlyRegister);

@@ -8,6 +8,7 @@ const roleRoutes = {
   PARENT: '/dashboard/parent',
   STUDENT: '/dashboard/student',
   STAFF: '/dashboard/staff',
+  CURRICULUM_MANAGER: '/dashboard/curriculum',
 };
 
 export const authService = {
@@ -129,5 +130,18 @@ export const authService = {
   getDemoAccounts: async () => {
     const response = await apiClient.get('/auth/demo-accounts');
     return response.data.data;
+  },
+
+  instantLogin: async (accountKey) => {
+    try {
+      const response = await apiClient.post('/auth/instant-login', { accountKey });
+      const { token, accessToken, refreshToken, user } = response.data.data;
+      localStorage.setItem('authToken', accessToken || token);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('user', JSON.stringify(user));
+      return { token: accessToken || token, refreshToken, user };
+    } catch (error) {
+      throw error.response?.data || error;
+    }
   },
 };

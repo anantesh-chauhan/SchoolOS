@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const StudentLoginPage = () => {
   const navigate = useNavigate();
@@ -152,22 +153,15 @@ const StudentLoginPage = () => {
 
             {/* Password Field */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
+              <PasswordInput
+                label="Password"
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="Enter your password"
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                  errors.password ? 'border-red-500' : 'border-slate-300'
-                }`}
+                error={errors.password}
+                autoComplete="current-password"
               />
-              {errors.password && (
-                <p className="text-xs text-red-600 mt-1">{errors.password}</p>
-              )}
             </div>
 
             {/* Submit Button */}
@@ -186,6 +180,7 @@ const StudentLoginPage = () => {
               )}
             </button>
           </form>
+          <button type="button" onClick={() => navigate('/account-recovery')} className="mt-4 w-full text-center text-sm font-semibold text-blue-600 hover:text-blue-700">Forgot password?</button>
 
           {/* Footer */}
           <div className="text-center mt-6 text-sm text-slate-600">

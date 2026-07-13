@@ -1,4 +1,5 @@
 import { verifyToken } from '../utils/jwt.util.js';
+import prisma from '../config/prisma.client.js';
 
 const VALID_ROLES = new Set([
   'PLATFORM_OWNER',
@@ -8,10 +9,11 @@ const VALID_ROLES = new Set([
   'PARENT',
   'STUDENT',
   'STAFF',
+  'CURRICULUM_MANAGER',
 ]);
 
 // Verify JWT token middleware
-export const authMiddleware = (req, res, next) => {
+export const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -32,6 +34,15 @@ export const authMiddleware = (req, res, next) => {
         message: 'Invalid token payload',
         code: 'INVALID_TOKEN_PAYLOAD',
       });
+    }
+
+    if (decoded.sessionVersion !== undefined) {
+      const account = ['STUDENT', 'PARENT'].includes(decoded.role)
+        ? await prisma.student.findFirst({ where: { id: decoded.studentId, schoolId: decoded.schoolId, isActive: true }, select: { sessionVersion: true } })
+        : await prisma.user.findFirst({ where: { id: decoded.id, isActive: true }, select: { sessionVersion: true } });
+      if (!account || account.sessionVersion !== decoded.sessionVersion) {
+        return res.status(401).json({ success: false, message: 'Session is no longer valid', code: 'SESSION_REVOKED' });
+      }
     }
     
     req.user = decoded;

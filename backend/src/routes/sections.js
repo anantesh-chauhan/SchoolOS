@@ -5,10 +5,8 @@ import { createNextSection, deleteSection, listSections } from '../controllers/s
 const router = express.Router();
 
 router.use(authMiddleware);
-router.use(requireRole('ADMIN', 'SCHOOL_OWNER'));
-
-router.get('/', listSections);
-router.post('/', createNextSection);
-router.delete('/:id', deleteSection);
+router.get('/', requireRole('ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER'), listSections);
+router.post('/', requireRole('ADMIN', 'SCHOOL_OWNER'), createNextSection);
+router.delete('/:id', requireRole('ADMIN', 'SCHOOL_OWNER'), deleteSection);
 
 export default router;

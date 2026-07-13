@@ -31,6 +31,7 @@ export const formatStaffUserId = ({ firstName, role, employeeId, schoolCode }) =
   return `${normalize(firstName)}.${normalize(role)}.${normalize(employeeId)}@${getSchoolDomain(schoolCode)}`;
 };
 
-export const generateInitialPassword = (firstName) => `${normalize(firstName)}@123`;
+export const generateInitialPassword = () => `${crypto.randomBytes(7).toString('base64url')}!aA7`;
 
 export { normalize };
+import crypto from 'crypto';
