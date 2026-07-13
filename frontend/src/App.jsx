@@ -56,6 +56,7 @@ const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPa
 const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
 const GalleryStudioPage = lazy(() => import('./pages/admin/GalleryStudioPage'));
 const AddStudentPage = lazy(() => import('./pages/admin/AddStudentPage'));
+const StudentAllocationPage = lazy(() => import('./pages/admin/StudentAllocationPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const PlatformOwnerProfilePage = lazy(() => import('./pages/profile/PlatformOwnerProfilePage'));
 const SchoolOwnerProfilePage = lazy(() => import('./pages/profile/SchoolOwnerProfilePage'));
@@ -114,6 +115,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={["ADMIN", "SCHOOL_OWNER"]}>
               <AddStudentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/admin/students/allocation"
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "SCHOOL_OWNER"]}>
+              <StudentAllocationPage />
             </ProtectedRoute>
           }
         />

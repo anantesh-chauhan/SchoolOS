@@ -32,12 +32,20 @@ export const getTeacherForUser = async (user) => {
     return null;
   }
 
+  const identity = user.employeeId
+    ? user
+    : await prisma.user.findFirst({
+        where: { id: user.id, schoolId: user.schoolId, role: 'TEACHER', isActive: true },
+        select: { employeeId: true, contactEmail: true },
+      });
+
   return prisma.teacher.findFirst({
     where: {
       schoolId: user.schoolId,
       OR: [
         { email: user.email },
-        ...(user.employeeId ? [{ employeeId: user.employeeId }] : []),
+        ...(identity?.contactEmail ? [{ email: identity.contactEmail }] : []),
+        ...(identity?.employeeId ? [{ employeeId: identity.employeeId }] : []),
       ],
       deletedAt: null,
     },

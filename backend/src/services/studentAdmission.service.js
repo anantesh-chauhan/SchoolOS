@@ -52,7 +52,7 @@ const createAdmissionNumber = async (tx) => {
   `);
 
   const syncRows = await tx.$queryRaw`
-    SELECT COALESCE(MAX(CAST(NULLIF(regexp_replace("admissionNo", '\\D', '', 'g'), '') AS BIGINT)), 0) AS "maxNo"
+    SELECT COALESCE(MAX(CAST(NULLIF(RIGHT(regexp_replace("admissionNo", '\\D', '', 'g'), 5), '') AS BIGINT)), 0) AS "maxNo"
     FROM "Student"
   `;
   const maxNo = Number(syncRows?.[0]?.maxNo || 0);
@@ -86,6 +86,33 @@ const buildPlainPasswords = ({ firstName, fatherName, admissionNo }) => {
     studentPassword: `${trimRequired(firstName)}@${last4}`,
     parentPassword: `${trimRequired(fatherName)}@${last4}`,
   };
+};
+
+const rollNumberValue = (value) => {
+  const parsed = Number.parseInt(String(value ?? '').replace(/\D/g, ''), 10);
+  return Number.isNaN(parsed) ? Number.MAX_SAFE_INTEGER : parsed;
+};
+
+const resequenceSectionRollNumbers = async (tx, { schoolId, className, section, session }) => {
+  if (!className || !section || !session) return 0;
+
+  const students = await tx.student.findMany({
+    where: { schoolId, className, section, session, isActive: true },
+    select: { id: true, rollNumber: true, createdAt: true },
+  });
+
+  students.sort((left, right) => {
+    const byRoll = rollNumberValue(left.rollNumber) - rollNumberValue(right.rollNumber);
+    if (byRoll !== 0) return byRoll;
+    return left.createdAt.getTime() - right.createdAt.getTime();
+  });
+
+  await Promise.all(students.map((student, index) => tx.student.update({
+    where: { id: student.id },
+    data: { rollNumber: String(index + 1) },
+  })));
+
+  return students.length;
 };
 
 const buildPdfBuffer = async ({ student, includePasswords = false, studentPassword, parentPassword }) => {
@@ -264,6 +291,8 @@ export const createStudentAdmission = async ({ schoolId, payload }) => {
             parentUserId,
             studentPasswordHash,
             parentPasswordHash,
+            passwordGenerated: true,
+            lastPasswordGeneratedAt: new Date(),
             isActive: true,
           },
           include: {
@@ -345,6 +374,7 @@ export const updateStudentAdmission = async ({ id, schoolId, role, actorStudentI
     STUDENT: ['address', 'email', 'mobile'],
     PARENT: ['alternateMobile', 'address'],
   };
+  editableFieldsByRole.SCHOOL_OWNER = editableFieldsByRole.ADMIN;
 
   const roleKey = editableFieldsByRole[role] ? role : null;
 
@@ -477,12 +507,17 @@ export const generateStudentCredentials = async ({ id, schoolId, forceRegenerate
 
   const nextStudentUserId = student.studentUserId || buildStudentUserId({
     firstName: student.studentFirstName,
+    session: student.session,
     admissionNo: student.admissionNo,
+    schoolCode: student.school.schoolCode,
   });
 
   const nextParentUserId = student.parentUserId || buildParentUserId({
     fatherName: student.fatherName,
+    studentFirstName: student.studentFirstName,
+    session: student.session,
     admissionNo: student.admissionNo,
+    schoolCode: student.school.schoolCode,
   });
 
   const plainPasswords = buildPlainPasswords({
@@ -503,6 +538,8 @@ export const generateStudentCredentials = async ({ id, schoolId, forceRegenerate
       parentUserId: nextParentUserId,
       studentPasswordHash,
       parentPasswordHash,
+      passwordGenerated: true,
+      lastPasswordGeneratedAt: new Date(),
     },
     include: {
       school: {
@@ -614,26 +651,95 @@ export const promoteStudentAdmission = async ({ id, schoolId, payload }) => {
 };
 
 export const softDeleteStudentAdmission = async ({ id, schoolId }) => {
-  const student = await prisma.student.findUnique({
-    where: { id },
+  return prisma.$transaction(async (tx) => {
+    const student = await tx.student.findUnique({ where: { id } });
+
+    if (!student) {
+      const error = new Error('Student not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (student.schoolId !== schoolId) {
+      const error = new Error('Unauthorized access to student');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const deactivated = await tx.student.update({
+      where: { id },
+      data: { isActive: false, rollNumber: null },
+    });
+
+    await resequenceSectionRollNumbers(tx, student);
+    return deactivated;
   });
+};
 
-  if (!student) {
-    const error = new Error('Student not found');
-    error.statusCode = 404;
-    throw error;
-  }
+export const allocateStudentAdmission = async ({ id, schoolId, classId, sectionId, session }) => {
+  return prisma.$transaction(async (tx) => {
+    const [student, classRow, sectionRow] = await Promise.all([
+      tx.student.findFirst({ where: { id, schoolId, isActive: true } }),
+      tx.class.findFirst({ where: { id: classId, schoolId, deletedAt: null } }),
+      tx.section.findFirst({ where: { id: sectionId, schoolId, classId, deletedAt: null } }),
+    ]);
 
-  if (student.schoolId !== schoolId) {
-    const error = new Error('Unauthorized access to student');
-    error.statusCode = 403;
-    throw error;
-  }
+    if (!student) {
+      const error = new Error('Active student not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    if (!classRow || !sectionRow) {
+      const error = new Error('The selected class and section are not valid for this school');
+      error.statusCode = 400;
+      throw error;
+    }
 
-  return await prisma.student.update({
-    where: { id },
-    data: {
-      isActive: false,
-    },
+    const oldCohort = {
+      schoolId,
+      className: student.className,
+      section: student.section,
+      session: student.session,
+    };
+    const nextSession = trimRequired(session || student.session);
+    const sameCohort = student.className === classRow.className
+      && student.section === sectionRow.sectionName
+      && student.session === nextSession;
+
+    if (!sameCohort) {
+      await tx.student.update({
+        where: { id },
+        data: {
+          className: classRow.className,
+          section: sectionRow.sectionName,
+          session: nextSession,
+          rollNumber: null,
+        },
+      });
+      await resequenceSectionRollNumbers(tx, oldCohort);
+    }
+
+    await resequenceSectionRollNumbers(tx, {
+      schoolId,
+      className: classRow.className,
+      section: sectionRow.sectionName,
+      session: nextSession,
+    });
+
+    return tx.student.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        admissionNo: true,
+        studentFirstName: true,
+        studentLastName: true,
+        studentUserId: true,
+        parentUserId: true,
+        className: true,
+        section: true,
+        session: true,
+        rollNumber: true,
+      },
+    });
   });
 };

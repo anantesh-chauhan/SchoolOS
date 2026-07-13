@@ -19,7 +19,7 @@ export const authService = {
 
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
+      const response = await apiClient.post('/auth/login', { email: String(email || '').trim().toLowerCase(), password });
       const { token, accessToken, refreshToken, user } = response.data.data;
       
       // Store token and user in localStorage
@@ -36,7 +36,7 @@ export const authService = {
   loginStudent: async (studentUserId, password) => {
     try {
       const response = await apiClient.post('/auth/login-student', { 
-        email: studentUserId, 
+        email: String(studentUserId || '').trim().toLowerCase(),
         password 
       });
       const { token, accessToken, refreshToken, user } = response.data.data;
@@ -55,7 +55,7 @@ export const authService = {
   loginParent: async (parentUserId, password) => {
     try {
       const response = await apiClient.post('/auth/login-parent', { 
-        email: parentUserId, 
+        email: String(parentUserId || '').trim().toLowerCase(),
         password 
       });
       const { token, accessToken, refreshToken, user } = response.data.data;

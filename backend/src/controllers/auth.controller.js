@@ -2,10 +2,85 @@ import bcryptjs from 'bcryptjs';
 import prisma from '../config/prisma.client.js';
 import { generateRefreshToken, generateToken, verifyRefreshToken } from '../utils/jwt.util.js';
 
+const normalizeLoginId = (value) => String(value ?? '').trim().toLowerCase();
+
+const portalStudentSelect = {
+  id: true,
+  schoolId: true,
+  studentFirstName: true,
+  studentLastName: true,
+  fatherName: true,
+  studentUserId: true,
+  parentUserId: true,
+  className: true,
+  section: true,
+  isActive: true,
+  school: {
+    select: {
+      id: true,
+      schoolName: true,
+      schoolCode: true,
+      logoUrl: true,
+      address: true,
+      city: true,
+      state: true,
+      phone: true,
+      email: true,
+      status: true,
+    },
+  },
+};
+
+const findPortalStudent = async ({ role, email, studentId, schoolId }) => {
+  if (!['STUDENT', 'PARENT'].includes(role)) return null;
+  const normalizedEmail = normalizeLoginId(email);
+  return prisma.student.findFirst({
+    where: {
+      ...(studentId ? { id: studentId } : {}),
+      ...(schoolId ? { schoolId } : {}),
+      isActive: true,
+      ...(role === 'STUDENT' ? { studentUserId: normalizedEmail } : { parentUserId: normalizedEmail }),
+    },
+    select: portalStudentSelect,
+  });
+};
+
+const buildPortalSession = (student, role) => {
+  const isParent = role === 'PARENT';
+  const id = isParent ? `parent_${student.id}` : student.id;
+  const email = isParent ? student.parentUserId : student.studentUserId;
+  const name = isParent
+    ? student.fatherName
+    : [student.studentFirstName, student.studentLastName].filter(Boolean).join(' ');
+  return {
+    payload: { id, email, name, role, schoolId: student.schoolId, studentId: student.id },
+    user: {
+      id,
+      email,
+      name,
+      role,
+      schoolId: student.schoolId,
+      studentId: student.id,
+      linkedStudent: {
+        id: student.id,
+        studentFirstName: student.studentFirstName,
+        studentLastName: student.studentLastName,
+        className: student.className,
+        section: student.section,
+      },
+      classId: null,
+      sectionId: null,
+      mustChangePassword: false,
+      school: student.school,
+    },
+  };
+};
+
 
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeLoginId(email);
 
     // Validation
     if (!email || !password) {
@@ -16,9 +91,35 @@ export const login = async (req, res) => {
       });
     }
 
+    // Student and parent identities may also have legacy User rows. Their
+    // authoritative credentials live on Student, so resolve them first.
+    const portalStudent = await prisma.student.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ studentUserId: normalizedEmail }, { parentUserId: normalizedEmail }],
+      },
+      select: { ...portalStudentSelect, studentPasswordHash: true, parentPasswordHash: true },
+    });
+    if (portalStudent) {
+      const role = portalStudent.studentUserId === normalizedEmail ? 'STUDENT' : 'PARENT';
+      const passwordHash = role === 'STUDENT' ? portalStudent.studentPasswordHash : portalStudent.parentPasswordHash;
+      const passwordMatches = passwordHash ? await bcryptjs.compare(password, passwordHash) : false;
+      if (!passwordMatches) {
+        return res.status(401).json({ success: false, message: 'Invalid email or password', code: 'INVALID_CREDENTIALS' });
+      }
+      const session = buildPortalSession(portalStudent, role);
+      const token = generateToken(session.payload);
+      const refreshToken = generateRefreshToken(session.payload);
+      return res.json({
+        success: true,
+        message: 'Login successful',
+        data: { token, accessToken: token, refreshToken, user: session.user },
+      });
+    }
+
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       select: {
         id: true,
         email: true,
@@ -28,10 +129,11 @@ export const login = async (req, res) => {
         schoolId: true,
         classId: true,
         sectionId: true,
-        // contactEmail: true,
+        contactEmail: true,
         employeeId: true,
         joiningYear: true,
         mustChangePassword: true,
+        isActive: true,
         alternateMobile: true,
         profileImage: true,
         school: {
@@ -109,6 +211,7 @@ export const login = async (req, res) => {
       name: user.name,
       role: user.role,
       schoolId: user.schoolId,
+      employeeId: user.employeeId,
       ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
 
@@ -166,6 +269,19 @@ export const login = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
+    if (['STUDENT', 'PARENT'].includes(req.user.role)) {
+      const portalStudent = await findPortalStudent({
+        role: req.user.role,
+        email: req.user.email,
+        studentId: req.user.studentId,
+        schoolId: req.user.schoolId,
+      });
+      if (!portalStudent) {
+        return res.status(404).json({ success: false, message: 'Portal account not found or inactive', code: 'NOT_FOUND' });
+      }
+      return res.json({ success: true, data: buildPortalSession(portalStudent, req.user.role).user });
+    }
+
     // user is already attached by authMiddleware
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
@@ -181,6 +297,7 @@ export const getMe = async (req, res) => {
         employeeId: true,
         joiningYear: true,
         mustChangePassword: true,
+        isActive: true,
         alternateMobile: true,
         profileImage: true,
         school: {
@@ -215,7 +332,7 @@ export const getMe = async (req, res) => {
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       return res.status(404).json({
         success: false,
         message: 'User not found',
@@ -292,8 +409,9 @@ export const loginStudent = async (req, res) => {
     }
 
     // Find student by studentUserId
+    const normalizedEmail = normalizeLoginId(email);
     const student = await prisma.student.findUnique({
-      where: { studentUserId: email },
+      where: { studentUserId: normalizedEmail },
       include: {
         school: {
           select: {
@@ -305,7 +423,7 @@ export const loginStudent = async (req, res) => {
       },
     });
 
-    if (!student) {
+    if (!student || !student.isActive) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -394,8 +512,9 @@ export const loginParent = async (req, res) => {
     }
 
     // Find student by parentUserId
+    const normalizedEmail = normalizeLoginId(email);
     const student = await prisma.student.findUnique({
-      where: { parentUserId: email },
+      where: { parentUserId: normalizedEmail },
       include: {
         school: {
           select: {
@@ -407,7 +526,7 @@ export const loginParent = async (req, res) => {
       },
     });
 
-    if (!student) {
+    if (!student || !student.isActive) {
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -507,12 +626,41 @@ export const refreshSession = async (req, res) => {
     }
 
     const decoded = verifyRefreshToken(incomingToken);
+    if (['STUDENT', 'PARENT'].includes(decoded.role)) {
+      const portalStudent = await findPortalStudent({
+        role: decoded.role,
+        email: decoded.email,
+        studentId: decoded.studentId,
+        schoolId: decoded.schoolId,
+      });
+      if (!portalStudent) {
+        return res.status(401).json({ success: false, message: 'Portal account not found or inactive', code: 'INVALID_REFRESH_TOKEN' });
+      }
+
+      const session = buildPortalSession(portalStudent, decoded.role);
+      const accessToken = generateToken(session.payload);
+      const refreshToken = generateRefreshToken(session.payload);
+      return res.json({
+        success: true,
+        message: 'Session refreshed',
+        data: { token: accessToken, accessToken, refreshToken, user: session.user },
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: { school: true },
     });
 
     if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+      });
+    }
+
+    if (!user.isActive) {
       return res.status(401).json({
         success: false,
         message: 'User not found for refresh token',
@@ -537,6 +685,7 @@ export const refreshSession = async (req, res) => {
       name: user.name,
       role: user.role,
       schoolId: user.schoolId,
+      employeeId: user.employeeId,
       ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
 

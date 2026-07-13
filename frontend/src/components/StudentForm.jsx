@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import apiClient from '../services/api';
 import { classService } from '../services/managementService';
@@ -165,6 +166,11 @@ const StudentForm = ({ onSave }) => {
   const handleGenerateCredentials = async () => {
     if (!savedStudentId) {
       toast.error('Please save the student first');
+      return;
+    }
+
+    if (credentials) {
+      setShowCredentialsModal(true);
       return;
     }
 
@@ -388,6 +394,15 @@ const StudentForm = ({ onSave }) => {
               )}
             </button>
 
+            {savedStudentId && (
+              <Link
+                to="/dashboard/admin/students/allocation"
+                className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-6 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+              >
+                Allocate class and section
+              </Link>
+            )}
+
             <button
               type="button"
               disabled={!savedStudentId || generatingCredentials}
@@ -400,7 +415,7 @@ const StudentForm = ({ onSave }) => {
                   Generating...
                 </>
               ) : (
-                'Generate Credentials'
+                credentials ? 'View Credentials' : 'Generate Credentials'
               )}
             </button>
           </div>

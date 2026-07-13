@@ -145,6 +145,7 @@ const DashboardLayout = ({ children, role }) => {
         icon: Users,
         items: [
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
+          { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
@@ -189,6 +190,7 @@ const DashboardLayout = ({ children, role }) => {
         icon: Users,
         items: [
           { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
+          { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
           { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
           { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
           { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
@@ -235,12 +237,18 @@ const DashboardLayout = ({ children, role }) => {
     ],
     PARENT: [
       {
-        group: 'System',
+        group: 'My Child',
+        icon: Users,
+        items: [
+          { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
+          { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
+        ],
+      },
+      {
+        group: 'Account',
         icon: Settings,
         items: [
           { label: 'My Profile', icon: UserRound, href: '/dashboard/parent/profile' },
-          { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
-          { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],

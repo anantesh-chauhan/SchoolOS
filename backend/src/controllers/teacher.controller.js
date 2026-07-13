@@ -1,5 +1,7 @@
 import prisma from '../config/prisma.client.js';
+import bcryptjs from 'bcryptjs';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
+import { formatTeacherUserId, generateInitialPassword, normalize } from '../services/identity.service.js';
 
 const DEFAULT_OVERLOAD_THRESHOLD = Number(process.env.TEACHER_OVERLOAD_THRESHOLD || 8);
 const CLASS_TEACHER_ROLES = ['CLASS_TEACHER', 'BOTH'];
@@ -44,6 +46,7 @@ export const createTeacher = async (req, res) => {
       qualification,
       specialization,
       subjectsHandled,
+      joiningYear,
     } = req.body;
 
     if (!teacherName || !email || !phone || !employeeId || !qualification || !specialization) {
@@ -53,25 +56,70 @@ export const createTeacher = async (req, res) => {
       });
     }
 
-    const created = await prisma.teacher.create({
-      data: {
-        schoolId,
-        teacherName: teacherName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        employeeId: employeeId.trim().toUpperCase(),
-        qualification: qualification.trim(),
-        specialization: specialization.trim(),
-        subjectsHandled: normalizeSubjectsHandled(subjectsHandled),
-      },
+    const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { schoolCode: true } });
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+
+    const nameParts = teacherName.trim().split(/\s+/);
+    const firstName = nameParts.shift();
+    const lastName = nameParts.join(' ') || 'teacher';
+    const normalizedEmployeeId = normalize(employeeId).toUpperCase();
+    const normalizedJoiningYear = Number.parseInt(joiningYear, 10) || new Date().getFullYear();
+    const loginId = formatTeacherUserId({
+      firstName,
+      lastName,
+      employeeId: normalizedEmployeeId,
+      joiningYear: normalizedJoiningYear,
+      schoolCode: school.schoolCode,
+    });
+    const plainPassword = generateInitialPassword(firstName);
+    const password = await bcryptjs.hash(plainPassword, 10);
+
+    const created = await prisma.$transaction(async (tx) => {
+      const teacher = await tx.teacher.create({
+        data: {
+          schoolId,
+          teacherName: teacherName.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+          employeeId: normalizedEmployeeId,
+          joiningYear: normalizedJoiningYear,
+          qualification: qualification.trim(),
+          specialization: specialization.trim(),
+          subjectsHandled: normalizeSubjectsHandled(subjectsHandled),
+        },
+      });
+      const user = await tx.user.create({
+        data: {
+          email: loginId,
+          password,
+          name: teacherName.trim(),
+          contactEmail: email.trim().toLowerCase(),
+          alternateMobile: phone.trim(),
+          role: 'TEACHER',
+          schoolId,
+          employeeId: normalizedEmployeeId,
+          joiningYear: normalizedJoiningYear,
+          mustChangePassword: true,
+        },
+      });
+      return { teacher, user };
     });
 
-    return res.status(201).json({ success: true, data: created });
+    return res.status(201).json({
+      success: true,
+      message: 'Teacher profile and login credentials created successfully',
+      data: {
+        teacher: created.teacher,
+        loginId: created.user.email,
+        password: plainPassword,
+        mustChangePassword: true,
+      },
+    });
   } catch (error) {
     if (error.code === 'P2002') {
       return res.status(409).json({
         success: false,
-        message: 'Teacher email or employeeId already exists for this school',
+        message: 'Teacher email, employee ID, or generated login ID already exists',
       });
     }
 
@@ -102,17 +150,29 @@ export const updateTeacher = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Teacher not found' });
     }
 
-    const updated = await prisma.teacher.update({
-      where: { id },
-      data: {
-        ...(teacherName !== undefined ? { teacherName: teacherName.trim() } : {}),
-        ...(email !== undefined ? { email: email.trim().toLowerCase() } : {}),
-        ...(phone !== undefined ? { phone: phone.trim() } : {}),
-        ...(employeeId !== undefined ? { employeeId: employeeId.trim().toUpperCase() } : {}),
-        ...(qualification !== undefined ? { qualification: qualification.trim() } : {}),
-        ...(specialization !== undefined ? { specialization: specialization.trim() } : {}),
-        ...(subjectsHandled !== undefined ? { subjectsHandled: normalizeSubjectsHandled(subjectsHandled) } : {}),
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const teacher = await tx.teacher.update({
+        where: { id },
+        data: {
+          ...(teacherName !== undefined ? { teacherName: teacherName.trim() } : {}),
+          ...(email !== undefined ? { email: email.trim().toLowerCase() } : {}),
+          ...(phone !== undefined ? { phone: phone.trim() } : {}),
+          ...(employeeId !== undefined ? { employeeId: employeeId.trim().toUpperCase() } : {}),
+          ...(qualification !== undefined ? { qualification: qualification.trim() } : {}),
+          ...(specialization !== undefined ? { specialization: specialization.trim() } : {}),
+          ...(subjectsHandled !== undefined ? { subjectsHandled: normalizeSubjectsHandled(subjectsHandled) } : {}),
+        },
+      });
+      await tx.user.updateMany({
+        where: { schoolId, role: 'TEACHER', employeeId: existing.employeeId },
+        data: {
+          name: teacher.teacherName,
+          contactEmail: teacher.email,
+          alternateMobile: teacher.phone,
+          employeeId: teacher.employeeId,
+        },
+      });
+      return teacher;
     });
 
     return res.json({ success: true, data: updated });
@@ -237,7 +297,10 @@ export const deleteTeacher = async (req, res) => {
       });
     }
 
-    await prisma.teacher.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.teacher.delete({ where: { id } });
+      await tx.user.deleteMany({ where: { schoolId, role: 'TEACHER', employeeId: existing.employeeId } });
+    });
 
     return res.json({ success: true, message: 'Teacher deleted successfully' });
   } catch (error) {

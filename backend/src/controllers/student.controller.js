@@ -2,8 +2,10 @@ import prisma from '../config/prisma.client.js';
 import * as parentUserIdService from '../services/parentUserId.service.js';
 import * as passwordService from '../services/password.service.js';
 import * as credentialService from '../services/credential.service.js';
+import { formatStudentUserId } from '../services/identity.service.js';
 import {
   createStudentAdmission,
+  allocateStudentAdmission,
   generateStudentCredentials,
   generateStudentAdmissionPdf,
   promoteStudentAdmission,
@@ -291,6 +293,64 @@ export const getStudents = async (req, res) => {
   }
 };
 
+export const getStudentAllocationRoster = async (req, res) => {
+  try {
+    const schoolId = req.user?.schoolId;
+    if (!schoolId || !['ADMIN', 'SCHOOL_OWNER'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Only school administrators can manage allocations' });
+    }
+
+    const students = await prisma.student.findMany({
+      where: { schoolId, isActive: true },
+      select: {
+        id: true,
+        admissionNo: true,
+        studentFirstName: true,
+        studentLastName: true,
+        studentUserId: true,
+        parentUserId: true,
+        className: true,
+        section: true,
+        rollNumber: true,
+        session: true,
+        createdAt: true,
+      },
+      orderBy: [{ className: 'asc' }, { section: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    return res.json({ success: true, data: students });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to load student allocation roster', error: error.message });
+  }
+};
+
+export const allocateStudent = async (req, res) => {
+  try {
+    if (!['ADMIN', 'SCHOOL_OWNER'].includes(req.user?.role)) {
+      return res.status(403).json({ success: false, message: 'Only school administrators can allocate students' });
+    }
+    const { classId, sectionId, session } = req.body;
+    if (!classId || !sectionId) {
+      return res.status(400).json({ success: false, message: 'Class and section are required' });
+    }
+
+    const student = await allocateStudentAdmission({
+      id: req.params.id,
+      schoolId: req.user.schoolId,
+      classId,
+      sectionId,
+      session,
+    });
+    return res.json({
+      success: true,
+      message: `Student allocated to ${student.className} - ${student.section} with roll number ${student.rollNumber}`,
+      data: student,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to allocate student' });
+  }
+};
+
 // Get student by ID
 export const getStudentById = async (req, res) => {
   try {
@@ -383,7 +443,7 @@ export const deleteStudent = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Student deactivated successfully',
+      message: 'Student deactivated and section roll numbers resequenced successfully',
     });
   } catch (error) {
     console.error('Error deleting student:', error);
@@ -554,12 +614,12 @@ export const generateStudentUserIdController = async (req, res) => {
       });
     }
 
-    const generatedUserId = generateUserIdFormat(
-      student.studentFirstName,
-      student.session,
-      student.admissionNo,
-      student.school.schoolCode
-    );
+    const generatedUserId = formatStudentUserId({
+      firstName: student.studentFirstName,
+      session: student.session,
+      admissionNo: student.admissionNo,
+      schoolCode: student.school.schoolCode,
+    });
 
     // Update student record with studentUserId
     const updatedStudent = await prisma.student.update({
@@ -594,16 +654,6 @@ export const generateStudentUserIdController = async (req, res) => {
     });
   }
 };
-
-// Helper function to generate user ID format
-function generateUserIdFormat(firstName, session, admissionNo, schoolCode) {
-  const cleanFirstName = String(firstName || '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-  const sessionShort = String(session || '').replace(/-/g, '').slice(-4);
-  const admissionTail = String(admissionNo || '').replace(/\D/g, '').padStart(4, '0').slice(-4);
-  const cleanSchoolCode = String(schoolCode || '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
-
-  return `${cleanFirstName}.${sessionShort}.${admissionTail}@${cleanSchoolCode}.schoolos`;
-}
 
 /**
  * Generate Parent User ID Controller

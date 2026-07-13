@@ -15,6 +15,7 @@ const emptyForm = {
   qualification: '',
   specialization: '',
   subjectsHandled: '',
+  joiningYear: String(new Date().getFullYear()),
 };
 
 export default function TeacherManagementPage() {
@@ -25,6 +26,7 @@ export default function TeacherManagementPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [newCredentials, setNewCredentials] = useState(null);
 
   const teachersQuery = useQuery({
     queryKey: ['teachers', page, search, subjectFilter],
@@ -33,8 +35,10 @@ export default function TeacherManagementPage() {
 
   const createMutation = useMutation({
     mutationFn: teacherService.create,
-    onSuccess: () => {
-      toast.success('Teacher added');
+    onSuccess: (response) => {
+      toast.success('Teacher profile created');
+      toast.success('Teacher login credentials generated');
+      setNewCredentials(response.data);
       setForm(emptyForm);
       setShowForm(false);
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
@@ -93,6 +97,7 @@ export default function TeacherManagementPage() {
       qualification: teacher.qualification || '',
       specialization: teacher.specialization || '',
       subjectsHandled: (teacher.subjectsHandled || []).join(', '),
+      joiningYear: String(teacher.joiningYear || new Date().getFullYear()),
     });
     setShowForm(true);
   };
@@ -262,6 +267,7 @@ export default function TeacherManagementPage() {
               <Input required placeholder="Email" type="email" value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} />
               <Input required placeholder="Phone" value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))} />
               <Input required placeholder="Employee ID" value={form.employeeId} onChange={(event) => setForm((prev) => ({ ...prev, employeeId: event.target.value }))} />
+              <Input required placeholder="Joining Year" type="number" min="1990" max="2100" value={form.joiningYear} onChange={(event) => setForm((prev) => ({ ...prev, joiningYear: event.target.value }))} />
               <Input required placeholder="Qualification" value={form.qualification} onChange={(event) => setForm((prev) => ({ ...prev, qualification: event.target.value }))} />
               <Input required placeholder="Specialization" value={form.specialization} onChange={(event) => setForm((prev) => ({ ...prev, specialization: event.target.value }))} />
               <div className="sm:col-span-2">
@@ -288,6 +294,30 @@ export default function TeacherManagementPage() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {newCredentials && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-600">Account ready</p>
+            <h3 className="mt-2 text-2xl font-black text-slate-950">Teacher login credentials</h3>
+            <p className="mt-2 text-sm text-slate-500">Share these securely. The teacher will be asked to change the temporary password.</p>
+            <div className="mt-5 space-y-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">Login ID</p>
+                <p className="mt-1 break-all font-mono text-sm font-bold text-slate-900">{newCredentials.loginId}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold text-slate-500">Temporary password</p>
+                <p className="mt-1 font-mono text-sm font-bold text-slate-900">{newCredentials.password}</p>
+              </div>
+            </div>
+            <div className="mt-5 flex gap-3">
+              <Button type="button" variant="secondary" className="flex-1" onClick={() => navigator.clipboard.writeText(`Login ID: ${newCredentials.loginId}\nPassword: ${newCredentials.password}`).then(() => toast.success('Credentials copied'))}>Copy credentials</Button>
+              <Button type="button" className="flex-1" onClick={() => setNewCredentials(null)}>Done</Button>
+            </div>
           </div>
         </div>
       )}

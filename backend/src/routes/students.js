@@ -1,6 +1,8 @@
 import express from 'express';
 import {
   createStudent,
+  allocateStudent,
+  getStudentAllocationRoster,
   getStudents,
   getStudentById,
   updateStudent,
@@ -29,6 +31,9 @@ router.use(authMiddleware);
  * Required: studentFirstName, dob, gender, className, fatherName, parentMobile, session
  */
 router.post('/', createStudent);
+
+router.get('/allocation/roster', getStudentAllocationRoster);
+router.put('/:id/allocation', allocateStudent);
 
 /**
  * POST /api/students/generate-serial

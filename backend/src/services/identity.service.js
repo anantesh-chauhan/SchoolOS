@@ -8,18 +8,19 @@ export const getSessionShort = (session) => {
 };
 
 export const getAdmissionTail = (admissionNo) => {
-  const digits = extractDigits(admissionNo).padStart(4, '0');
-  return digits.slice(-4);
+  // Keep the complete immutable admission sequence. Truncating this value can
+  // create collisions once a school has a large historical student register.
+  return extractDigits(admissionNo).padStart(4, '0');
 };
 
 export const getSchoolDomain = (schoolCode) => `${normalize(schoolCode)}.schoolos`;
 
 export const formatStudentUserId = ({ firstName, session, admissionNo, schoolCode }) => {
-  return `${normalize(firstName)}.${getSessionShort(session)}.${getAdmissionTail(admissionNo)}@${getSchoolDomain(schoolCode)}`;
+  return `${normalize(firstName) || 'student'}.${getSessionShort(session)}.${getAdmissionTail(admissionNo)}@${getSchoolDomain(schoolCode)}`;
 };
 
 export const formatParentUserId = ({ fatherName, studentFirstName, session, admissionNo, schoolCode }) => {
-  return `${normalize(fatherName)}.${normalize(studentFirstName)}.${getSessionShort(session)}${getAdmissionTail(admissionNo)}@${getSchoolDomain(schoolCode)}`;
+  return `${normalize(fatherName) || 'parent'}.${normalize(studentFirstName) || 'student'}.${getSessionShort(session)}${getAdmissionTail(admissionNo)}@${getSchoolDomain(schoolCode)}`;
 };
 
 export const formatTeacherUserId = ({ firstName, lastName, employeeId, joiningYear, schoolCode }) => {
