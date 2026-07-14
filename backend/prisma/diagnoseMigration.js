@@ -44,6 +44,13 @@ const indexes = await client.query(`
   order by indexname
 `);
 
-console.log(JSON.stringify({ migrations: migrations.rows, tables: tables.rows, types: types.rows, indexes: indexes.rows }, null, 2));
+const feeTables = await client.query(`
+  select table_name
+  from information_schema.tables
+  where table_schema = 'public' and table_name like 'Fee%'
+  order by table_name
+`);
+
+console.log(JSON.stringify({ migrations: migrations.rows, tables: tables.rows, types: types.rows, indexes: indexes.rows, feeTables: feeTables.rows }, null, 2));
 
 await client.end();

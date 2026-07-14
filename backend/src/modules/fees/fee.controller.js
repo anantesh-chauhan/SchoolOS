@@ -1,0 +1,23 @@
+import * as service from './fee.service.js';
+import { validatePayment, validateSettings, validateStructure } from './fee.validation.js';
+
+const safe = (value) => JSON.parse(JSON.stringify(value, (_, item) => typeof item === 'bigint' ? Number(item) : item));
+const send = (res, data, status = 200) => res.status(status).json({ success: true, data: safe(data) });
+const handler = (fn) => async (req, res) => { try { await fn(req, res); } catch (error) { res.status(error.status || 400).json({ success: false, message: error.message }); } };
+
+export const getSettings = handler(async (req, res) => send(res, await service.getSettings(req.user)));
+export const saveSettings = handler(async (req, res) => send(res, await service.saveSettings(req, validateSettings(req.body))));
+export const structures = handler(async (req, res) => send(res, await service.listStructures(req.user, req.query.academicSession)));
+export const createStructure = handler(async (req, res) => send(res, await service.createStructure(req, validateStructure(req.body)), 201));
+export const publishStructure = handler(async (req, res) => send(res, await service.publishStructure(req, req.params.id)));
+export const students = handler(async (req, res) => send(res, await service.searchStudents(req.user, String(req.query.q || '').trim())));
+export const studentFees = handler(async (req, res) => send(res, await service.getStudentFees(req.user, req.params.studentId, req.query.academicSession)));
+export const myFees = handler(async (req, res) => send(res, await service.getStudentFees(req.user, req.user.studentId, req.query.academicSession)));
+export const collect = handler(async (req, res) => {
+  const key = req.get('idempotency-key'); if (!key || key.length < 8 || key.length > 100) throw new Error('A valid Idempotency-Key header is required');
+  send(res, await service.collectPayment(req, validatePayment(req.body), key), 201);
+});
+export const dashboard = handler(async (req, res) => send(res, await service.dashboard(req.user, req.query.academicSession)));
+export const requestAdjustment = handler(async (req, res) => send(res, await service.requestAdjustment(req, req.body), 201));
+export const approvals = handler(async (req, res) => send(res, await service.listApprovals(req.user)));
+export const verify = handler(async (req, res) => { const result = await service.verifyReceipt(req.params.code); return result ? send(res, result) : res.status(404).json({ success: false, message: 'Invalid receipt' }); });

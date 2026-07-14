@@ -1,0 +1,32 @@
+import * as service from './feeAdvanced.service.js';
+import PDFDocument from 'pdfkit';
+
+const safe = (value) => JSON.parse(JSON.stringify(value, (_, item) => typeof item === 'bigint' ? Number(item) : item));
+const send = (res, data, status = 200) => res.status(status).json({ success: true, data: safe(data) });
+const wrap = (fn) => async (req, res) => { try { await fn(req, res); } catch (error) { res.status(error.status || 400).json({ success: false, message: error.message }); } };
+export const preview = wrap(async (req, res) => send(res, await service.previewAssignment(req.user, req.body)));
+export const assign = wrap(async (req, res) => send(res, await service.createAssignmentAndCharges(req, req.body), 201));
+export const cheque = wrap(async (req, res) => send(res, await service.changeChequeStatus(req, req.params.id, req.body.status, req.body.reason)));
+export const reviewAdjustment = wrap(async (req, res) => send(res, await service.reviewAdjustment(req, req.params.id, req.body.decision, req.body.comment)));
+export const processAdjustment = wrap(async (req, res) => send(res, await service.processAdjustment(req, req.params.id)));
+export const cancelReceipt = wrap(async (req, res) => send(res, await service.cancelReceipt(req, req.params.id, req.body.reason, req.body.approvalRequestId)));
+export const templates = wrap(async (req, res) => send(res, await service.listTemplates(req.user)));
+export const saveTemplate = wrap(async (req, res) => send(res, await service.saveTemplate(req, req.body), 201));
+export const reminders = wrap(async (req, res) => send(res, await service.sendReminders(req, req.body), 201));
+export const closings = wrap(async (req, res) => send(res, await service.listClosings(req.user)));
+export const submitClosing = wrap(async (req, res) => send(res, await service.submitClosing(req, req.body), 201));
+export const reviewClosing = wrap(async (req, res) => send(res, await service.reviewClosing(req, req.params.id, req.body.status, req.body.comment)));
+export const period = wrap(async (req, res) => send(res, await service.setPeriodLock(req, req.body)));
+export const rollover = wrap(async (req, res) => send(res, await service.rollover(req, req.body)));
+export const scholarship = wrap(async (req, res) => send(res, await service.createScholarship(req, req.body), 201));
+export const assignScholarship = wrap(async (req, res) => send(res, await service.assignScholarship(req, req.body), 201));
+export const family = wrap(async (req, res) => send(res, await service.familyOverview(req.user)));
+export const linkFamily = wrap(async (req, res) => send(res, await service.linkFamily(req, req.body), 201));
+export const report = wrap(async (req, res) => {
+  const result = await service.report(req.user, req.query); if (req.query.format === 'pdf') { res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition','inline; filename="fee-report.pdf"');const doc=new PDFDocument({size:'A4',margin:40});doc.pipe(res);doc.fontSize(18).text('SchoolOS Fee Collection Report',{align:'center'}).fontSize(9).text(`Generated ${new Date().toLocaleString()}`,{align:'center'}).moveDown();for(const p of result.rows){if(doc.y>740)doc.addPage();doc.text(`${p.receipt?.receiptNumber||p.paymentNumber}  ${new Date(p.paymentDate).toLocaleDateString()}  ${p.student.studentFirstName} ${p.student.studentLastName||''}  ${p.method}  ${(p.amountMinor/100).toFixed(2)}`);}doc.moveDown().font('Helvetica-Bold').text(`Total: ${(result.totalMinor/100).toFixed(2)}`);doc.end();return; } if (req.query.format !== 'csv') return send(res, result);
+  const escape = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`; const rows = [['Receipt','Date','Student','Admission No','Class','Method','Status','Amount Minor'], ...result.rows.map((p) => [p.receipt?.receiptNumber,p.paymentDate,`${p.student.studentFirstName} ${p.student.studentLastName || ''}`,p.student.admissionNo,`${p.student.className} ${p.student.section || ''}`,p.method,p.status,p.amountMinor])];
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8'); res.setHeader('Content-Disposition', 'attachment; filename="fee-report.csv"'); res.send(`SchoolOS Fee Report\nGenerated,${new Date().toISOString()}\nFilters,${escape(JSON.stringify(result.filters))}\n\n${rows.map((row) => row.map(escape).join(',')).join('\n')}`);
+});
+export const platform = wrap(async (req, res) => send(res, await service.platformAnalytics(req.user)));
+export const audits = wrap(async (req, res) => send(res, await service.auditLogs(req.user, req.query)));
+export const document = wrap(async (req, res) => send(res, await service.attachDocument(req, req.body), 201));

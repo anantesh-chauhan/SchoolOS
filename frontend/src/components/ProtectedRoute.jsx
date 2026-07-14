@@ -66,6 +66,7 @@ const ProtectedRoute = ({
           const profileRoutes = {
             SCHOOL_OWNER: '/dashboard/school/profile', ADMIN: '/dashboard/admin/profile',
             CURRICULUM_MANAGER: '/dashboard/curriculum/profile', TEACHER: '/dashboard/teacher/profile',
+            FEE_MANAGER: '/dashboard/fee-manager/profile',
             STUDENT: '/dashboard/student/profile', PARENT: '/dashboard/parent/profile', STAFF: '/dashboard/staff/profile',
           };
           setIsAuthorized(false);

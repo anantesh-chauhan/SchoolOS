@@ -12,6 +12,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "seed": "node prisma/seed.js",
+    "seed:fees": "node prisma/seedFees.js",
     "seed:teacher-dashboard": "node prisma/seedTeacherDashboardData.js",
     "seed:class-teachers": "node prisma/seedClassTeachers.js",
     "seed:official-resources": "node prisma/seedOfficialChapterResources.js",
@@ -40,6 +41,7 @@
     "jsonwebtoken": "^9.0.2",
     "pdfkit": "^0.18.0",
     "pg": "^8.11.3",
+    "qrcode": "^1.5.4",
     "redis": "^4.6.12",
     "uuid": "^9.0.1"
   },

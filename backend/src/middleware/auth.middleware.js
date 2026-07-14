@@ -10,6 +10,7 @@ const VALID_ROLES = new Set([
   'STUDENT',
   'STAFF',
   'CURRICULUM_MANAGER',
+  'FEE_MANAGER',
 ]);
 
 // Verify JWT token middleware

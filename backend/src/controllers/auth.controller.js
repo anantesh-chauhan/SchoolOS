@@ -750,7 +750,7 @@ export const getDemoAccounts = async (req, res) => {
     const [users, portalStudents] = await Promise.all([prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
       },
       select: {
         id: true,

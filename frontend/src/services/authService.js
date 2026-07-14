@@ -9,6 +9,7 @@ const roleRoutes = {
   STUDENT: '/dashboard/student',
   STAFF: '/dashboard/staff',
   CURRICULUM_MANAGER: '/dashboard/curriculum',
+  FEE_MANAGER: '/dashboard/fees',
 };
 
 export const authService = {

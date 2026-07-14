@@ -2,7 +2,7 @@ import express from 'express';
 import { body, validationResult } from 'express-validator';
 import { authMiddleware, requireRole } from '../middleware/auth.middleware.js';
 import profileController from '../controllers/profile.controller.js';
-import { createCurriculumManagerUser, createStaffUser, createTeacherUser } from '../controllers/user.controller.js';
+import { createCurriculumManagerUser, createFeeManagerUser, createStaffUser, createTeacherUser } from '../controllers/user.controller.js';
 
 const router = express.Router();
 
@@ -12,6 +12,7 @@ router.get('/me', authMiddleware, profileController.getMyProfile);
 router.post('/create-teacher', authMiddleware, requireRole('ADMIN', 'SCHOOL_OWNER', 'PLATFORM_OWNER'), createTeacherUser);
 router.post('/create-staff', authMiddleware, requireRole('ADMIN', 'SCHOOL_OWNER', 'PLATFORM_OWNER'), createStaffUser);
 router.post('/create-curriculum-manager', authMiddleware, requireRole('ADMIN', 'SCHOOL_OWNER'), createCurriculumManagerUser);
+router.post('/create-fee-manager', authMiddleware, requireRole('ADMIN', 'SCHOOL_OWNER'), createFeeManagerUser);
 
 // Update my profile - whitelist enforced in controller
 router.put(

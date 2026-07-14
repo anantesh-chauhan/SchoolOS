@@ -24,6 +24,8 @@ import {
   X,
   MessageSquare,
   KeyRound,
+  BadgeIndianRupee,
+  Plus,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -113,6 +115,7 @@ const DashboardLayout = ({ children, role }) => {
         group: 'Tenant Management', icon: School, items: [
           { label: 'School Management', icon: School, href: '/dashboard/platform/schools' },
           { label: 'Branding & Settings', icon: Settings, href: '/dashboard/platform/school-settings' },
+          { label: 'Fee Module Analytics', icon: BadgeIndianRupee, href: '/dashboard/platform/fees' },
         ],
       },
       {
@@ -126,6 +129,7 @@ const DashboardLayout = ({ children, role }) => {
       { group:'Support & Quality', icon:MessageSquare, items:[{label:'Issue Reports',icon:MessageSquare,href:'/platform/issues'},{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] },
     ],
     SCHOOL_OWNER: [
+      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
       {
         group: 'Academic Setup',
         icon: BookOpen,
@@ -170,6 +174,7 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     ADMIN: [
+      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
       { group: 'Overview', icon: Home, items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
         ],
@@ -228,6 +233,9 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'My Profile', icon: UserRound, href: '/dashboard/curriculum/profile' },
       ] },
     ],
+    FEE_MANAGER: [
+      { group: 'Fee Operations', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: Home, href: '/dashboard/fees' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Closing & Reports', icon: ClipboardCheck, href: '/dashboard/fees/operations' }, { label: 'My Profile', icon: UserRound, href: '/dashboard/fee-manager/profile' }] },
+    ],
     TEACHER: [
       {
         group: 'Overview', icon: Home,
@@ -263,6 +271,8 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
           { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
+          { label: 'Children Fees', icon: BadgeIndianRupee, href: '/parent/fees' },
+          { label: 'Family Fee Summary', icon: BadgeIndianRupee, href: '/parent/fees/family' },
         ],
       },
       {
@@ -281,6 +291,7 @@ const DashboardLayout = ({ children, role }) => {
         icon: Home,
         items: [
           { label: 'Dashboard', icon: Home, href: '/student/dashboard' },
+          { label: 'My Fees', icon: BadgeIndianRupee, href: '/student/fees' },
         ],
       },
       {
@@ -332,6 +343,7 @@ const DashboardLayout = ({ children, role }) => {
     STUDENT: '/dashboard/student/profile',
     STAFF: '/dashboard/staff/profile',
     CURRICULUM_MANAGER: '/dashboard/curriculum/profile',
+    FEE_MANAGER: '/dashboard/fee-manager/profile',
   };
 
   const breadcrumb = useMemo(() => {
@@ -359,6 +371,7 @@ const DashboardLayout = ({ children, role }) => {
       SCHOOL_OWNER: 'bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-200',
       ADMIN: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200',
       CURRICULUM_MANAGER: 'bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-200',
+      FEE_MANAGER: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200',
       TEACHER: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200',
       PARENT: 'bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-200',
       STUDENT: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200',

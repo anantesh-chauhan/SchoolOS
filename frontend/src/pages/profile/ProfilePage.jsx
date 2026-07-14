@@ -492,7 +492,7 @@ const ProfilePage = ({ role }) => {
 };
 
 ProfilePage.propTypes = {
-  role: PropTypes.oneOf(['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']).isRequired,
+  role: PropTypes.oneOf(['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'TEACHER', 'PARENT', 'STUDENT', 'STAFF']).isRequired,
 };
 
 export default ProfilePage;
