@@ -5,7 +5,31 @@ import QRCode from 'qrcode';
 export const streamReceiptPdf = async (req, res) => {
   const receipt = await prisma.feeReceipt.findFirst({ where: { id: req.params.id, schoolId: req.user.schoolId }, include: { school: true, payment: { include: { student: true, allocations: { include: { charge: { include: { feeComponent: true } } } } } } } });
   if (!receipt) return res.status(404).json({ success: false, message: 'Receipt not found' });
-  if (['STUDENT', 'PARENT'].includes(req.user.role) && receipt.payment.studentId !== req.user.studentId) return res.status(403).json({ success: false, message: 'Forbidden' });
+  if (['STUDENT', 'PARENT'].includes(req.user.role)) {
+    // STUDENT: studentId in token is authoritative.
+    if (req.user.role === 'STUDENT') {
+      if (receipt.payment.studentId !== req.user.studentId) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    }
+
+    // PARENT: validate receipt.student belongs to any active family link for this parent.
+    if (req.user.role === 'PARENT') {
+      const familyLink = await prisma.feeFamilyLink.findFirst({
+        where: {
+          schoolId: req.user.schoolId,
+          parentUserId: req.user.email,
+          studentId: receipt.payment.studentId,
+          active: true,
+        },
+        select: { id: true },
+      });
+      if (!familyLink) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+    }
+  }
+
   await prisma.$transaction([
     prisma.feeReceipt.update({ where: { id: receipt.id }, data: { printCount: { increment: 1 }, lastPrintedAt: new Date() } }),
     prisma.feeAuditLog.create({ data: { schoolId: req.user.schoolId, userId: req.user.id, userRole: req.user.role, action: 'RECEIPT_PRINTED', entityType: 'FeeReceipt', entityId: receipt.id, ipAddress: req.ip, userAgent: req.get('user-agent') } }),

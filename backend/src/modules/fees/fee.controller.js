@@ -11,8 +11,15 @@ export const structures = handler(async (req, res) => send(res, await service.li
 export const createStructure = handler(async (req, res) => send(res, await service.createStructure(req, validateStructure(req.body)), 201));
 export const publishStructure = handler(async (req, res) => send(res, await service.publishStructure(req, req.params.id)));
 export const students = handler(async (req, res) => send(res, await service.searchStudents(req.user, String(req.query.q || '').trim())));
+export const hierarchy = handler(async (req, res) => send(res, await service.getFeeHierarchy(req.user, req.query.academicSession)));
 export const studentFees = handler(async (req, res) => send(res, await service.getStudentFees(req.user, req.params.studentId, req.query.academicSession)));
-export const myFees = handler(async (req, res) => send(res, await service.getStudentFees(req.user, req.user.studentId, req.query.academicSession)));
+export const myFees = handler(async (req, res) => {
+  // For STUDENT: use token studentId.
+  // For PARENT: allow choosing a child via query param; ownership is enforced in service.
+  const studentId = req.query.studentId ? String(req.query.studentId) : req.user.studentId;
+  return send(res, await service.getStudentFees(req.user, studentId, req.query.academicSession));
+});
+
 export const collect = handler(async (req, res) => {
   const key = req.get('idempotency-key'); if (!key || key.length < 8 || key.length > 100) throw new Error('A valid Idempotency-Key header is required');
   send(res, await service.collectPayment(req, validatePayment(req.body), key), 201);

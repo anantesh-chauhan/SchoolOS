@@ -827,9 +827,10 @@ export const getDemoAccounts = async (req, res) => {
       PARENT: 'Parents',
       STAFF: 'Staff',
       CURRICULUM_MANAGER: 'Curriculum Managers',
+      FEE_MANAGER: 'Fee Managers',
     };
 
-    const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Teachers', 'Staff', 'Students', 'Parents']
+    const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Teachers', 'Staff', 'Students', 'Parents']
       .map((role) => ({ role, users: [] }));
     const groupByLabel = new Map(groups.map((group) => [group.role, group]));
     const portalLoginIds = new Set(portalStudents.flatMap((student) => [student.studentUserId, student.parentUserId]).filter(Boolean).map(normalizeLoginId));

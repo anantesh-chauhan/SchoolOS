@@ -28,7 +28,15 @@ export default function LoginPage() {
   const [instantLoginEmail, setInstantLoginEmail] = useState('');
   const [errors, setErrors] = useState({});
   const [branding, setBranding] = useState(null);
-  const [demoAccounts, setDemoAccounts] = useState([]);
+  const [demoAccounts, setDemoAccounts] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('schoolosInstantAccounts');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [demoAccountsLoading, setDemoAccountsLoading] = useState(true);
   const [demoSearch, setDemoSearch] = useState('');
   const [instantFilters, setInstantFilters] = useState({ role: '', school: '', className: '', section: '' });
 
@@ -87,22 +95,22 @@ export default function LoginPage() {
 
   useEffect(() => {
     let mounted = true;
-    authService
-      .getDemoAccounts()
-      .then((groups) => {
-        if (mounted && Array.isArray(groups) && groups.length > 0) {
-          setDemoAccounts(groups);
-        }
-      })
-      .catch(() => {
-        if (mounted) {
-          setDemoAccounts([]);
-        }
-      });
-
-    return () => {
-      mounted = false;
+    let retryTimer;
+    const loadAccounts = async (retry = false) => {
+      try {
+        const groups = await authService.getDemoAccounts();
+        if (!mounted || !Array.isArray(groups) || groups.length === 0) return;
+        setDemoAccounts(groups);
+        sessionStorage.setItem('schoolosInstantAccounts', JSON.stringify(groups));
+      } catch {
+        // Keep the most recent successful list visible while the API reconnects.
+        if (mounted && retry) retryTimer = window.setTimeout(() => loadAccounts(true), 5000);
+      } finally {
+        if (mounted) setDemoAccountsLoading(false);
+      }
     };
+    loadAccounts(true);
+    return () => { mounted = false; window.clearTimeout(retryTimer); };
   }, []);
 
   const featureList = useMemo(

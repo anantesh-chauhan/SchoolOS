@@ -251,6 +251,7 @@ const DashboardLayout = ({ children, role }) => {
       },
       { group: 'Class Management', icon: Users, items: [
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
+          { label: 'Class Fee View', icon: BadgeIndianRupee, href: '/dashboard/teacher/fees' },
           { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
           { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },

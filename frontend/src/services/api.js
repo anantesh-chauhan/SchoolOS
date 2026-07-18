@@ -21,7 +21,8 @@ const onRefreshed = (newToken) => {
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  // Fee summaries and reports can take longer on a cold database connection.
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },

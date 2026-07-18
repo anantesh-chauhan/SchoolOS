@@ -30,3 +30,6 @@ export const report = wrap(async (req, res) => {
 export const platform = wrap(async (req, res) => send(res, await service.platformAnalytics(req.user)));
 export const audits = wrap(async (req, res) => send(res, await service.auditLogs(req.user, req.query)));
 export const document = wrap(async (req, res) => send(res, await service.attachDocument(req, req.body), 201));
+export const teacherSections = wrap(async (req, res) => send(res, await service.teacherSections(req.user)));
+export const teacherSectionFees = wrap(async (req, res) => send(res, await service.teacherSectionFees(req.user, req.params.sectionId, req.query.academicSession)));
+export const teacherReminder = wrap(async (req, res) => send(res, await service.teacherSendReminder(req, req.body), 201));

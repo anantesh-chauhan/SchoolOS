@@ -24,6 +24,9 @@ try {
       { schoolId: school.id, academicSession: school.students[0].session, name: 'Transport Fee', code: 'TRANSPORT', amountMinor: 50000, frequency: 'MONTHLY', mandatory: false, createdById: admin.id },
     ] } }, include: { components: true } });
     const components = await prisma.feeComponent.findMany({ where: { feeStructureId: structure.id } });
+    if (!await prisma.feeAssignment.count({ where: { schoolId: school.id, academicSession: structure.academicSession, feeStructureId: structure.id, targetType: 'SCHOOL', active: true } })) {
+      await prisma.feeAssignment.create({ data: { schoolId: school.id, academicSession: structure.academicSession, feeStructureId: structure.id, targetType: 'SCHOOL', priority: 10, createdById: admin.id } });
+    }
     for (const [index, student] of school.students.entries()) {
       const account = await prisma.studentFeeAccount.upsert({ where: { schoolId_studentId_academicSession: { schoolId: school.id, studentId: student.id, academicSession: student.session } }, create: { schoolId: school.id, studentId: student.id, academicSession: student.session }, update: {} });
       if (await prisma.studentFeeCharge.count({ where: { feeAccountId: account.id } })) continue;
@@ -33,10 +36,37 @@ try {
         await prisma.studentFeeCharge.create({ data: { schoolId: school.id, studentId: student.id, feeAccountId: account.id, feeStructureId: structure.id, feeComponentId: component.id, academicSession: student.session, installmentName: `${dueDate.toLocaleString('en', { month: 'long' })} Tuition`, dueDate, baseAmountMinor: 150000, paidMinor, status: paidMinor === 150000n ? 'PAID' : paidMinor > 0n ? 'PARTIALLY_PAID' : dueDate < new Date() ? 'OVERDUE' : 'UPCOMING' } });
       }
     }
+    // Create real payment, allocation and receipt rows for the seeded charges.
+    // This makes the student fee history screens useful immediately after seeding.
+    for (const [index, student] of school.students.entries()) {
+      const account = await prisma.studentFeeAccount.findUnique({ where: { schoolId_studentId_academicSession: { schoolId: school.id, studentId: student.id, academicSession: student.session } } });
+      if (!account || await prisma.feePayment.count({ where: { feeAccountId: account.id } })) continue;
+      const charges = await prisma.studentFeeCharge.findMany({ where: { feeAccountId: account.id }, orderBy: { dueDate: 'asc' } });
+      for (const [chargeIndex, charge] of charges.entries()) {
+        const amountMinor = BigInt(charge.paidMinor);
+        if (!amountMinor) continue;
+        const paymentDate = addMonths(new Date('2026-04-05T00:00:00Z'), chargeIndex);
+        const payment = await prisma.feePayment.create({ data: {
+          schoolId: school.id, studentId: student.id, feeAccountId: account.id, academicSession: student.session,
+          idempotencyKey: `seed-${student.id}-${charge.id}`, paymentNumber: `DEMO-PAY-${student.admissionNo || index}-${chargeIndex + 1}`,
+          amountMinor, method: chargeIndex % 2 ? 'UPI' : 'CASH', status: 'COMPLETED', paymentDate, collectedById: feeManager.id,
+          allocations: { create: { schoolId: school.id, chargeId: charge.id, amountMinor } },
+        } });
+        await prisma.feeReceipt.create({ data: {
+          schoolId: school.id, academicSession: student.session, paymentId: payment.id,
+          receiptNumber: `DEMO/${student.session}/${String(index + 1).padStart(2, '0')}${String(chargeIndex + 1).padStart(2, '0')}`,
+          verificationCode: `seed-${school.id.slice(-8)}-${student.id.slice(-8)}-${chargeIndex}`,
+          snapshot: { student: { name: `${student.studentFirstName} ${student.studentLastName || ''}`.trim(), admissionNo: student.admissionNo }, payment: { amountMinor: Number(amountMinor), paymentDate } },
+        } });
+      }
+    }
     const template = await prisma.feeNotificationTemplate.upsert({ where: { schoolId_name: { schoolId: school.id, name: 'Overdue fee reminder' } }, create: { schoolId: school.id, name: 'Overdue fee reminder', type: 'OVERDUE', title: 'Fee payment reminder', body: 'Dear {{parentName}}, {{dueAmount}} is pending for {{studentName}} and was due on {{dueDate}}.', createdById: admin.id }, update: {} });
     const scholarship = await prisma.feeScholarship.upsert({ where: { schoolId_academicSession_code: { schoolId: school.id, academicSession: school.students[0].session, code: 'MERIT-DEMO' } }, create: { schoolId: school.id, academicSession: school.students[0].session, name: 'Merit Scholarship', code: 'MERIT-DEMO', type: 'PERCENTAGE', valueBasisPoints: 2500, maximumMinor: 100000, requiresDocument: true, createdById: admin.id }, update: {} });
     const first = school.students[0];
-    await prisma.feeFamilyLink.upsert({ where: { schoolId_parentUserId_studentId: { schoolId: school.id, parentUserId: first.parentUserId || `parent-${first.id}`, studentId: first.id } }, create: { schoolId: school.id, parentUserId: first.parentUserId || `parent-${first.id}`, studentId: first.id }, update: {} });
+    for (const parentStudent of school.students.filter((student) => student.parentUserId)) {
+      const linkedChildren = school.students.filter((student) => student.parentMobile === parentStudent.parentMobile);
+      for (const child of linkedChildren) await prisma.feeFamilyLink.upsert({ where: { schoolId_parentUserId_studentId: { schoolId: school.id, parentUserId: parentStudent.parentUserId, studentId: child.id } }, create: { schoolId: school.id, parentUserId: parentStudent.parentUserId, studentId: child.id }, update: { active: true } });
+    }
     if (!await prisma.feeReminder.count({ where: { schoolId: school.id, studentId: first.id } })) await prisma.feeReminder.create({ data: { schoolId: school.id, studentId: first.id, academicSession: first.session, type: template.type, title: template.title, message: `Dear ${first.fatherName}, this is a demo fee reminder for ${first.studentFirstName}.`, sentById: feeManager.id } });
     if (!await prisma.studentFeeScholarship.count({ where: { schoolId: school.id, studentId: first.id, scholarshipId: scholarship.id } })) await prisma.studentFeeScholarship.create({ data: { schoolId: school.id, studentId: first.id, scholarshipId: scholarship.id, academicSession: first.session, amountMinor: 37500, status: 'APPROVED', requestedById: admin.id, approvedById: admin.id, approvedAt: new Date(), reason: 'Demo merit award' } });
     const refundStudent = school.students[1] || first;
