@@ -29,6 +29,7 @@ import curriculumRoutes from './src/routes/curriculum.js';
 import feeRoutes from './src/modules/fees/fee.routes.js';
 import homeworkRoutes from './src/modules/homework/homework.routes.js';
 import communicationRoutes from './src/modules/communication/communication.routes.js';
+import hrRoutes from './src/modules/hr/hr.routes.js';
 import { processScheduled, processQueuedDeliveries } from './src/modules/communication/communication.service.js';
 
 const app = express();
@@ -114,6 +115,7 @@ app.use('/api/curriculum', curriculumRoutes);
 app.use('/api/fees', feeRoutes);
 app.use('/api', homeworkRoutes);
 app.use('/api', communicationRoutes);
+app.use('/api/hr', hrRoutes);
 
 
 // 404 Handler

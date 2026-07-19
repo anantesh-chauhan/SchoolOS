@@ -23,6 +23,7 @@
     "seed:homework": "node prisma/seedHomeworkResources.js",
     "seed:communication": "node prisma/seedCommunication.js",
     "seed:communication-demo-additive": "node prisma/seedCommunicationNotificationDemo.js",
+    "seed:hr": "node prisma/seedHrPayroll.js",
     "backfill:communication": "node prisma/backfillLegacyCommunication.js",
     "seed:class-teachers": "node prisma/seedClassTeachers.js",
     "seed:official-resources": "node prisma/seedOfficialChapterResources.js",

@@ -1,4 +1,5 @@
 import prisma from '../../config/prisma.client.js';
+import { randomUUID } from 'node:crypto';
 import { getTeacherForUser } from '../../utils/teacherAuthorization.util.js';
 import { CommunicationError } from './communication.validation.js';
 import { emitToRecipient } from './realtime.service.js';
@@ -6,6 +7,50 @@ import { principalKey } from './communication.service.js';
 
 const ADMINS = new Set(['SCHOOL_OWNER','ADMIN']);
 const now = () => new Date();
+
+const messageCategory = (type) => type === 'FEE_SUPPORT' ? 'FEE' : type === 'ACADEMIC_SUPPORT' ? 'ACADEMIC' : 'GENERAL';
+const notificationRecipient = (participant, conversationId, messageId) => ({
+  id: `notification_recipient_${randomUUID()}`,
+  recipientKey: participant.participantKey,
+  userId: participant.userId || null,
+  studentId: participant.studentId || null,
+  parentId: participant.role === 'PARENT' ? participant.participantKey.slice('parent:'.length) : null,
+  recipientRole: participant.role,
+  deliveryContext: 'DIRECT',
+  context: { conversationId, messageId },
+});
+
+const createMessageAlert = async (tx, user, conversation, message, participants) => {
+  const alertRecipients = participants.filter((participant) => !participant.mutedUntil || participant.mutedUntil <= now());
+  if (!alertRecipients.length) return [];
+  const recipients = alertRecipients.map((participant) => notificationRecipient(participant, conversation.id, message.id));
+  const notification = await tx.notification.create({
+    data: {
+      schoolId: user.schoolId,
+      type: 'NEW_MESSAGE',
+      category: messageCategory(conversation.type),
+      priority: 'NORMAL',
+      title: `New message from ${user.name || user.role.replaceAll('_', ' ')}`,
+      message: message.content,
+      shortMessage: message.content.slice(0, 240),
+      actionUrl: `/communication?tab=inbox&conversation=${conversation.id}`,
+      actionLabel: 'Open conversation',
+      sourceModule: 'COMMUNICATION',
+      sourceEntityType: 'Message',
+      sourceEntityId: message.id,
+      createdByUserId: ['PARENT','STUDENT'].includes(user.role) ? null : user.id,
+      createdByRole: user.role,
+      status: 'PUBLISHED',
+      publishedAt: now(),
+      isSystemGenerated: true,
+      resolvedRecipientCount: recipients.length,
+      dedupeKey: `MESSAGE:${message.id}`,
+    },
+  });
+  await tx.notificationRecipient.createMany({ data: recipients.map((recipient) => ({ ...recipient, notificationId: notification.id, schoolId: user.schoolId })) });
+  await tx.notificationDelivery.createMany({ data: recipients.map((recipient) => ({ notificationRecipientId: recipient.id, channel: 'IN_APP', provider: 'database-conversation', status: 'DELIVERED', attemptCount: 1, sentAt: now(), deliveredAt: now() })) });
+  return recipients.map((recipient) => recipient.recipientKey);
+};
 
 const identityForKey = async (schoolId, key) => {
   if (key.startsWith('user:')) { const row = await prisma.user.findFirst({ where: { id: key.slice(5), schoolId, isActive: true } }); return row ? { participantKey: key, userId: row.id, studentId: null, role: row.role } : null; }
@@ -57,13 +102,15 @@ export const createConversation = async (user, input) => {
   if (identities.some((value) => !value)) throw new CommunicationError('A participant is invalid or belongs to another school.');
   await assertConversationTargets(user, input, identities);
   const self = { participantKey: selfKey, userId: ['PARENT','STUDENT'].includes(user.role) ? null : user.id, studentId: user.studentId || null, role: user.role, canManage: true };
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const conversation = await tx.conversation.create({ data: { schoolId: user.schoolId, type: input.type, subject: input.subject, classId: input.classId, sectionId: input.sectionId, studentId: input.studentId || user.studentId || null, createdByKey: selfKey, participants: { create: [self, ...identities] } } });
     const message = await tx.message.create({ data: { conversationId: conversation.id, schoolId: user.schoolId, senderKey: selfKey, senderUserId: self.userId, senderRole: user.role, content: input.message } });
+    const notifiedKeys = await createMessageAlert(tx, user, conversation, message, identities);
     await tx.communicationAudit.create({ data: { schoolId: user.schoolId, actorKey: selfKey, action: 'CONVERSATION_CREATED', entityType: 'Conversation', entityId: conversation.id, current: { type: input.type } } });
-    identities.forEach((participant) => emitToRecipient(participant.participantKey, 'message', { conversationId: conversation.id, messageId: message.id }));
-    return conversation;
+    return { conversation, message, notifiedKeys };
   });
+  result.notifiedKeys.forEach((recipientKey) => emitToRecipient(recipientKey, 'message', { conversationId: result.conversation.id, messageId: result.message.id, notification: true }));
+  return result.conversation;
 };
 
 const membership = async (user, conversationId) => {
@@ -86,11 +133,33 @@ export const getConversation = async (user, id, query = {}) => {
 export const sendMessage = async (user, conversationId, input) => {
   const member = await membership(user, conversationId); if (!member.canReply) throw new CommunicationError('You cannot reply to this conversation.', 403); if (member.conversation.status !== 'OPEN') throw new CommunicationError('This conversation is closed.', 409);
   if (input.replyToMessageId) { const reply = await prisma.message.findFirst({ where: { id: input.replyToMessageId, conversationId } }); if (!reply) throw new CommunicationError('Reply target is invalid.'); }
-  const message = await prisma.$transaction(async (tx) => { const row = await tx.message.create({ data: { conversationId, schoolId: user.schoolId, senderKey: principalKey(user), senderUserId: ['PARENT','STUDENT'].includes(user.role) ? null : user.id, senderRole: user.role, messageType: input.messageType, content: input.content, replyToMessageId: input.replyToMessageId } }); await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now() } }); return row; });
-  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId, leftAt: null, participantKey: { not: principalKey(user) } } }); participants.forEach((participant) => emitToRecipient(participant.participantKey, 'message', { conversationId, messageId: message.id })); return message;
+  const participants = await prisma.conversationParticipant.findMany({ where: { conversationId, leftAt: null, participantKey: { not: principalKey(user) } } });
+  const result = await prisma.$transaction(async (tx) => {
+    const message = await tx.message.create({ data: { conversationId, schoolId: user.schoolId, senderKey: principalKey(user), senderUserId: ['PARENT','STUDENT'].includes(user.role) ? null : user.id, senderRole: user.role, messageType: input.messageType, content: input.content, replyToMessageId: input.replyToMessageId } });
+    const conversation = await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: now() } });
+    const notifiedKeys = await createMessageAlert(tx, user, conversation, message, participants);
+    return { message, notifiedKeys };
+  });
+  result.notifiedKeys.forEach((recipientKey) => emitToRecipient(recipientKey, 'message', { conversationId, messageId: result.message.id, notification: true }));
+  return result.message;
 };
 
-export const markConversationRead = async (user, id) => { const member = await membership(user, id); return prisma.conversationParticipant.update({ where: { id: member.id }, data: { lastReadAt: now() } }); };
+export const markConversationRead = async (user, id) => {
+  const member = await membership(user, id);
+  return prisma.$transaction(async (tx) => {
+    const participant = await tx.conversationParticipant.update({ where: { id: member.id }, data: { lastReadAt: now() } });
+    await tx.notificationRecipient.updateMany({
+      where: {
+        schoolId: user.schoolId,
+        recipientKey: principalKey(user),
+        readAt: null,
+        notification: { sourceModule: 'COMMUNICATION', sourceEntityType: 'Message', actionUrl: `/communication?tab=inbox&conversation=${id}` },
+      },
+      data: { readAt: now(), seenAt: now() },
+    });
+    return participant;
+  });
+};
 export const setConversationStatus = async (user, id, status) => { const member = await membership(user, id); if (!member.canManage) throw new CommunicationError('Only a conversation manager can change its status.', 403); return prisma.conversation.update({ where: { id }, data: { status, closedAt: status === 'CLOSED' ? now() : null } }); };
 
 export const editMessage = async (user, id, content) => {

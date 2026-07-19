@@ -85,6 +85,8 @@ const ReceiptVerificationPage = lazy(() => import('./pages/fees/ReceiptVerificat
 const HomeworkWorkspacePage = lazy(() => import('./pages/homework/HomeworkWorkspacePage'));
 const NotificationCenterPage = lazy(() => import('./pages/communication/NotificationCenterPage'));
 const CommunicationWorkspacePage = lazy(() => import('./pages/communication/CommunicationWorkspacePage'));
+const HRWorkspacePage = lazy(() => import('./pages/hr/HRWorkspacePage'));
+const EmployeeSelfServicePage = lazy(() => import('./pages/hr/EmployeeSelfServicePage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -115,8 +117,10 @@ export default function App() {
           <Route path="/account-recovery" element={<AccountRecoveryPage />} />
           <Route path="/fees/verify/:code" element={<ReceiptVerificationPage />} />
           <Route path="/homework" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><HomeworkWorkspacePage /></ProtectedRoute>} />
-          <Route path="/notifications" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><NotificationCenterPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','HR','TEACHER','PARENT','STUDENT','STAFF']}><NotificationCenterPage /></ProtectedRoute>} />
           <Route path="/communication" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><CommunicationWorkspacePage /></ProtectedRoute>} />
+          <Route path="/dashboard/hr" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><HRWorkspacePage /></ProtectedRoute>} />
+          <Route path="/my/hr" element={<ProtectedRoute allowedRoles={['HR','TEACHER','STAFF']}><EmployeeSelfServicePage /></ProtectedRoute>} />
           <Route path="/support/my-reports" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><MyReportsPage /></ProtectedRoute>} />
           <Route path="/platform/issues" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><IssueManagementPage /></ProtectedRoute>} />
 

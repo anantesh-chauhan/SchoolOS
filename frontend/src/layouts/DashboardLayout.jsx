@@ -27,6 +27,8 @@ import {
   BadgeIndianRupee,
   Plus,
   BellRing,
+  Briefcase,
+  WalletCards,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -237,8 +239,21 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'My Profile', icon: UserRound, href: '/dashboard/curriculum/profile' },
       ] },
     ],
+    HR: [
+      { group: 'People Operations', icon: Briefcase, items: [
+        { label: 'HR Dashboard', icon: Home, href: '/dashboard/hr' },
+        { label: 'Employees', icon: UsersRound, href: '/dashboard/hr' },
+        { label: 'Attendance & Leave', icon: ClipboardCheck, href: '/dashboard/hr' },
+        { label: 'Payroll & Reports', icon: BadgeIndianRupee, href: '/dashboard/hr' },
+      ] },
+      { group: 'My Account', icon: UserRound, items: [{ label: 'My HR Profile', icon: UserRound, href: '/my/hr' }] },
+    ],
     FEE_MANAGER: [
-      { group: 'Fee Operations', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: Home, href: '/dashboard/fees' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Closing & Reports', icon: ClipboardCheck, href: '/dashboard/fees/operations' }, { label: 'My Profile', icon: UserRound, href: '/dashboard/fee-manager/profile' }] },
+      { group: 'Fee Operations', icon: BadgeIndianRupee, 
+        items: [{ label: 'Fee Dashboard', icon: Home, href: '/dashboard/fees' },
+           { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' },
+            { label: 'Closing & Reports', icon: ClipboardCheck, href: '/dashboard/fees/operations' },
+             { label: 'My Profile', icon: UserRound, href: '/dashboard/fee-manager/profile' }] },
     ],
     TEACHER: [
       {
@@ -262,6 +277,7 @@ const DashboardLayout = ({ children, role }) => {
         ],
       },
       { group: 'Account', icon: Settings, items: [
+          { label: 'My HR & Payslips', icon: WalletCards, href: '/my/hr' },
           { label: 'My Profile', icon: UserRound, href: '/dashboard/teacher/profile' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
@@ -329,6 +345,7 @@ const DashboardLayout = ({ children, role }) => {
         group: 'System',
         icon: Settings,
         items: [
+          { label: 'My HR & Payslips', icon: WalletCards, href: '/my/hr' },
           { label: 'My Profile', icon: UserRound, href: '/dashboard/staff/profile' },
           { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
@@ -340,7 +357,7 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   const groupedItems = roleMenuConfig[role] || [];
-  if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items:[{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
+  if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
   const profileRouteByRole = {
     PLATFORM_OWNER: '/dashboard/platform/profile',
@@ -352,6 +369,7 @@ const DashboardLayout = ({ children, role }) => {
     STAFF: '/dashboard/staff/profile',
     CURRICULUM_MANAGER: '/dashboard/curriculum/profile',
     FEE_MANAGER: '/dashboard/fee-manager/profile',
+    HR: '/dashboard/hr',
   };
 
   const breadcrumb = useMemo(() => {
@@ -380,6 +398,7 @@ const DashboardLayout = ({ children, role }) => {
       ADMIN: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200',
       CURRICULUM_MANAGER: 'bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-200',
       FEE_MANAGER: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200',
+      HR: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200',
       TEACHER: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-200',
       PARENT: 'bg-pink-50 text-pink-700 dark:bg-pink-950/50 dark:text-pink-200',
       STUDENT: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-200',

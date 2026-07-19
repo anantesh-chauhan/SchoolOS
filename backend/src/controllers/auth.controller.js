@@ -750,7 +750,7 @@ export const getDemoAccounts = async (req, res) => {
     const [users, portalStudents] = await Promise.all([prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
       },
       select: {
         id: true,
@@ -828,9 +828,10 @@ export const getDemoAccounts = async (req, res) => {
       STAFF: 'Staff',
       CURRICULUM_MANAGER: 'Curriculum Managers',
       FEE_MANAGER: 'Fee Managers',
+      HR: 'Human Resources',
     };
 
-    const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Teachers', 'Staff', 'Students', 'Parents']
+    const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Human Resources', 'Teachers', 'Staff', 'Students', 'Parents']
       .map((role) => ({ role, users: [] }));
     const groupByLabel = new Map(groups.map((group) => [group.role, group]));
     const portalLoginIds = new Set(portalStudents.flatMap((student) => [student.studentUserId, student.parentUserId]).filter(Boolean).map(normalizeLoginId));

@@ -25,7 +25,7 @@ export const communicationService = {
   conversation: (id) => apiClient.get(`/conversations/${id}`).then(data),
   createConversation: (payload) => apiClient.post('/conversations', payload).then(data),
   sendMessage: (id, payload) => apiClient.post(`/conversations/${id}/messages`, payload).then(data),
-  readConversation: (id) => apiClient.patch(`/conversations/${id}/read`).then(data),
+  readConversation: (id) => apiClient.patch(`/conversations/${id}/read`).then(data).then(notificationsChanged),
   closeConversation: (id) => apiClient.post(`/conversations/${id}/close`).then(data),
   directory: (params = {}) => apiClient.get('/communication/recipients', { params }).then(data),
   audienceOptions: () => apiClient.get('/communication/audience-options').then(data),

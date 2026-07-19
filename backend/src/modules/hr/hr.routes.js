@@ -1,0 +1,14 @@
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import { authMiddleware, requireRole } from '../../middleware/auth.middleware.js';
+import * as controller from './hr.controller.js';
+const router=express.Router(); const managers=requireRole('SCHOOL_OWNER','ADMIN','HR'); const access=requireRole('SCHOOL_OWNER','ADMIN','HR','TEACHER','STAFF'); const sensitive=rateLimit({windowMs:60000,limit:60});
+router.use(authMiddleware); router.get('/platform/analytics',requireRole('PLATFORM_OWNER'),controller.platformAnalytics); router.use(access);
+router.get('/dashboard',managers,controller.dashboard);
+router.get('/employees',managers,controller.employees); router.post('/employees',managers,sensitive,controller.createEmployee); router.get('/employees/me',controller.me); router.get('/employees/:id',controller.employee); router.patch('/employees/:id',managers,sensitive,controller.updateEmployee);
+router.get('/policy',managers,controller.policy); router.put('/policy',managers,controller.savePolicy);
+router.get('/attendance',controller.attendance); router.post('/attendance/bulk',managers,sensitive,controller.saveAttendance);
+router.get('/leaves',controller.leaves); router.post('/leaves',controller.applyLeave); router.patch('/leaves/:id/review',managers,sensitive,controller.reviewLeavePolicyAware);
+router.get('/payroll',controller.payrolls); router.post('/payroll/generate',managers,sensitive,controller.runPayroll); router.patch('/payroll/:id',managers,sensitive,controller.updatePayroll); router.get('/payroll/:id/payslip',controller.payslip);
+router.get('/reports/salary-register',managers,controller.report);
+export default router;

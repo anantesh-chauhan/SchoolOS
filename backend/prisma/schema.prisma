@@ -180,6 +180,12 @@ model School {
   academicNotifications     AcademicNotification[]
   academicContentAudits     AcademicContentAudit[]
   homeworkModuleSetting     HomeworkModuleSetting?
+  employees                 Employee[]
+  hrLeavePolicy             HrLeavePolicy?
+  employeeAttendances       EmployeeAttendance[]
+  employeeLeaveApplications EmployeeLeaveApplication[]
+  employeePayrolls          EmployeePayroll[]
+  hrAuditLogs               HrAuditLog[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -574,6 +580,7 @@ model Teacher {
   homework                  Homework[]
   teacherSubjects           TeacherSubject[]
   timetableSlots            TimetableSlot[]
+  employee                  Employee?
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -1598,6 +1605,226 @@ model TeacherAttendance {
   @@index([schoolId, teacherId, attendanceDate])
   @@index([schoolId, teacherId, academicSession])
   @@index([schoolId, markedById])
+}
+
+// School-wide employment records. Teaching employees can link to the existing
+// Teacher model without duplicating academic assignments.
+model Employee {
+  id                String                     @id @default(cuid())
+  schoolId          String
+  userId            String?
+  teacherId         String?                    @unique
+  employeeId        String
+  firstName         String
+  lastName          String?
+  gender            String?
+  dateOfBirth       DateTime?
+  bloodGroup        String?
+  mobile            String
+  email             String?
+  aadhaarMasked     String?
+  panMasked         String?
+  address           String?
+  department        String
+  designation       String
+  category          EmployeeCategory
+  employmentType    EmploymentType             @default(PERMANENT)
+  status            EmploymentStatus           @default(ACTIVE)
+  joiningDate       DateTime
+  exitDate          DateTime?
+  bankName          String?
+  bankAccountMasked String?
+  ifsc              String?
+  emergencyContact  Json?
+  qualifications    Json?
+  experience        Json?
+  profileImageUrl   String?
+  metadata          Json?
+  deletedAt         DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  school            School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher           Teacher?                   @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  documents         EmployeeDocument[]
+  salaryRevisions   EmployeeSalaryRevision[]
+  attendances       EmployeeAttendance[]
+  leaveApplications EmployeeLeaveApplication[]
+  leaveBalances     EmployeeLeaveBalance[]
+  payrolls          EmployeePayroll[]
+
+  @@unique([schoolId, employeeId])
+  @@index([schoolId, status, deletedAt])
+  @@index([schoolId, department, designation])
+  @@index([schoolId, category])
+  @@index([schoolId, mobile])
+  @@index([userId])
+}
+
+model EmployeeDocument {
+  id         String    @id @default(cuid())
+  employeeId String
+  type       String
+  name       String
+  url        String
+  expiresAt  DateTime?
+  verifiedAt DateTime?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, type])
+  @@index([expiresAt])
+}
+
+model EmployeeSalaryRevision {
+  id            String    @id @default(cuid())
+  employeeId    String
+  monthlyGross  Decimal   @db.Decimal(14, 2)
+  basicSalary   Decimal   @db.Decimal(14, 2)
+  components    Json?
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  reason        String?
+  approvedById  String?
+  createdAt     DateTime  @default(now())
+  employee      Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, effectiveFrom])
+  @@index([employeeId, effectiveFrom, effectiveTo])
+}
+
+model HrLeavePolicy {
+  id                String   @id @default(cuid())
+  schoolId          String   @unique
+  annualLeaveCount  Decimal  @default(15) @db.Decimal(6, 2)
+  monthlyPaidLimit  Decimal  @default(2) @db.Decimal(6, 2)
+  carryForward      Boolean  @default(true)
+  maxCarryForward   Decimal? @db.Decimal(6, 2)
+  leaveExpiryMonth  Int?
+  lateEntriesPerDay Int?
+  includeWeeklyOff  Boolean  @default(false)
+  rules             Json?
+  updatedById       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model EmployeeLeaveBalance {
+  id         String    @id @default(cuid())
+  employeeId String
+  leaveYear  Int
+  opening    Decimal   @default(0) @db.Decimal(6, 2)
+  accrued    Decimal   @default(15) @db.Decimal(6, 2)
+  used       Decimal   @default(0) @db.Decimal(6, 2)
+  adjusted   Decimal   @default(0) @db.Decimal(6, 2)
+  expiresAt  DateTime?
+  updatedAt  DateTime  @updatedAt
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, leaveYear])
+  @@index([leaveYear])
+}
+
+model EmployeeLeaveApplication {
+  id            String             @id @default(cuid())
+  schoolId      String
+  employeeId    String
+  leaveType     EmployeeLeaveType
+  startDate     DateTime
+  endDate       DateTime
+  days          Decimal            @db.Decimal(6, 2)
+  reason        String
+  attachmentUrl String?
+  status        LeaveRequestStatus @default(PENDING)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewComment String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  school        School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employee      Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, startDate])
+  @@index([schoolId, employeeId, startDate])
+}
+
+model EmployeeAttendance {
+  id               String                   @id @default(cuid())
+  schoolId         String
+  employeeId       String
+  attendanceDate   DateTime
+  status           EmployeeAttendanceStatus @default(PRESENT)
+  source           AttendanceSource         @default(MANUAL)
+  checkIn          DateTime?
+  checkOut         DateTime?
+  minutesLate      Int                      @default(0)
+  minutesEarlyExit Int                      @default(0)
+  remarks          String?
+  sourceReference  String?
+  markedById       String?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  school           School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employee         Employee                 @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, employeeId, attendanceDate])
+  @@index([schoolId, attendanceDate, status])
+  @@index([schoolId, employeeId, attendanceDate])
+  @@index([source, sourceReference])
+}
+
+model EmployeePayroll {
+  id                   String        @id @default(cuid())
+  schoolId             String
+  employeeId           String
+  payrollMonth         DateTime
+  workingDays          Decimal       @db.Decimal(6, 2)
+  payableDays          Decimal       @db.Decimal(6, 2)
+  attendanceSummary    Json
+  monthlyGross         Decimal       @db.Decimal(14, 2)
+  basePay              Decimal       @db.Decimal(14, 2)
+  allowances           Json?
+  allowanceTotal       Decimal       @default(0) @db.Decimal(14, 2)
+  deductions           Json?
+  deductionTotal       Decimal       @default(0) @db.Decimal(14, 2)
+  netSalary            Decimal       @db.Decimal(14, 2)
+  status               PayrollStatus @default(PENDING)
+  lockedAt             DateTime?
+  generatedById        String?
+  paidAt               DateTime?
+  transactionReference String?
+  remarks              String?
+  payslipNumber        String
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  school               School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employee             Employee      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([schoolId, employeeId, payrollMonth])
+  @@unique([schoolId, payslipNumber])
+  @@index([schoolId, payrollMonth, status])
+  @@index([schoolId, employeeId, payrollMonth])
+}
+
+model HrAuditLog {
+  id         String   @id @default(cuid())
+  schoolId   String
+  actorId    String?
+  actorRole  String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
 }
 
 model AcademicCalendarDay {
@@ -3046,6 +3273,88 @@ enum Role {
   STAFF
   CURRICULUM_MANAGER
   FEE_MANAGER
+  HR
+}
+
+enum EmployeeCategory {
+  TEACHING
+  NON_TEACHING
+  SUPPORT
+  ADMINISTRATION
+  TRANSPORT
+  LIBRARY
+  LABORATORY
+  IT
+  OTHER
+}
+
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  GUEST_FACULTY
+  VISITING_FACULTY
+  PART_TIME
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  RESIGNED
+  RETIRED
+}
+
+enum EmployeeAttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  PAID_LEAVE
+  CASUAL_LEAVE
+  MEDICAL_LEAVE
+  EARNED_LEAVE
+  MATERNITY_LEAVE
+  PATERNITY_LEAVE
+  HOLIDAY
+  WORK_FROM_HOME
+  OFFICIAL_DUTY
+  LATE
+  EARLY_EXIT
+}
+
+enum AttendanceSource {
+  MANUAL
+  BULK
+  IMPORT
+  BIOMETRIC
+  RFID
+  FACE_RECOGNITION
+  GPS
+}
+
+enum EmployeeLeaveType {
+  PAID
+  CASUAL
+  MEDICAL
+  EARNED
+  MATERNITY
+  PATERNITY
+  UNPAID
+  OTHER
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  PENDING
+  PROCESSED
+  PAID
+  CANCELLED
+  HOLD
 }
 
 enum CommunicationCategory {
