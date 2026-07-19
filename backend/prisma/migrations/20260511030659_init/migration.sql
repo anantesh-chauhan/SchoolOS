@@ -1,0 +1,3 @@
+-- Legacy compatibility marker.
+-- The original SQL predates this repository's migration history and is captured
+-- by 202607080000_baseline for deterministic shadow-database reconstruction.

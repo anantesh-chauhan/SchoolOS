@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
 import bcryptjs from 'bcryptjs';
 import {
   CBSE_CLASS_CATALOG,
@@ -8,6 +8,12 @@ import {
   SUBJECT_CODE_BY_NAME,
   getChapterEntries,
 } from '../src/constants/cbseAcademicSeed.js';
+
+if (process.env.DATABASE_URL?.includes('sslmode=require')) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL.replace('sslmode=require', 'sslmode=no-verify');
+}
+
+const { PrismaClient } = await import('../src/generated/prisma/index.js');
 
 const prisma = new PrismaClient();
 const DEMO_PASSWORD = 'admin123';

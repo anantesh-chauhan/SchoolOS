@@ -48,6 +48,11 @@ try {
       const structure = await prisma.feeStructure.upsert({ where: { schoolId_academicSession_code_version: { schoolId: school.id, academicSession: session, code, version: 1 } }, create: { schoolId: school.id, academicSession: session, name: `${className} Academic Fee Plan`, code, mode: 'COMPONENT_BASED', status: 'PUBLISHED', version: 1, createdById: collector.id, approvedById: collector.id, publishedAt: new Date(), components: { create: [{ schoolId: school.id, academicSession: session, name: 'Monthly Tuition', code: 'TUITION', amountMinor: rupees(tuition), frequency: 'MONTHLY', dueDay: 10, createdById: collector.id }, { schoolId: school.id, academicSession: session, name: 'Smart Class & Activity', code: 'ACTIVITY', amountMinor: rupees(rank <= 5 ? 250 : 400), frequency: 'MONTHLY', dueDay: 10, createdById: collector.id }] } }, update: {} , include: { components: true } });
       const tuitionComponent = structure.components.find((c) => c.code === 'TUITION'); const activityComponent = structure.components.find((c) => c.code === 'ACTIVITY');
       for (const [studentIndex, student] of students.entries()) {
+        const expectedRealisticCharges = studentIndex % 5 < 2 ? 15 : 10;
+        const existingRealisticCharges = await prisma.studentFeeCharge.count({
+          where: { studentId: student.id, feeStructure: { code: { startsWith: 'RFE-' } } },
+        });
+        if (existingRealisticCharges >= expectedRealisticCharges) continue;
         const account = await prisma.studentFeeAccount.upsert({ where: { schoolId_studentId_academicSession: { schoolId: school.id, studentId: student.id, academicSession: session } }, create: { schoolId: school.id, studentId: student.id, academicSession: session }, update: {} });
         for (const month of MONTHS) for (const component of [tuitionComponent, activityComponent]) {
           const amount = BigInt(component.amountMinor); const paid = month < 6 ? (studentIndex % 5 === 0 ? amount : studentIndex % 5 === 1 && month === 5 ? amount / 2n : 0n) : 0n;

@@ -1,6 +1,12 @@
-import prisma from '../src/config/prisma.client.js';
-import { ensureSchoolSecurityCurriculumDefaults } from '../src/services/schoolSecurityCurriculumSeed.service.js';
+import 'dotenv/config';
 import bcryptjs from 'bcryptjs';
+
+if (process.env.DATABASE_URL?.includes('sslmode=require')) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL.replace('sslmode=require', 'sslmode=no-verify');
+}
+
+const { default: prisma } = await import('../src/config/prisma.client.js');
+const { ensureSchoolSecurityCurriculumDefaults } = await import('../src/services/schoolSecurityCurriculumSeed.service.js');
 
 if (process.env.NODE_ENV === 'production' && !process.env.CURRICULUM_MANAGER_SEED_PASSWORD) {
   throw new Error('Set CURRICULUM_MANAGER_SEED_PASSWORD before running this seed in production');

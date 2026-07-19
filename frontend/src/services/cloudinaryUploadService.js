@@ -59,6 +59,10 @@ export const cloudinaryUploadService = {
     const response = await apiClient.post('/uploads/section-resource-signature', { schoolId, classId, sectionId, subjectId });
     return response.data;
   },
+  getHomeworkSignature: async ({ homeworkId }) => {
+    const response = await apiClient.post('/uploads/homework-signature', { homeworkId });
+    return response.data;
+  },
   getIssueScreenshotSignature: async () => (await apiClient.post('/uploads/issue-screenshot-signature')).data,
   uploadToCloudinary,
 };

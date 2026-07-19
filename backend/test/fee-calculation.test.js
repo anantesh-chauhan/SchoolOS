@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allocatePayment, calculateCharge, calculateLateFee } from '../src/modules/fees/feeCalculation.service.js';
 import { hasPermission, PERMISSIONS } from '../src/config/permissions.js';
+import { validatePayment } from '../src/modules/fees/fee.validation.js';
 
 test('discounts and scholarships never exceed the base fee', () => {
   const result = calculateCharge({ baseAmountMinor: 100000, discountMinor: 70000, scholarshipMinor: 50000 });
@@ -39,4 +40,20 @@ test('students and parents have view-only fee permission', () => {
     assert.equal(hasPermission(role, PERMISSIONS.FEES_VIEW), true);
     assert.equal(hasPermission(role, PERMISSIONS.FEES_COLLECT), false);
   }
+});
+
+test('teachers and general staff have no fee-data permission by default', () => {
+  for (const role of ['TEACHER', 'STAFF']) assert.equal(hasPermission(role, PERMISSIONS.FEES_VIEW), false);
+});
+
+test('manual payment allocations reject duplicate charges and invalid methods', () => {
+  assert.throws(() => validatePayment({ studentId: 'student', academicSession: '2026-27', amountMinor: 10000, method: 'CASH', allocations: [{ chargeId: 'charge', amountMinor: 5000 }, { chargeId: 'charge', amountMinor: 5000 }] }), /duplicate charges/);
+  assert.throws(() => validatePayment({ studentId: 'student', academicSession: '2026-27', amountMinor: 10000, method: 'CRYPTO' }), /Unsupported payment method/);
+});
+
+test('payment validation preserves exact minor units and payer metadata', () => {
+  const result = validatePayment({ studentId: 'student', academicSession: '2026-27', amountMinor: 10001, method: 'UPI', payerName: 'A Parent', payerRelation: 'Father', allocations: [{ chargeId: 'charge-1', amountMinor: 7500 }] });
+  assert.equal(result.amountMinor, 10001n);
+  assert.equal(result.allocations[0].amountMinor, 7500n);
+  assert.equal(result.payerName, 'A Parent');
 });

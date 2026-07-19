@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { validateAnnouncement, validateAudienceRules, validateConversation, validateTemplateVariables } from '../src/modules/communication/communication.validation.js';
+
+test('announcement rejects expiry before publish time', () => assert.throws(() => validateAnnouncement({ title:'Notice',content:'Body',publishAt:'2026-08-02T10:00:00Z',expiresAt:'2026-08-01T10:00:00Z',audienceRules:[{kind:'SCHOOL_WIDE'}] }), /expiresAt/));
+test('audience rules require entity ids for scoped targets', () => assert.throws(() => validateAudienceRules([{ kind:'SECTION',entityIds:[] }]), /requires entityIds/));
+test('audience rules deduplicate entity ids', () => assert.deepEqual(validateAudienceRules([{ kind:'DIRECT',entityIds:['a','a','b'] }])[0].entityIds,['a','b']));
+test('external actions require https while app paths are accepted', () => { assert.equal(validateAnnouncement({title:'A',content:'B',actionUrl:'/homework',audienceRules:[{kind:'SCHOOL_WIDE'}]}).actionUrl,'/homework'); assert.throws(()=>validateAnnouncement({title:'A',content:'B',actionUrl:'http://unsafe.test',audienceRules:[{kind:'SCHOOL_WIDE'}]}),/HTTPS/); });
+test('students cannot smuggle sender identity into conversation validation', () => { const value=validateConversation({type:'STUDENT_TEACHER',participantKeys:['user:t1'],message:'Help',senderUserId:'forged'});assert.equal(value.senderUserId,undefined); });
+test('template renderer rejects undeclared and missing variables', () => { const template={titleTemplate:'Hello {{studentName}}',bodyTemplate:'At {{schoolName}}',shortBodyTemplate:null,allowedVariables:['studentName']};assert.throws(()=>validateTemplateVariables(template,{studentName:'A'}),/unsupported/); const valid={...template,allowedVariables:['studentName','schoolName']};assert.throws(()=>validateTemplateVariables(valid,{studentName:'A'}),/Missing/);assert.equal(validateTemplateVariables(valid,{studentName:'A',schoolName:'S'}).title,'Hello A'); });

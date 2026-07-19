@@ -28,3 +28,9 @@ test('school administrators retain wildcard control', () => {
   assert.equal(hasPermission('ADMIN', PERMISSIONS.USERS_PASSWORD_RESET), true);
   assert.equal(hasPermission('SCHOOL_OWNER', PERMISSIONS.CURRICULUM_MANAGE), true);
 });
+
+test('platform owners retain cross-module control', () => {
+  assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.USERS_PASSWORD_RESET), true);
+  assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.CURRICULUM_MANAGE), true);
+  assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.FEES_REPORT), true);
+});

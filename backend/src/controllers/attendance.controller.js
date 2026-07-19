@@ -1,4 +1,5 @@
 import prisma from '../config/prisma.client.js';
+import { createSystemNotification } from '../modules/communication/communication.service.js';
 import {
   assertTeacherIsClassTeacherForSection,
   isSchoolAdmin,
@@ -145,6 +146,8 @@ export const markStudentAttendance = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Attendance contains invalid students or statuses' });
     }
 
+    const previousRows = await prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, studentId: { in: normalizedRecords.map((record) => record.studentId) }, attendanceDate }, select: { studentId: true, status: true } });
+    const previous = new Map(previousRows.map((row) => [row.studentId, row.status]));
     await prisma.$transaction(
       normalizedRecords.map((record) => prisma.studentAttendance.upsert({
         where: {
@@ -174,6 +177,12 @@ export const markStudentAttendance = async (req, res) => {
         },
       }))
     );
+
+    const day = attendanceDate.toISOString().slice(0, 10);
+    await Promise.all(normalizedRecords.filter((record) => ['ABSENT','LATE'].includes(record.status) || (previous.has(record.studentId) && previous.get(record.studentId) !== record.status)).map((record) => {
+      const corrected = previous.has(record.studentId) && previous.get(record.studentId) !== record.status;
+      return createSystemNotification({ schoolId, type: corrected ? 'ATTENDANCE_CORRECTED' : `ATTENDANCE_${record.status}`, category: 'ATTENDANCE', priority: record.status === 'ABSENT' ? 'HIGH' : 'NORMAL', title: corrected ? 'Attendance corrected' : record.status === 'ABSENT' ? 'Absence recorded' : 'Late arrival recorded', message: corrected ? `Attendance for ${day} was changed from ${previous.get(record.studentId)} to ${record.status}.` : `Attendance status for ${day}: ${record.status}.`, actionUrl: '/student/attendance', sourceModule: 'ATTENDANCE', sourceEntityType: 'STUDENT_ATTENDANCE', sourceEntityId: `${record.studentId}:${day}`, dedupeKey: `${corrected ? 'CORRECTED' : record.status}:${record.studentId}:${day}:${record.status}`, students: [record.studentId], mandatory: record.status === 'ABSENT' });
+    }));
 
     return res.json({ success: true, message: 'Student attendance saved' });
   } catch (error) {
@@ -442,6 +451,15 @@ export const saveCalendarDay = async (req, res) => {
     if (!calendarDate || !VALID_DAY_TYPES.has(dayType)) return res.status(400).json({ success: false, message: 'Valid date and dayType are required' });
     const data = { academicSession: String(req.body.academicSession || sessionForDate(calendarDate)), dayType, title: String(req.body.title || '').trim() || null, description: String(req.body.description || '').trim() || null, endDate: normalizeDate(req.body.endDate) || calendarDate, eventType: String(req.body.eventType || dayType), holidayType: req.body.holidayType || null, applicableClassIds: req.body.applicableClassIds || [], applicableSectionIds: req.body.applicableSectionIds || [], applicableRoles: req.body.applicableRoles || [], isFullDay: req.body.isFullDay !== false, isSchoolWide: req.body.isSchoolWide !== false, region: req.body.region || null, isVisible: req.body.isVisible !== false, colorCategory: req.body.colorCategory || null, isRecurring: Boolean(req.body.isRecurring), sourceNote: req.body.sourceNote || null, createdById: req.user.id };
     const day = await prisma.academicCalendarDay.upsert({ where: { schoolId_calendarDate: { schoolId: req.user.schoolId, calendarDate } }, update: data, create: { schoolId: req.user.schoolId, calendarDate, ...data } });
+    if (day.isVisible) {
+      let studentWhere = { schoolId: req.user.schoolId, isActive: true };
+      if (!day.isSchoolWide && (day.applicableClassIds.length || day.applicableSectionIds.length)) {
+        const [classes, sections] = await Promise.all([prisma.class.findMany({ where: { schoolId: req.user.schoolId, id: { in: day.applicableClassIds } }, select: { className: true } }), prisma.section.findMany({ where: { schoolId: req.user.schoolId, id: { in: day.applicableSectionIds } }, include: { class: true } })]);
+        studentWhere = { ...studentWhere, OR: [...classes.map((row) => ({ className: row.className })), ...sections.map((row) => ({ className: row.class.className, section: row.sectionName }))] };
+      }
+      const recipients = await prisma.student.findMany({ where: studentWhere, select: { id: true } });
+      await createSystemNotification({ schoolId: req.user.schoolId, type: `CALENDAR_${day.dayType}`, category: day.dayType === 'HOLIDAY' ? 'HOLIDAY' : day.dayType === 'EXAM' ? 'EXAM' : 'EVENT', priority: day.eventType === 'EMERGENCY' ? 'EMERGENCY' : 'NORMAL', title: day.title || day.dayType.replaceAll('_', ' '), message: day.description || `Calendar update for ${calendarDate.toISOString().slice(0,10)}.`, actionUrl: '/dashboard/calendar', sourceModule: 'ACADEMIC_CALENDAR', sourceEntityType: 'ACADEMIC_CALENDAR_DAY', sourceEntityId: day.id, dedupeKey: `CALENDAR:${day.id}:${day.updatedAt.getTime()}`, students: recipients.map((row) => row.id), mandatory: day.eventType === 'EMERGENCY' });
+    }
     return res.json({ success: true, data: day, message: 'Calendar day saved' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Failed to save calendar day' });

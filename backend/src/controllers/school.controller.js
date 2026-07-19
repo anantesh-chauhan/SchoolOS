@@ -85,16 +85,55 @@ export const createSchool = async (req, res) => {
         return created;
       });
 
+    const shouldInitializeAcademics = req.body.initializeAcademics !== false;
+    let academicSetup = null;
+    let provisioningWarning = null;
+    if (shouldInitializeAcademics) {
+      try {
+        academicSetup = await initializeNewSchoolAcademicSetup(school.id, { sectionNames: req.body.sectionNames });
+        school = await prisma.school.update({
+          where: { id: school.id },
+          data: {
+            config: {
+              ...(school.config && typeof school.config === 'object' ? school.config : {}),
+              provisioning: { status: 'READY', completedAt: new Date().toISOString(), template: academicSetup.template },
+            },
+          },
+        });
+      } catch (setupError) {
+        provisioningWarning = setupError.message || 'Academic initialization failed';
+        school = await prisma.school.update({
+          where: { id: school.id },
+          data: {
+            config: {
+              ...(school.config && typeof school.config === 'object' ? school.config : {}),
+              provisioning: { status: 'FAILED', failedAt: new Date().toISOString(), error: provisioningWarning },
+            },
+          },
+        });
+      }
+    }
+
     return res.status(201).json({
       success: true,
+      message: academicSetup ? 'School tenant and academic foundation created' : 'School tenant and credentials created',
       data: {
         school: normalizeSchoolPayload(school),
         credentials: {
           schoolOwner: { name: String(ownerName).trim(), loginId: normalizedOwnerEmail, temporaryPassword: plainOwnerPassword },
           admin: { name: String(adminName).trim(), loginId: normalizedAdminEmail, temporaryPassword: plainAdminPassword },
+          curriculumManager: academicSetup?.securityCurriculumCalendar?.curriculumManager
+            ? { name: 'Curriculum Manager', ...academicSetup.securityCurriculumCalendar.curriculumManager }
+            : null,
           mustChangePassword: true,
         },
-        defaults: { academicStructureSeeded: false, settingsCreated: true, brandingCreated: true },
+        defaults: { academicStructureSeeded: Boolean(academicSetup), settingsCreated: true, brandingCreated: true },
+        academicSetup,
+        provisioning: {
+          status: academicSetup ? 'READY' : shouldInitializeAcademics ? 'FAILED' : 'PENDING',
+          warning: provisioningWarning,
+          retryAvailable: shouldInitializeAcademics && !academicSetup,
+        },
       },
     });
   } catch (error) {
@@ -117,7 +156,12 @@ export const initializeSchoolAcademicDefaults = async (req, res) => {
   try {
     const school = await prisma.school.findUnique({ where: { id: req.params.id }, select: { id: true, schoolName: true } });
     if (!school) return res.status(404).json({ success: false, message: 'School not found' });
-    const academicSetup = await initializeNewSchoolAcademicSetup(school.id);
+    const academicSetup = await initializeNewSchoolAcademicSetup(school.id, { sectionNames: req.body.sectionNames });
+    const current = await prisma.school.findUnique({ where: { id: school.id }, select: { config: true } });
+    await prisma.school.update({
+      where: { id: school.id },
+      data: { config: { ...(current?.config && typeof current.config === 'object' ? current.config : {}), provisioning: { status: 'READY', completedAt: new Date().toISOString(), template: academicSetup.template } } },
+    });
     return res.json({ success: true, message: 'CBSE academic foundation initialized', data: { school, academicSetup } });
   } catch (error) {
     return res.status(500).json({ success: false, message: `Academic initialization failed: ${error.message}`, code: error.code || 'ACADEMIC_SETUP_FAILED' });
@@ -197,13 +241,31 @@ export const listSchools = async (req, res) => {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { users: true, students: true, teachers: true, classes: true, sections: true, subjects: true, chapters: true } },
+          users: { where: { role: { in: ['SCHOOL_OWNER', 'ADMIN'] }, isActive: true }, select: { id: true, name: true, email: true, role: true }, orderBy: { role: 'asc' } },
+          feeModuleSetting: { select: { enabled: true, mode: true } },
+        },
       }),
       prisma.school.count({ where }),
     ]);
 
     return res.json({
       success: true,
-      data: rows,
+      data: rows.map((row) => ({
+        ...row,
+        summary: {
+          users: row._count.users,
+          students: row._count.students,
+          teachers: row._count.teachers,
+          classes: row._count.classes,
+          sections: row._count.sections,
+          subjects: row._count.subjects,
+          chapters: row._count.chapters,
+          academicsReady: row._count.classes >= 15 && row._count.sections >= 15,
+          feeModuleEnabled: row.feeModuleSetting?.enabled || false,
+        },
+      })),
       meta: {
         total,
         page,
@@ -217,6 +279,67 @@ export const listSchools = async (req, res) => {
       message: 'Failed to fetch schools',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+};
+
+export const getSchoolTenantDetails = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.id },
+      include: {
+        settings: true,
+        users: {
+          where: { role: { in: ['SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER'] } },
+          select: { id: true, name: true, email: true, contactEmail: true, employeeId: true, role: true, isActive: true, lastLoginAt: true, createdAt: true },
+          orderBy: [{ role: 'asc' }, { name: 'asc' }],
+        },
+        _count: { select: { users: true, students: true, teachers: true, classes: true, sections: true, subjects: true, chapters: true, feeStructures: true, feePayments: true } },
+      },
+    });
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+
+    const [activeStudents, activeTeachers, activeUsers, feeCollections] = await Promise.all([
+      prisma.student.count({ where: { schoolId: school.id, isActive: true } }),
+      prisma.teacher.count({ where: { schoolId: school.id, deletedAt: null } }),
+      prisma.user.count({ where: { schoolId: school.id, isActive: true } }),
+      prisma.feePayment.aggregate({ where: { schoolId: school.id, status: 'COMPLETED' }, _count: { _all: true }, _sum: { amountMinor: true } }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        ...school,
+        summary: {
+          ...school._count,
+          activeStudents,
+          activeTeachers,
+          activeUsers,
+          academicsReady: school._count.classes >= 15 && school._count.sections >= 15,
+          completedPayments: feeCollections._count._all,
+          collectedAmountMinor: String(feeCollections._sum.amountMinor || 0),
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to load tenant details', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
+  }
+};
+
+export const updateSchoolByPlatform = async (req, res) => {
+  try {
+    const allowed = ['schoolName', 'address', 'city', 'state', 'phone', 'email', 'logoUrl', 'status'];
+    const data = Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, typeof req.body[key] === 'string' ? req.body[key].trim() : req.body[key]]));
+    if (!Object.keys(data).length) return res.status(400).json({ success: false, message: 'No supported school fields were provided' });
+    if (data.email) data.email = data.email.toLowerCase();
+    const school = await prisma.school.update({ where: { id: req.params.id }, data });
+    await prisma.schoolSettings.updateMany({
+      where: { schoolId: school.id },
+      data: { schoolName: school.schoolName, logoUrl: school.logoUrl, email: school.email, phone: school.phone, addressLine1: school.address, city: school.city, state: school.state },
+    });
+    return res.json({ success: true, message: 'Tenant details updated', data: normalizeSchoolPayload(school) });
+  } catch (error) {
+    if (error.code === 'P2025') return res.status(404).json({ success: false, message: 'School not found' });
+    return res.status(500).json({ success: false, message: 'Failed to update tenant', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 };
 

@@ -44,6 +44,10 @@ model User {
   assignedIssues           IssueReport[]            @relation("IssueAssignee")
   issueMessages            IssueReportMessage[]
   issueAuditActions        IssueReportAudit[]       @relation("IssueAuditActor")
+  createdHomework          Homework[]               @relation("HomeworkCreator")
+  reviewedSubmissions      HomeworkSubmission[]     @relation("SubmissionReviewer")
+  uploadedAcademicFiles    AcademicAttachment[]     @relation("AcademicAttachmentUploader")
+  academicAuditActions     AcademicContentAudit[]   @relation("AcademicContentAuditActor")
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 
@@ -160,6 +164,22 @@ model School {
   feeFinancialPeriods       FeeFinancialPeriod[]
   feeDocuments              FeeDocument[]
   feeFamilyLinks            FeeFamilyLink[]
+  feeCategories             FeeCategory[]
+  feeInvoices               FeeInvoice[]
+  feeInvoiceItems           FeeInvoiceItem[]
+  feeRefunds                FeeRefund[]
+  feeRefundAllocations      FeeRefundAllocation[]
+  transportFeeRoutes        TransportFeeRoute[]
+  transportFeeStops         TransportFeeStop[]
+  transportFeeAssignments   TransportFeeAssignment[]
+  homework                  Homework[]
+  homeworkAudiences         HomeworkAudience[]
+  homeworkSubmissions       HomeworkSubmission[]
+  academicAttachments       AcademicAttachment[]
+  academicLinks             AcademicExternalLink[]
+  academicNotifications     AcademicNotification[]
+  academicContentAudits     AcademicContentAudit[]
+  homeworkModuleSetting     HomeworkModuleSetting?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -339,6 +359,7 @@ model Class {
   studentAttendances        StudentAttendance[]
   books                     Book[]
   curriculumUnits           CurriculumUnit[]
+  homework                  Homework[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -380,6 +401,7 @@ model Section {
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
   studentAttendances        StudentAttendance[]
+  homework                  Homework[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -430,6 +452,7 @@ model Subject {
   learningInterventions     LearningIntervention[]
   books                     Book[]
   curriculumUnits           CurriculumUnit[]
+  homework                  Homework[]
   deletedAt                 DateTime?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -484,6 +507,7 @@ model Chapter {
   studentChapterMasteries   StudentChapterMastery[]
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
+  homework                  Homework[]
   curriculumVersion         CurriculumVersion?         @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
   book                      Book?                      @relation(fields: [bookId], references: [id], onDelete: SetNull)
   unit                      CurriculumUnit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
@@ -547,6 +571,7 @@ model Teacher {
   chapterAssessments        ChapterAssessment[]
   learningInterventions     LearningIntervention[]     @relation("InterventionAssignedTeacher")
   teacherAttendances        TeacherAttendance[]
+  homework                  Homework[]
   teacherSubjects           TeacherSubject[]
   timetableSlots            TimetableSlot[]
   deletedAt                 DateTime?
@@ -616,7 +641,7 @@ model ChapterProgress {
 }
 
 model SectionResource {
-  id                  String              @id @default(cuid())
+  id                  String                @id @default(cuid())
   schoolId            String
   classId             String
   sectionId           String
@@ -625,24 +650,36 @@ model SectionResource {
   teacherId           String?
   title               String
   description         String?
-  resourceType        SectionResourceType @default(NOTE)
+  resourceType        SectionResourceType   @default(NOTE)
   fileUrl             String?
   externalUrl         String?
-  isVisibleToStudents Boolean             @default(true)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  isVisibleToStudents Boolean               @default(true)
+  academicSession     String?
+  createdByUserId     String?
+  createdByRole       Role?
+  status              AcademicContentStatus @default(PUBLISHED)
+  publishedAt         DateTime?
+  scheduledAt         DateTime?
+  isFeatured          Boolean               @default(false)
+  isDownloadable      Boolean               @default(true)
+  deletedAt           DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
-  school  School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class   Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  section Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  teacher Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class         Class                  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section       Section                @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject       Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter       Chapter?               @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  teacher       Teacher?               @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  attachments   AcademicAttachment[]
+  externalLinks AcademicExternalLink[]
 
   @@index([schoolId, classId, sectionId, subjectId])
   @@index([schoolId, teacherId])
   @@index([schoolId, chapterId])
   @@index([schoolId, isVisibleToStudents])
+  @@index([schoolId, academicSession, status, publishedAt])
 }
 
 model SubjectWeeklyRequirement {
@@ -1183,6 +1220,13 @@ model Student {
   feeReminders              FeeReminder[]
   feeScholarships           StudentFeeScholarship[]
   feeFamilyLinks            FeeFamilyLink[]
+  feeInvoices               FeeInvoice[]
+  feeInvoiceItems           FeeInvoiceItem[]
+  feeRefunds                FeeRefund[]
+  transportFeeAssignments   TransportFeeAssignment[]
+  homeworkAudiences         HomeworkAudience[]
+  homeworkSubmissions       HomeworkSubmission[]
+  academicNotifications     AcademicNotification[]
 
   @@unique([studentUserId])
   @@unique([parentUserId])
@@ -1758,6 +1802,550 @@ model CurriculumAuditLog {
   @@index([schoolId, entityType, entityId])
 }
 
+// Homework and learning resources extend the existing curriculum graph. Academic
+// sessions remain strings to match Student.session and the rest of SchoolOS.
+model HomeworkModuleSetting {
+  id                           String   @id @default(cuid())
+  schoolId                     String   @unique
+  enabled                      Boolean  @default(true)
+  parentVisibility             Boolean  @default(true)
+  parentSubmissionAllowed      Boolean  @default(false)
+  defaultLateSubmissionAllowed Boolean  @default(false)
+  defaultReminderHours         Int[]    @default([24, 3])
+  maximumUploadBytes           Int      @default(10485760)
+  maximumAttachmentCount       Int      @default(5)
+  allowedMimeTypes             String[] @default(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/jpeg", "image/png", "image/webp", "text/plain"])
+  studentResubmissionAllowed   Boolean  @default(true)
+  teacherEditAfterPublication  Boolean  @default(true)
+  marksVisible                 Boolean  @default(true)
+  feedbackVisible              Boolean  @default(true)
+  resourceDownloadAllowed      Boolean  @default(true)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  school                       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model Homework {
+  id                     String                @id @default(cuid())
+  schoolId               String
+  academicSession        String
+  createdByUserId        String?
+  createdByRole          Role
+  classId                String
+  sectionId              String
+  subjectId              String
+  chapterId              String?
+  teacherAssignmentId    String?
+  title                  String
+  description            String?
+  instructions           String?
+  homeworkType           HomeworkType          @default(PRACTICE)
+  priority               HomeworkPriority      @default(NORMAL)
+  estimatedMinutes       Int?
+  maximumMarks           Int?
+  passingMarks           Int?
+  allowSubmission        Boolean               @default(true)
+  allowLateSubmission    Boolean               @default(false)
+  requiresAttachment     Boolean               @default(false)
+  textResponseEnabled    Boolean               @default(true)
+  resubmissionAllowed    Boolean               @default(true)
+  maximumAttempts        Int                   @default(1)
+  maximumAttachments     Int                   @default(5)
+  allowedSubmissionTypes String[]              @default([])
+  submissionInstructions String?
+  learningObjective      String?
+  assignedAt             DateTime              @default(now())
+  dueAt                  DateTime?
+  scheduledAt            DateTime?
+  publishedAt            DateTime?
+  closedAt               DateTime?
+  status                 AcademicContentStatus @default(DRAFT)
+  audienceMode           HomeworkAudienceMode  @default(ENTIRE_SECTION)
+  updatedAfterPublish    Boolean               @default(false)
+  archivedAt             DateTime?
+  deletedAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  creator       User?                  @relation("HomeworkCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  class         Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section       Section                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject       Subject                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapter       Chapter?               @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  audiences     HomeworkAudience[]
+  submissions   HomeworkSubmission[]
+  attachments   AcademicAttachment[]
+  externalLinks AcademicExternalLink[]
+  Teacher       Teacher?               @relation(fields: [teacherId], references: [id])
+  teacherId     String?
+
+  @@index([schoolId, academicSession, status, publishedAt])
+  @@index([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, chapterId])
+  @@index([schoolId, createdByUserId])
+  @@index([schoolId, dueAt])
+}
+
+model HomeworkAudience {
+  id         String               @id @default(cuid())
+  schoolId   String
+  homeworkId String
+  studentId  String
+  kind       HomeworkAudienceKind @default(INCLUDE)
+  createdAt  DateTime             @default(now())
+  school     School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework   Homework             @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId, kind])
+  @@index([schoolId, studentId, kind])
+}
+
+model HomeworkSubmission {
+  id                      String                   @id @default(cuid())
+  schoolId                String
+  homeworkId              String
+  studentId               String
+  attemptNumber           Int                      @default(1)
+  textResponse            String?
+  submittedAt             DateTime?
+  status                  HomeworkSubmissionStatus @default(IN_PROGRESS)
+  isLate                  Boolean                  @default(false)
+  reviewedAt              DateTime?
+  reviewedByUserId        String?
+  marksAwarded            Int?
+  feedback                String?
+  privateTeacherNote      String?
+  marksReleasedAt         DateTime?
+  returnedAt              DateTime?
+  resubmissionRequestedAt DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  school                  School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework                Homework                 @relation(fields: [homeworkId], references: [id], onDelete: Restrict)
+  student                 Student                  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  reviewer                User?                    @relation("SubmissionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  attachments             AcademicAttachment[]
+
+  @@unique([homeworkId, studentId, attemptNumber])
+  @@index([schoolId, homeworkId, status, submittedAt])
+  @@index([schoolId, studentId, submittedAt])
+}
+
+model AcademicAttachment {
+  id               String              @id @default(cuid())
+  schoolId         String
+  homeworkId       String?
+  resourceId       String?
+  submissionId     String?
+  fileName         String
+  originalName     String
+  fileUrl          String
+  publicId         String?
+  mimeType         String
+  fileSize         Int
+  attachmentType   String
+  uploadedByUserId String?
+  createdAt        DateTime            @default(now())
+  school           School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework         Homework?           @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource         SectionResource?    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  submission       HomeworkSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  uploadedBy       User?               @relation("AcademicAttachmentUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
+  @@index([schoolId, submissionId])
+}
+
+model AcademicExternalLink {
+  id         String           @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  label      String?
+  url        String
+  domain     String
+  createdAt  DateTime         @default(now())
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework   Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
+}
+
+model AcademicNotification {
+  id                 String    @id @default(cuid())
+  schoolId           String
+  recipientStudentId String?
+  recipientRole      Role?
+  recipientUserId    String?
+  type               String
+  title              String
+  body               String
+  entityType         String
+  entityId           String
+  dedupeKey          String    @unique
+  readAt             DateTime?
+  createdAt          DateTime  @default(now())
+  school             School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  recipientStudent   Student?  @relation(fields: [recipientStudentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, recipientStudentId, createdAt])
+  @@index([schoolId, recipientUserId, createdAt])
+}
+
+model AcademicContentAudit {
+  id          String   @id @default(cuid())
+  schoolId    String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  actor       User?    @relation("AcademicContentAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, entityType, entityId, createdAt])
+  @@index([schoolId, actorUserId, createdAt])
+}
+
+// Unified communication module. recipientKey/participantKey deliberately support
+// both User accounts (user:<id>) and portal identities (student:<studentId> or
+// parent:<parentUserId>) without weakening tenant checks.
+model Notification {
+  id                      String                     @id @default(cuid())
+  schoolId                String?
+  academicSessionId       String?
+  type                    String
+  category                CommunicationCategory      @default(GENERAL)
+  priority                NotificationPriority       @default(NORMAL)
+  title                   String
+  message                 String
+  shortMessage            String?
+  actionUrl               String?
+  actionLabel             String?
+  icon                    String?
+  imageUrl                String?
+  sourceModule            String
+  sourceEntityType        String?
+  sourceEntityId          String?
+  createdByUserId         String?
+  createdByRole           Role?
+  status                  NotificationStatus         @default(DRAFT)
+  scheduledAt             DateTime?
+  publishedAt             DateTime?
+  expiresAt               DateTime?
+  acknowledgementDeadline DateTime?
+  requiresAcknowledgement Boolean                    @default(false)
+  allowReply              Boolean                    @default(false)
+  isSystemGenerated       Boolean                    @default(false)
+  isMandatory             Boolean                    @default(false)
+  resolvedRecipientCount  Int                        @default(0)
+  dedupeKey               String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  deletedAt               DateTime?
+  recipients              NotificationRecipient[]
+  audienceRules           NotificationAudienceRule[]
+  announcement            Announcement?
+  attachments             CommunicationAttachment[]
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, status, publishedAt])
+  @@index([schoolId, category, createdAt])
+  @@index([scheduledAt, status])
+  @@index([sourceModule, sourceEntityType, sourceEntityId])
+}
+
+model NotificationAudienceRule {
+  id             String       @id @default(cuid())
+  notificationId String
+  kind           AudienceKind
+  role           Role?
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId, kind])
+}
+
+model NotificationRecipient {
+  id                  String                 @id @default(cuid())
+  notificationId      String
+  schoolId            String?
+  recipientKey        String
+  userId              String?
+  studentId           String?
+  parentId            String?
+  recipientRole       Role
+  deliveryContext     AudienceKind
+  context             Json?
+  seenAt              DateTime?
+  readAt              DateTime?
+  acknowledgedAt      DateTime?
+  acknowledgementNote String?
+  dismissedAt         DateTime?
+  archivedAt          DateTime?
+  isMuted             Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  notification        Notification           @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  deliveries          NotificationDelivery[]
+
+  @@unique([notificationId, recipientKey])
+  @@index([schoolId, recipientKey, readAt, createdAt])
+  @@index([notificationId, acknowledgedAt])
+}
+
+model NotificationDelivery {
+  id                      String                @id @default(cuid())
+  notificationRecipientId String
+  channel                 DeliveryChannel
+  status                  DeliveryStatus        @default(QUEUED)
+  attemptCount            Int                   @default(0)
+  provider                String
+  providerMessageId       String?
+  sentAt                  DateTime?
+  deliveredAt             DateTime?
+  failedAt                DateTime?
+  failureReason           String?
+  nextRetryAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  recipient               NotificationRecipient @relation(fields: [notificationRecipientId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationRecipientId, channel])
+  @@index([status, nextRetryAt])
+  @@index([channel, status, createdAt])
+}
+
+model Announcement {
+  id                      String                    @id @default(cuid())
+  schoolId                String
+  academicSessionId       String?
+  notificationId          String                    @unique
+  title                   String
+  content                 String
+  summary                 String?
+  category                CommunicationCategory     @default(GENERAL)
+  priority                NotificationPriority      @default(NORMAL)
+  status                  NotificationStatus        @default(DRAFT)
+  publishAt               DateTime?
+  expiresAt               DateTime?
+  acknowledgementDeadline DateTime?
+  requiresAcknowledgement Boolean                   @default(false)
+  allowComments           Boolean                   @default(false)
+  allowReplies            Boolean                   @default(false)
+  createdByUserId         String
+  updatedByUserId         String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  archivedAt              DateTime?
+  deletedAt               DateTime?
+  notification            Notification              @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  attachments             CommunicationAttachment[]
+
+  @@index([schoolId, status, publishAt])
+  @@index([schoolId, category, createdAt])
+}
+
+model Conversation {
+  id            String                    @id @default(cuid())
+  schoolId      String
+  type          ConversationType
+  subject       String?
+  classId       String?
+  sectionId     String?
+  studentId     String?
+  createdByKey  String
+  status        ConversationStatus        @default(OPEN)
+  lastMessageAt DateTime                  @default(now())
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  closedAt      DateTime?
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@index([schoolId, status, lastMessageAt])
+  @@index([schoolId, classId, sectionId])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  participantKey String
+  userId         String?
+  studentId      String?
+  role           Role
+  joinedAt       DateTime     @default(now())
+  leftAt         DateTime?
+  lastReadAt     DateTime?
+  mutedUntil     DateTime?
+  canReply       Boolean      @default(true)
+  canManage      Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, participantKey])
+  @@index([participantKey, leftAt, conversationId])
+}
+
+model Message {
+  id               String                    @id @default(cuid())
+  conversationId   String
+  schoolId         String
+  senderKey        String
+  senderUserId     String?
+  senderRole       Role
+  messageType      MessageType               @default(TEXT)
+  content          String
+  replyToMessageId String?
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime                  @default(now())
+  conversation     Conversation              @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo          Message?                  @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[]                 @relation("MessageReplies")
+  attachments      CommunicationAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([schoolId, senderKey, createdAt])
+}
+
+model CommunicationAttachment {
+  id             String        @id @default(cuid())
+  schoolId       String
+  uploadedByKey  String
+  notificationId String?
+  announcementId String?
+  messageId      String?
+  fileName       String
+  originalName   String
+  fileUrl        String
+  publicId       String?
+  mimeType       String
+  fileSize       Int
+  createdAt      DateTime      @default(now())
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, notificationId])
+  @@index([schoolId, announcementId])
+  @@index([schoolId, messageId])
+}
+
+model NotificationPreference {
+  id              String                @id @default(cuid())
+  schoolId        String
+  recipientKey    String
+  userId          String?
+  category        CommunicationCategory
+  inAppEnabled    Boolean               @default(true)
+  emailEnabled    Boolean               @default(true)
+  smsEnabled      Boolean               @default(false)
+  pushEnabled     Boolean               @default(false)
+  whatsAppEnabled Boolean               @default(false)
+  digestMode      DigestMode            @default(IMMEDIATE)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  timezone        String                @default("UTC")
+  language        String                @default("en")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([schoolId, recipientKey, category])
+  @@index([schoolId, recipientKey])
+}
+
+model CommunicationPolicy {
+  id                           String   @id @default(cuid())
+  schoolId                     String   @unique
+  directMessagingEnabled       Boolean  @default(true)
+  studentToTeacherEnabled      Boolean  @default(true)
+  parentToTeacherEnabled       Boolean  @default(true)
+  teacherToParentEnabled       Boolean  @default(true)
+  studentRepliesEnabled        Boolean  @default(true)
+  parentRepliesEnabled         Boolean  @default(true)
+  groupCreationEnabled         Boolean  @default(false)
+  allowedAttachmentTypes       String[] @default(["application/pdf", "image/jpeg", "image/png", "image/webp"])
+  maximumAttachmentBytes       Int      @default(10485760)
+  maximumAttachmentCount       Int      @default(5)
+  messageEditingWindowMinutes  Int      @default(15)
+  messageDeletionWindowMinutes Int      @default(15)
+  communicationRetentionDays   Int      @default(730)
+  quietHoursStart              String?
+  quietHoursEnd                String?
+  emergencyBypassesQuietHours  Boolean  @default(true)
+  readReceiptsEnabled          Boolean  @default(true)
+  acknowledgementEnabled       Boolean  @default(true)
+  emailDeliveryEnabled         Boolean  @default(false)
+  smsDeliveryEnabled           Boolean  @default(false)
+  pushDeliveryEnabled          Boolean  @default(false)
+  whatsAppDeliveryEnabled      Boolean  @default(false)
+  moderationEnabled            Boolean  @default(false)
+  blockedWords                 String[] @default([])
+  maximumRecipientsPerMessage  Int      @default(5000)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model NotificationTemplate {
+  id                String                @id @default(cuid())
+  schoolId          String?
+  name              String
+  code              String
+  category          CommunicationCategory
+  channel           DeliveryChannel
+  titleTemplate     String
+  bodyTemplate      String
+  shortBodyTemplate String?
+  allowedVariables  String[]              @default([])
+  isSystemTemplate  Boolean               @default(false)
+  isActive          Boolean               @default(true)
+  createdByUserId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([schoolId, code, channel])
+  @@index([schoolId, category, isActive])
+}
+
+model DeviceToken {
+  id           String         @id @default(cuid())
+  schoolId     String
+  recipientKey String
+  token        String         @unique
+  platform     DevicePlatform
+  isActive     Boolean        @default(true)
+  lastUsedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([schoolId, recipientKey, isActive])
+}
+
+model CommunicationAudit {
+  id         String   @id @default(cuid())
+  schoolId   String?
+  actorKey   String?
+  action     String
+  entityType String
+  entityId   String?
+  previous   Json?
+  current    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
 // Fee and financial management. Monetary values are stored in minor units.
 model FeeModuleSetting {
   id                      String           @id @default(cuid())
@@ -1811,14 +2399,15 @@ model FeeStructure {
 model FeeComponent {
   id              String             @id @default(cuid())
   schoolId        String
-  feeStructureId  String
-  academicSession String
+  feeStructureId  String?
+  categoryId      String?
+  academicSession String?
   name            String
   code            String
   description     String?
   feeType         String?
-  amountMinor     BigInt
-  frequency       FeeFrequency
+  amountMinor     BigInt             @default(0)
+  frequency       FeeFrequency       @default(ONE_TIME)
   dueDay          Int?
   gracePeriodDays Int                @default(0)
   lateFeeRule     Json?
@@ -1834,11 +2423,32 @@ model FeeComponent {
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   school          School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
-  feeStructure    FeeStructure       @relation(fields: [feeStructureId], references: [id], onDelete: Restrict)
+  feeStructure    FeeStructure?      @relation(fields: [feeStructureId], references: [id], onDelete: Restrict)
+  category        FeeCategory?       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   charges         StudentFeeCharge[]
 
   @@unique([schoolId, feeStructureId, code])
   @@index([schoolId, academicSession, active])
+  @@index([schoolId, categoryId, active])
+}
+
+model FeeCategory {
+  id           String         @id @default(cuid())
+  schoolId     String
+  name         String
+  code         String
+  description  String?
+  displayOrder Int            @default(0)
+  active       Boolean        @default(true)
+  createdById  String?
+  updatedById  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  school       School         @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  components   FeeComponent[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active, displayOrder])
 }
 
 model FeeAssignment {
@@ -1898,6 +2508,7 @@ model StudentFeeCharge {
   baseAmountMinor     BigInt
   discountMinor       BigInt                  @default(0)
   scholarshipMinor    BigInt                  @default(0)
+  waiverMinor         BigInt                  @default(0)
   lateFeeMinor        BigInt                  @default(0)
   paidMinor           BigInt                  @default(0)
   refundedMinor       BigInt                  @default(0)
@@ -1912,6 +2523,8 @@ model StudentFeeCharge {
   feeComponent        FeeComponent?           @relation(fields: [feeComponentId], references: [id], onDelete: Restrict)
   allocations         FeePaymentAllocation[]
   scholarships        StudentFeeScholarship[]
+  invoiceItem         FeeInvoiceItem?
+  refundAllocations   FeeRefundAllocation[]
 
   @@unique([schoolId, studentId, feeStructureId, feeComponentId, academicSession, installmentName])
   @@index([schoolId, studentId, academicSession])
@@ -1931,6 +2544,8 @@ model FeePayment {
   method               FeePaymentMethod
   status               FeePaymentStatus       @default(COMPLETED)
   paymentDate          DateTime
+  payerName            String?
+  payerRelation        String?
   bankName             String?
   instrumentNumber     String?
   instrumentDate       DateTime?
@@ -1947,6 +2562,7 @@ model FeePayment {
   feeAccount           StudentFeeAccount      @relation(fields: [feeAccountId], references: [id], onDelete: Restrict)
   allocations          FeePaymentAllocation[]
   receipt              FeeReceipt?
+  refunds              FeeRefund[]
 
   @@unique([schoolId, idempotencyKey])
   @@unique([schoolId, paymentNumber])
@@ -1984,6 +2600,7 @@ model FeeReceipt {
   updatedAt        DateTime         @updatedAt
   school           School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
   payment          FeePayment       @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  refunds          FeeRefund[]
 
   @@unique([schoolId, academicSession, receiptNumber])
   @@index([schoolId, status, createdAt])
@@ -2035,6 +2652,183 @@ model FeeAdjustment {
 
   @@index([schoolId, status, createdAt])
   @@index([schoolId, studentId])
+}
+
+model FeeInvoice {
+  id                 String           @id @default(cuid())
+  schoolId           String
+  studentId          String
+  academicSession    String
+  invoiceNumber      String
+  billingPeriod      String
+  issueDate          DateTime
+  dueDate            DateTime
+  classSnapshot      String
+  sectionSnapshot    String?
+  grossAmountMinor   BigInt
+  discountMinor      BigInt           @default(0)
+  waiverMinor        BigInt           @default(0)
+  fineMinor          BigInt           @default(0)
+  previousDueMinor   BigInt           @default(0)
+  adjustmentMinor    BigInt           @default(0)
+  netPayableMinor    BigInt
+  amountPaidMinor    BigInt           @default(0)
+  outstandingMinor   BigInt
+  status             FeeInvoiceStatus @default(DRAFT)
+  idempotencyKey     String
+  issuedById         String?
+  cancelledById      String?
+  cancellationReason String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  school             School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  student            Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  items              FeeInvoiceItem[]
+
+  @@unique([schoolId, academicSession, invoiceNumber])
+  @@unique([schoolId, idempotencyKey])
+  @@index([schoolId, academicSession, status])
+  @@index([schoolId, studentId, dueDate])
+}
+
+model FeeInvoiceItem {
+  id                    String           @id @default(cuid())
+  schoolId              String
+  invoiceId             String
+  studentId             String
+  chargeId              String           @unique
+  componentNameSnapshot String
+  componentCodeSnapshot String
+  originalAmountMinor   BigInt
+  discountMinor         BigInt           @default(0)
+  waiverMinor           BigInt           @default(0)
+  fineMinor             BigInt           @default(0)
+  finalAmountMinor      BigInt
+  paidMinor             BigInt           @default(0)
+  createdAt             DateTime         @default(now())
+  school                School           @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  student               Student          @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  invoice               FeeInvoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  charge                StudentFeeCharge @relation(fields: [chargeId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, invoiceId])
+  @@index([schoolId, studentId])
+}
+
+model FeeRefund {
+  id              String                @id @default(cuid())
+  schoolId        String
+  studentId       String
+  paymentId       String
+  receiptId       String?
+  refundNumber    String
+  amountMinor     BigInt
+  method          FeePaymentMethod
+  status          FeeRefundStatus       @default(PENDING)
+  reason          String
+  referenceNumber String?
+  requestedById   String
+  approvedById    String?
+  processedById   String?
+  approvedAt      DateTime?
+  processedAt     DateTime?
+  idempotencyKey  String
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  school          School                @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  student         Student               @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  payment         FeePayment            @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  receipt         FeeReceipt?           @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  allocations     FeeRefundAllocation[]
+
+  @@unique([schoolId, refundNumber])
+  @@unique([schoolId, idempotencyKey])
+  @@index([schoolId, studentId, status])
+  @@index([schoolId, paymentId, createdAt])
+}
+
+model FeeRefundAllocation {
+  id          String            @id @default(cuid())
+  schoolId    String
+  refundId    String
+  chargeId    String?
+  amountMinor BigInt
+  source      String
+  createdAt   DateTime          @default(now())
+  school      School            @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  refund      FeeRefund         @relation(fields: [refundId], references: [id], onDelete: Restrict)
+  charge      StudentFeeCharge? @relation(fields: [chargeId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, refundId])
+  @@index([schoolId, chargeId])
+}
+
+model TransportFeeRoute {
+  id            String                   @id @default(cuid())
+  schoolId      String
+  name          String
+  code          String
+  vehicleNumber String?
+  description   String?
+  active        Boolean                  @default(true)
+  createdById   String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  school        School                   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  stops         TransportFeeStop[]
+  assignments   TransportFeeAssignment[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active])
+}
+
+model TransportFeeStop {
+  id           String                   @id @default(cuid())
+  schoolId     String
+  routeId      String
+  name         String
+  sequence     Int
+  distanceKm   Decimal?                 @db.Decimal(8, 2)
+  monthlyMinor BigInt
+  active       Boolean                  @default(true)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  school       School                   @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  route        TransportFeeRoute        @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  pickupFor    TransportFeeAssignment[] @relation("TransportPickupStop")
+  dropFor      TransportFeeAssignment[] @relation("TransportDropStop")
+
+  @@unique([schoolId, routeId, name])
+  @@index([schoolId, routeId, active])
+}
+
+model TransportFeeAssignment {
+  id                 String                    @id @default(cuid())
+  schoolId           String
+  studentId          String
+  academicSession    String
+  routeId            String
+  pickupStopId       String?
+  dropStopId         String?
+  tripType           TransportTripType         @default(TWO_WAY)
+  monthlyMinor       BigInt
+  startDate          DateTime
+  endDate            DateTime?
+  status             TransportAssignmentStatus @default(ACTIVE)
+  prorationRule      String                    @default("DAILY")
+  createdById        String?
+  cancelledById      String?
+  cancellationReason String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  school             School                    @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  student            Student                   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  route              TransportFeeRoute         @relation(fields: [routeId], references: [id], onDelete: Restrict)
+  pickupStop         TransportFeeStop?         @relation("TransportPickupStop", fields: [pickupStopId], references: [id], onDelete: Restrict)
+  dropStop           TransportFeeStop?         @relation("TransportDropStop", fields: [dropStopId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, studentId, academicSession, status])
+  @@index([schoolId, routeId, status])
 }
 
 model FeeScholarship {
@@ -2254,6 +3048,173 @@ enum Role {
   FEE_MANAGER
 }
 
+enum CommunicationCategory {
+  GENERAL
+  SYSTEM
+  SECURITY
+  ACADEMIC
+  EXAM
+  RESULT
+  FEE
+  ATTENDANCE
+  HOMEWORK
+  RESOURCE
+  TRANSPORT
+  EVENT
+  HOLIDAY
+  ADMISSION
+  SPORTS
+  EMERGENCY
+  STAFF
+  PARENT
+  STUDENT
+  LEGAL
+  OTHER
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+  EMERGENCY
+}
+
+enum NotificationStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CANCELLED
+  EXPIRED
+  ARCHIVED
+}
+
+enum AudienceKind {
+  DIRECT
+  ROLE
+  SCHOOL_WIDE
+  STAFF
+  CLASS
+  SECTION
+  SUBJECT
+  PARENT_OF_STUDENT
+  AUTOMATED_RULE
+  SAVED_GROUP
+}
+
+enum DeliveryChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+  WHATSAPP
+  WEB_SOCKET
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+enum ConversationType {
+  DIRECT
+  PARENT_TEACHER
+  STUDENT_TEACHER
+  ADMIN_STAFF
+  FEE_SUPPORT
+  ACADEMIC_SUPPORT
+  GROUP
+  SYSTEM_SUPPORT
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+  BLOCKED
+  ARCHIVED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  SYSTEM
+  ANNOUNCEMENT_REFERENCE
+  HOMEWORK_REFERENCE
+  FEE_REFERENCE
+  ATTENDANCE_REFERENCE
+}
+
+enum DigestMode {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  NONE
+}
+
+enum DevicePlatform {
+  WEB
+  IOS
+  ANDROID
+}
+
+enum AcademicContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CLOSED
+  ARCHIVED
+  CANCELLED
+}
+
+enum HomeworkType {
+  PRACTICE
+  WORKSHEET
+  READING
+  WRITING
+  PROJECT
+  REVISION
+  PRACTICAL
+  TEST_PREPARATION
+  OTHER
+}
+
+enum HomeworkPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum HomeworkAudienceMode {
+  ENTIRE_SECTION
+  SELECTED_STUDENTS
+  ENTIRE_SECTION_WITH_EXCLUSIONS
+}
+
+enum HomeworkAudienceKind {
+  INCLUDE
+  EXCLUDE
+}
+
+enum HomeworkSubmissionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  LATE_SUBMITTED
+  UNDER_REVIEW
+  RETURNED
+  RESUBMISSION_REQUESTED
+  RESUBMITTED
+  GRADED
+  EXCUSED
+}
+
 enum FeeStructureMode {
   SIMPLE
   COMPONENT_BASED
@@ -2336,6 +3297,8 @@ enum FeePaymentStatus {
   PENDING_CLEARANCE
   COMPLETED
   CLEARED
+  PARTIALLY_REFUNDED
+  REFUNDED
   BOUNCED
   CANCELLED
   REVERSED
@@ -2382,6 +3345,37 @@ enum FeeApprovalStatus {
   REJECTED
   CANCELLED
   PROCESSED
+}
+
+enum FeeInvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+  ADJUSTED
+}
+
+enum FeeRefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PROCESSED
+  CANCELLED
+}
+
+enum TransportTripType {
+  ONE_WAY_PICKUP
+  ONE_WAY_DROP
+  TWO_WAY
+}
+
+enum TransportAssignmentStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  COMPLETED
 }
 
 enum IssuePriority {
@@ -2543,8 +3537,18 @@ enum SectionResourceType {
   NOTE
   LINK
   PDF
+  DOCUMENT
+  PRESENTATION
   IMAGE
+  AUDIO
   VIDEO
+  EXTERNAL_LINK
+  YOUTUBE
+  WORKSHEET
+  SAMPLE_PAPER
+  QUESTION_PAPER
+  ANSWER_KEY
+  NOTES
   ASSIGNMENT
   OTHER
 }

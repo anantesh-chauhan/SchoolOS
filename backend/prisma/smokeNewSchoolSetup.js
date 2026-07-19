@@ -1,7 +1,12 @@
 import 'dotenv/config';
-import prisma from '../src/config/prisma.client.js';
-import { initializeNewSchoolAcademicSetup } from '../src/services/newSchoolAcademicSetup.service.js';
 import bcryptjs from 'bcryptjs';
+
+if (process.env.DATABASE_URL?.includes('sslmode=require')) {
+  process.env.DATABASE_URL = process.env.DATABASE_URL.replace('sslmode=require', 'sslmode=no-verify');
+}
+
+const { default: prisma } = await import('../src/config/prisma.client.js');
+const { initializeNewSchoolAcademicSetup } = await import('../src/services/newSchoolAcademicSetup.service.js');
 
 const stamp = Date.now().toString(36).toUpperCase();
 let schoolId;

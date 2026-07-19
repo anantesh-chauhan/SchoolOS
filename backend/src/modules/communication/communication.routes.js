@@ -1,0 +1,16 @@
+import express from 'express';
+import { authMiddleware, requireRole } from '../../middleware/auth.middleware.js';
+import * as controller from './communication.controller.js';
+
+const router = express.Router(); router.use(authMiddleware);
+router.get('/notifications', controller.listNotifications); router.get('/notifications/unread-count', controller.unreadCount); router.get('/notifications/stream', controller.stream); router.get('/notifications/:id', controller.getNotification); router.patch('/notifications/:id/read', controller.readNotification); router.patch('/notifications/read-all', controller.readAllNotifications); router.patch('/notifications/:id/acknowledge', controller.acknowledgeNotification); router.patch('/notifications/:id/archive', controller.archiveNotification); router.delete('/notifications/:id', controller.deleteNotification);
+router.post('/announcements', controller.createAnnouncement); router.get('/announcements', controller.listAnnouncements); router.get('/announcements/:id', controller.getAnnouncement); router.patch('/announcements/:id', controller.updateAnnouncement); router.post('/announcements/:id/publish', controller.publishAnnouncement); router.post('/announcements/:id/cancel', controller.cancelAnnouncement); router.post('/announcements/:id/archive', controller.archiveAnnouncement); router.get('/announcements/:id/recipients', controller.announcementRecipients); router.get('/announcements/:id/analytics', controller.announcementAnalytics);
+router.post('/conversations', controller.createConversation); router.get('/conversations', controller.listConversations); router.get('/conversations/:id', controller.getConversation); router.post('/conversations/:id/messages', controller.sendMessage); router.patch('/messages/:id', controller.editMessage); router.delete('/messages/:id', controller.deleteMessage); router.post('/conversations/:id/close', controller.closeConversation); router.post('/conversations/:id/reopen', controller.reopenConversation); router.patch('/conversations/:id/read', controller.readConversation);
+router.get('/notification-preferences', controller.getPreferences); router.patch('/notification-preferences', controller.updatePreferences); router.post('/device-tokens', controller.registerDevice); router.delete('/device-tokens/:id', controller.deleteDevice);
+router.get('/notification-templates', controller.listTemplates); router.post('/notification-templates', controller.createTemplate); router.patch('/notification-templates/:id', controller.updateTemplate); router.delete('/notification-templates/:id', controller.deleteTemplate);
+router.get('/communication-policy', controller.getPolicy); router.patch('/communication-policy', controller.updatePolicy);
+router.get('/communication/recipients', controller.recipientDirectory);
+router.post('/communication/attachments', controller.registerAttachment);
+router.get('/admin/communication/summary', controller.communicationSummary); router.get('/admin/communication/delivery', controller.deliveryReport); router.get('/admin/communication/acknowledgements', controller.deliveryReport); router.get('/admin/communication/failures', controller.deliveryReport);
+router.post('/communication/jobs/run', requireRole('SCHOOL_OWNER','ADMIN'), controller.runJobs);
+export default router;

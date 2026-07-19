@@ -1,6 +1,7 @@
 import { signCloudinaryParams } from '../utils/cloudinary.util.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import { requireSchoolAdminOrAssignedTeacher, sendAuthorizationError } from '../utils/teacherAuthorization.util.js';
+import { getHomework } from '../modules/homework/homework.service.js';
 
 const generateTimestamp = () => Math.floor(Date.now() / 1000);
 
@@ -105,7 +106,7 @@ export const getSectionResourceUploadSignature = async (req, res) => {
       });
     }
 
-    await requireSchoolAdminOrAssignedTeacher(req.user, { schoolId, classId, sectionId, subjectId });
+    if (req.user.role !== 'CURRICULUM_MANAGER') await requireSchoolAdminOrAssignedTeacher(req.user, { schoolId, classId, sectionId, subjectId });
 
     const timestamp = generateTimestamp();
     const folder = `schoolos/${schoolId}/resources/${classId}/${sectionId}/${subjectId}`;
@@ -129,6 +130,22 @@ export const getSectionResourceUploadSignature = async (req, res) => {
       message: 'Failed to generate resource upload signature',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
+  }
+};
+
+export const getHomeworkUploadSignature = async (req, res) => {
+  try {
+    const homeworkId = String(req.body.homeworkId || '').trim();
+    if (!homeworkId) return res.status(400).json({ success: false, message: 'homeworkId is required' });
+    const homework = await getHomework(req.user, homeworkId, req.body.studentId);
+    if (req.user.role === 'PARENT') return res.status(403).json({ success: false, message: 'Parents cannot upload homework submissions' });
+    const timestamp = generateTimestamp();
+    const purpose = req.user.role === 'STUDENT' ? 'submissions' : 'content';
+    const folder = `schoolos/${req.user.schoolId}/homework/${homework.id}/${purpose}`;
+    const paramsToSign = { folder, timestamp };
+    return res.json({ success: true, data: { cloudName: process.env.CLOUDINARY_CLOUD_NAME, apiKey: process.env.CLOUDINARY_API_KEY, timestamp, folder, signature: signCloudinaryParams(paramsToSign) } });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Failed to generate homework upload signature', ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}) });
   }
 };
 

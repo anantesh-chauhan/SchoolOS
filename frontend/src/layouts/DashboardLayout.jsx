@@ -26,6 +26,7 @@ import {
   KeyRound,
   BadgeIndianRupee,
   Plus,
+  BellRing,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -129,7 +130,7 @@ const DashboardLayout = ({ children, role }) => {
       { group:'Support & Quality', icon:MessageSquare, items:[{label:'Issue Reports',icon:MessageSquare,href:'/platform/issues'},{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] },
     ],
     SCHOOL_OWNER: [
-      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
+      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
       {
         group: 'Academic Setup',
         icon: BookOpen,
@@ -144,6 +145,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
           { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
           { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
         ],
       },
       {
@@ -174,7 +176,7 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     ADMIN: [
-      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
+      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
       { group: 'Overview', icon: Home, items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
         ],
@@ -192,6 +194,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
           { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
           { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
         ],
       },
       {
@@ -228,6 +231,7 @@ const DashboardLayout = ({ children, role }) => {
       { group: 'Academic Planning', icon: BookOpen, items: [
         { label: 'Books & Chapters', icon: BookOpenCheck, href: '/dashboard/curriculum/manage' },
         { label: 'Weekly Slots', icon: Layers, href: '/dashboard/admin/weekly-slots' },
+        { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
       ] },
       { group: 'Account', icon: Settings, items: [
         { label: 'My Profile', icon: UserRound, href: '/dashboard/curriculum/profile' },
@@ -245,13 +249,13 @@ const DashboardLayout = ({ children, role }) => {
       },
       { group: 'Teaching', icon: BookOpen, items: [
           { label: 'My Classes & Subjects', icon: School, href: '/teacher/assignments' },
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
           { label: 'Poll Management', icon: MessageSquare, href: '/teacher/polls' },
           { label: 'Student Performance', icon: Users, href: '/teacher/performance' },
         ],
       },
       { group: 'Class Management', icon: Users, items: [
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
-          { label: 'Class Fee View', icon: BadgeIndianRupee, href: '/dashboard/teacher/fees' },
           { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
           { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
@@ -272,6 +276,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
           { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
           { label: 'Children Fees', icon: BadgeIndianRupee, href: '/parent/fees' },
           { label: 'Family Fee Summary', icon: BadgeIndianRupee, href: '/parent/fees/family' },
         ],
@@ -299,6 +304,7 @@ const DashboardLayout = ({ children, role }) => {
         group: 'Academics', icon: BookOpen, items: [
           { label: 'My Subjects', icon: BookOpen, href: '/student/subjects' },
           { label: 'My Performance', icon: BookOpenCheck, href: '/student/performance' },
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
         ],
       },
       { group: 'Attendance', icon: ClipboardCheck, items: [
@@ -334,6 +340,7 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   const groupedItems = roleMenuConfig[role] || [];
+  if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items:[{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
   const profileRouteByRole = {
     PLATFORM_OWNER: '/dashboard/platform/profile',

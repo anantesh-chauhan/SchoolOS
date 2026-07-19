@@ -1,0 +1,33 @@
+import apiClient from './api';
+
+const data = (response) => response.data.data;
+export const communicationService = {
+  notifications: (params = {}) => apiClient.get('/notifications', { params }).then(data),
+  unreadCount: () => apiClient.get('/notifications/unread-count').then(data),
+  notification: (id) => apiClient.get(`/notifications/${id}`).then(data),
+  read: (id) => apiClient.patch(`/notifications/${id}/read`).then(data),
+  readAll: () => apiClient.patch('/notifications/read-all').then(data),
+  acknowledge: (id, note = '') => apiClient.patch(`/notifications/${id}/acknowledge`, { note }).then(data),
+  archive: (id) => apiClient.patch(`/notifications/${id}/archive`).then(data),
+  announcements: (params = {}) => apiClient.get('/announcements', { params }).then(data),
+  announcement: (id) => apiClient.get(`/announcements/${id}`).then(data),
+  createAnnouncement: (payload) => apiClient.post('/announcements', payload).then(data),
+  updateAnnouncement: (id, payload) => apiClient.patch(`/announcements/${id}`, payload).then(data),
+  publishAnnouncement: (id) => apiClient.post(`/announcements/${id}/publish`).then(data),
+  cancelAnnouncement: (id) => apiClient.post(`/announcements/${id}/cancel`).then(data),
+  announcementAnalytics: (id) => apiClient.get(`/announcements/${id}/analytics`).then(data),
+  conversations: (params = {}) => apiClient.get('/conversations', { params }).then(data),
+  conversation: (id) => apiClient.get(`/conversations/${id}`).then(data),
+  createConversation: (payload) => apiClient.post('/conversations', payload).then(data),
+  sendMessage: (id, payload) => apiClient.post(`/conversations/${id}/messages`, payload).then(data),
+  readConversation: (id) => apiClient.patch(`/conversations/${id}/read`).then(data),
+  closeConversation: (id) => apiClient.post(`/conversations/${id}/close`).then(data),
+  directory: (params = {}) => apiClient.get('/communication/recipients', { params }).then(data),
+  preferences: () => apiClient.get('/notification-preferences').then(data),
+  updatePreferences: (preferences) => apiClient.patch('/notification-preferences', { preferences }).then(data),
+  templates: () => apiClient.get('/notification-templates').then(data),
+  policy: () => apiClient.get('/communication-policy').then(data),
+  updatePolicy: (payload) => apiClient.patch('/communication-policy', payload).then(data),
+  summary: () => apiClient.get('/admin/communication/summary').then(data),
+  delivery: (params = {}) => apiClient.get('/admin/communication/delivery', { params }).then(data),
+};

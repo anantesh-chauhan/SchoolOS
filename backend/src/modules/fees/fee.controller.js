@@ -1,5 +1,6 @@
 import * as service from './fee.service.js';
 import { validatePayment, validateSettings, validateStructure } from './fee.validation.js';
+import { createSystemNotification } from '../communication/communication.service.js';
 
 const safe = (value) => JSON.parse(JSON.stringify(value, (_, item) => typeof item === 'bigint' ? Number(item) : item));
 const send = (res, data, status = 200) => res.status(status).json({ success: true, data: safe(data) });
@@ -22,7 +23,9 @@ export const myFees = handler(async (req, res) => {
 
 export const collect = handler(async (req, res) => {
   const key = req.get('idempotency-key'); if (!key || key.length < 8 || key.length > 100) throw new Error('A valid Idempotency-Key header is required');
-  send(res, await service.collectPayment(req, validatePayment(req.body), key), 201);
+  const input = validatePayment(req.body); const result = await service.collectPayment(req, input, key);
+  if (!result.idempotentReplay && result.payment?.status === 'COMPLETED') await createSystemNotification({ schoolId: req.user.schoolId, type: 'PAYMENT_RECEIVED', category: 'FEE', title: 'Payment received', message: `Payment ${result.payment.paymentNumber} was received successfully${result.receipt?.receiptNumber ? `. Receipt ${result.receipt.receiptNumber} is available.` : '.'}`, actionUrl: '/parent/fees', sourceModule: 'FEES', sourceEntityType: 'FEE_PAYMENT', sourceEntityId: result.payment.id, dedupeKey: `PAYMENT_RECEIVED:${result.payment.id}`, students: [input.studentId], roles: ['STUDENT','PARENT'], mandatory: true });
+  send(res, result, 201);
 });
 export const dashboard = handler(async (req, res) => send(res, await service.dashboard(req.user, req.query.academicSession)));
 export const requestAdjustment = handler(async (req, res) => send(res, await service.requestAdjustment(req, req.body), 201));

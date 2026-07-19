@@ -511,9 +511,29 @@ export const createBookmark = bookmarkHandlers.create;
 export const updateBookmark = bookmarkHandlers.update;
 export const deleteBookmark = bookmarkHandlers.remove;
 
-export const listNotifications = notificationHandlers.list;
+export const listNotifications = async (req, res) => {
+  if (['STUDENT', 'PARENT'].includes(req.user?.role) && req.user?.studentId) {
+    try {
+      const rows = await prisma.academicNotification.findMany({
+        where: { schoolId: req.user.schoolId, recipientStudentId: req.user.studentId, recipientRole: req.user.role },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      });
+      return res.json({ success: true, data: rows.map((row) => ({ ...row, isRead: Boolean(row.readAt), link: '/homework' })) });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
+    }
+  }
+  return notificationHandlers.list(req, res);
+};
 export const markNotificationRead = async (req, res) => {
   try {
+    if (['STUDENT', 'PARENT'].includes(req.user?.role) && req.user?.studentId) {
+      const existingPortalNotification = await prisma.academicNotification.findFirst({ where: { id: req.params.id, schoolId: req.user.schoolId, recipientStudentId: req.user.studentId, recipientRole: req.user.role } });
+      if (!existingPortalNotification) return res.status(404).json({ success: false, message: 'Notification not found' });
+      const row = await prisma.academicNotification.update({ where: { id: req.params.id }, data: { readAt: new Date() } });
+      return res.json({ success: true, data: { ...row, isRead: true, link: '/homework' } });
+    }
     const context = getUserContext(req);
     const { id } = req.params;
     const existing = await prisma.userWidgetNotification.findFirst({ where: { id, schoolId: context.schoolId, userId: context.userId } });

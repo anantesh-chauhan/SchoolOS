@@ -33,6 +33,7 @@ export default function SchoolManagementPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [credentials, setCredentials] = useState(null);
+  const [detailSchoolId, setDetailSchoolId] = useState(null);
   const limit = 8;
   const queryClient = useQueryClient();
 
@@ -64,6 +65,12 @@ export default function SchoolManagementPage() {
     onError: () => setCredentials((current) => current ? { ...current, setupStatus: 'FAILED' } : current),
   });
 
+  const detailQuery = useQuery({
+    queryKey: ['school-tenant-details', detailSchoolId],
+    queryFn: () => schoolService.details(detailSchoolId),
+    enabled: Boolean(detailSchoolId),
+  });
+
   const createMutation = useMutation({
     mutationFn: async (payload) => {
       const toastId = toast.loading('Creating school tenant and login accounts…');
@@ -78,14 +85,16 @@ export default function SchoolManagementPage() {
     },
     onSuccess: (response) => {
       const schoolId = response.data?.school?.id;
+      const academicSetup = response.data?.academicSetup;
+      const provisioning = response.data?.provisioning;
       toast.success('School branding and default settings created');
       toast.success('School Owner login credentials created');
       toast.success('School Admin login credentials created');
-      setCredentials({ ...(response.data?.credentials || {}), schoolId, setupStatus: 'INITIALIZING' });
+      if (academicSetup) toast.success(`Academic foundation ready: ${academicSetup.classes} classes, ${academicSetup.sections} sections and ${academicSetup.chapters} chapters`);
+      setCredentials({ ...(response.data?.credentials || {}), schoolId, setupStatus: academicSetup ? 'READY' : provisioning?.status || 'FAILED', academicSetup });
       setOpen(false);
       setForm(initialSchool);
       queryClient.invalidateQueries({ queryKey: ['schools'] });
-      initializeMutation.mutate({ schoolId });
     },
     onError: () => undefined,
   });
@@ -140,6 +149,8 @@ export default function SchoolManagementPage() {
                     <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Code</th>
                     <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">City</th>
                     <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">State</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">People</th>
+                    <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Academics</th>
                     <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Status</th>
                     <th className="px-8 py-4 font-bold uppercase tracking-widest text-[10px]">Actions</th>
                   </tr>
@@ -147,14 +158,14 @@ export default function SchoolManagementPage() {
                 <tbody className="divide-y divide-slate-50">
                   {isLoading && (
                     <tr>
-                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={6}>
+                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={8}>
                         Loading schools...
                       </td>
                     </tr>
                   )}
                   {!isLoading && !hasData && (
                     <tr>
-                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={6}>
+                      <td className="px-8 py-10 text-slate-400 text-center font-medium" colSpan={8}>
                         No schools found.
                       </td>
                     </tr>
@@ -165,17 +176,13 @@ export default function SchoolManagementPage() {
                       <td className="px-8 py-5 text-slate-500 font-medium">{school.schoolCode}</td>
                       <td className="px-8 py-5 text-slate-500">{school.city}</td>
                       <td className="px-8 py-5 text-slate-500">{school.state}</td>
+                      <td className="px-8 py-5 text-xs text-slate-500"><p>{school.summary?.students || 0} students</p><p>{school.summary?.teachers || 0} teachers</p></td>
+                      <td className="px-8 py-5 text-xs text-slate-500"><p>{school.summary?.classes || 0} classes · {school.summary?.sections || 0} sections</p><p>{school.summary?.subjects || 0} subjects · {school.summary?.chapters || 0} chapters</p></td>
                       <td className="px-8 py-5">
                         <Badge variant={school.status === 'ACTIVE' ? 'success' : 'muted'} className="rounded-md px-2 py-0.5 text-[10px]">{school.status}</Badge>
                       </td>
                       <td className="px-8 py-5">
-                        <Button
-                          variant="danger"
-                          className="h-9 px-4 rounded-lg font-bold opacity-0 group-hover:opacity-100 transition-all"
-                          onClick={() => deleteMutation.mutate(school.id)}
-                        >
-                          Delete
-                        </Button>
+                        <div className="flex gap-2"><Button variant="secondary" className="h-9 px-4 rounded-lg font-bold" onClick={() => setDetailSchoolId(school.id)}>View</Button><Button variant="danger" className="h-9 px-4 rounded-lg font-bold opacity-0 group-hover:opacity-100 transition-all" onClick={() => { if (window.confirm(`Delete ${school.schoolName}? This permanently removes the tenant and its data.`)) deleteMutation.mutate(school.id); }}>Delete</Button></div>
                       </td>
                     </tr>
                   ))}
@@ -283,11 +290,14 @@ export default function SchoolManagementPage() {
           {credentials && <div className="space-y-4">
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Copy these credentials now. Temporary passwords are returned only once and both users must change them after login.</div>
             <div className={`rounded-xl border p-4 text-sm font-bold ${credentials.setupStatus === 'READY' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : credentials.setupStatus === 'FAILED' ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-sky-200 bg-sky-50 text-sky-800'}`}>
-              {credentials.setupStatus === 'READY' ? 'Academic setup complete: LKG to Class 12, three sections per class, CBSE subjects, chapters and resources are ready.' : credentials.setupStatus === 'FAILED' ? 'Accounts were created, but academic setup failed. Your credentials are safe; use Retry Academic Setup.' : 'Academic setup is running. Keep this dialog open to follow progress.'}
+              {credentials.setupStatus === 'READY' ? 'Academic setup complete: Nursery to Class 12, three sections per class, CBSE subjects, chapters and resources are ready and editable.' : credentials.setupStatus === 'FAILED' ? 'Accounts were created, but academic setup failed. Your credentials are safe; use Retry Academic Setup.' : 'Academic setup is pending.'}
             </div>
-            {[['School Owner', credentials.schoolOwner], ['Administrator', credentials.admin]].map(([label, account]) => <div key={label} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><p className="font-black">{label}</p><p className="mt-2 text-sm">Name: {account.name}</p><p className="text-sm">Login ID: <span className="font-mono font-bold">{account.loginId}</span></p><p className="text-sm">Temporary password: <span className="font-mono font-bold">{account.temporaryPassword}</span></p></div>)}
+            {[['School Owner', credentials.schoolOwner], ['Administrator', credentials.admin], ['Curriculum Manager', credentials.curriculumManager]].filter(([, account]) => account).map(([label, account]) => <div key={label} className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><p className="font-black">{label}</p><p className="mt-2 text-sm">Name: {account.name}</p><p className="text-sm">Login ID: <span className="font-mono font-bold">{account.loginId}</span></p><p className="text-sm">Temporary password: <span className="font-mono font-bold">{account.temporaryPassword || 'Existing account password unchanged'}</span></p></div>)}
             <div className="flex flex-wrap justify-end gap-2">{credentials.setupStatus === 'FAILED' && <Button variant="secondary" onClick={() => initializeMutation.mutate({ schoolId: credentials.schoolId })} disabled={initializeMutation.isPending}>Retry Academic Setup</Button>}<Button onClick={() => setCredentials(null)} disabled={initializeMutation.isPending}>I have copied them</Button></div>
           </div>}
+        </Modal>
+        <Modal open={Boolean(detailSchoolId)} onClose={() => setDetailSchoolId(null)} title="Tenant details">
+          {detailQuery.isLoading ? <div className="p-6 text-center text-slate-500">Loading tenant summary...</div> : detailQuery.isError ? <div className="p-6 text-rose-600">Could not load tenant details.</div> : detailQuery.data?.data && (() => { const tenant = detailQuery.data.data; const summary = tenant.summary || {}; return <div className="space-y-5"><div><h3 className="text-xl font-black">{tenant.schoolName}</h3><p className="text-sm text-slate-500">{tenant.schoolCode} · {tenant.city}, {tenant.state}</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[['Students', summary.activeStudents], ['Teachers', summary.activeTeachers], ['Classes', summary.classes], ['Sections', summary.sections], ['Subjects', summary.subjects], ['Chapters', summary.chapters], ['Users', summary.activeUsers], ['Payments', summary.completedPayments]].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-200 p-3"><p className="text-2xl font-black">{value || 0}</p><p className="text-xs text-slate-500">{label}</p></div>)}</div><div><p className="font-bold">Privileged accounts</p><div className="mt-2 space-y-2">{tenant.users.map((user) => <div key={user.id} className="rounded-xl bg-slate-50 p-3 text-sm"><span className="font-bold">{user.name}</span><span className="ml-2 text-xs text-slate-500">{user.role.replaceAll('_', ' ')}</span><p className="font-mono text-xs text-slate-600">{user.email}</p></div>)}</div></div><div className="flex justify-end"><Button onClick={() => setDetailSchoolId(null)}>Close</Button></div></div>; })()}
         </Modal>
       </motion.div>
     </DashboardLayout>

@@ -7,6 +7,18 @@ export const feeService = {
   structures: (academicSession) => api.get('/fees/structures', { params: { academicSession } }).then(data),
   createStructure: (payload) => api.post('/fees/structures', payload).then(data),
   publishStructure: (id) => api.post(`/fees/structures/${id}/publish`).then(data),
+  categories: (params) => api.get('/fees/categories', { params }).then(data),
+  createCategory: (payload) => api.post('/fees/categories', payload).then(data),
+  updateCategory: (id, payload) => api.patch(`/fees/categories/${id}`, payload).then(data),
+  components: (params) => api.get('/fees/components', { params }).then(data),
+  createComponent: (payload) => api.post('/fees/components', payload).then(data),
+  invoices: (params) => api.get('/fees/invoices', { params }).then(data),
+  generateInvoices: (payload, key = crypto.randomUUID()) => api.post('/fees/invoices/generate', payload, { headers: { 'Idempotency-Key': key } }).then(data),
+  refunds: (params) => api.get('/fees/refunds', { params }).then(data),
+  processRefund: (payload, key = crypto.randomUUID()) => api.post('/fees/refunds', payload, { headers: { 'Idempotency-Key': key } }).then(data),
+  transportRoutes: () => api.get('/fees/transport/routes').then(data),
+  createTransportRoute: (payload) => api.post('/fees/transport/routes', payload).then(data),
+  assignTransport: (payload) => api.post('/fees/transport/assignments', payload).then(data),
   dashboard: (academicSession) => api.get('/fees/dashboard', { params: { academicSession } }).then(data),
   searchStudents: (q) => api.get('/fees/students/search', { params: { q } }).then(data),
   hierarchy: (academicSession) => api.get('/fees/hierarchy', { params: { academicSession } }).then(data),
@@ -18,7 +30,10 @@ export const feeService = {
 
   collect: (payload, key) => api.post('/fees/payments', payload, { headers: { 'Idempotency-Key': key } }).then(data),
   approvals: () => api.get('/fees/approvals').then(data),
-  receiptPdfUrl: (id) => `/api/fees/receipts/${id}/pdf`,
+  downloadReceipt: async (id, filename = 'fee-receipt.pdf') => {
+    const response = await api.get(`/fees/receipts/${id}/pdf`, { responseType: 'blob' });
+    const url = URL.createObjectURL(response.data); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
+  },
   previewAssignment: (payload) => api.post('/fees/assignments/preview', payload).then(data),
   publishAssignment: (payload) => api.post('/fees/assignments/publish', payload).then(data),
   chequeStatus: (id, payload) => api.patch(`/fees/cheques/${id}/status`, payload).then(data),
@@ -38,5 +53,8 @@ export const feeService = {
   family: () => api.get('/fees/family').then(data),
   linkFamily: (payload) => api.post('/fees/family-links', payload).then(data),
   report: (params) => api.get('/fees/reports/collections', { params }).then(data),
+  downloadReport: async (params, filename = 'fee-report.csv') => {
+    const response = await api.get('/fees/reports/collections', { params, responseType: 'blob' }); const url = URL.createObjectURL(response.data); const link = document.createElement('a'); link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
+  },
   platformAnalytics: () => api.get('/fees/platform/analytics').then(data),
 };

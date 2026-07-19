@@ -27,6 +27,9 @@ import studentPortalRoutes from './src/modules/student/studentPortal.routes.js';
 import securityRoutes from './src/routes/security.js';
 import curriculumRoutes from './src/routes/curriculum.js';
 import feeRoutes from './src/modules/fees/fee.routes.js';
+import homeworkRoutes from './src/modules/homework/homework.routes.js';
+import communicationRoutes from './src/modules/communication/communication.routes.js';
+import { processScheduled, processQueuedDeliveries } from './src/modules/communication/communication.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -109,6 +112,8 @@ app.use('/api/student', studentPortalRoutes);
 app.use('/api', securityRoutes);
 app.use('/api/curriculum', curriculumRoutes);
 app.use('/api/fees', feeRoutes);
+app.use('/api', homeworkRoutes);
+app.use('/api', communicationRoutes);
 
 
 // 404 Handler
@@ -147,6 +152,10 @@ const startServer = async () => {
       console.log(`   Health Check: http://localhost:${PORT}/api/health`);
       console.log(`   Auth API: http://localhost:${PORT}/api/auth/login\n`);
     });
+    if (process.env.COMMUNICATION_JOBS_ENABLED !== 'false') {
+      const interval = Math.max(15000, Number(process.env.COMMUNICATION_JOB_INTERVAL_MS) || 60000);
+      setInterval(() => processScheduled().then(() => processQueuedDeliveries({})).catch((error) => console.error('Communication job failed:', error.message)), interval).unref();
+    }
   } catch (error) {
     console.error('\n❌ Failed to start server:\n');
     console.error(`   Error: ${error.message}\n`);

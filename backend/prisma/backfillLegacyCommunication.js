@@ -1,0 +1,15 @@
+import 'dotenv/config';
+const { PrismaClient } = await import('../src/generated/prisma/index.js');
+const prisma = new PrismaClient();
+
+const backfillWidgets = async () => {
+  const rows = await prisma.userWidgetNotification.findMany({ include: { user: { select: { role: true, isActive: true } } } }); let migrated=0;
+  for(const row of rows){const dedupeKey=`LEGACY_WIDGET:${row.id}`;if(await prisma.notification.findFirst({where:{schoolId:row.schoolId,dedupeKey}}))continue;await prisma.notification.create({data:{schoolId:row.schoolId,type:row.type,category:row.type?.includes('SECURITY')?'SECURITY':'SYSTEM',title:row.title,message:row.body,actionUrl:row.link,sourceModule:'LEGACY_WIDGET',sourceEntityType:'UserWidgetNotification',sourceEntityId:row.id,status:'PUBLISHED',publishedAt:row.createdAt,isSystemGenerated:true,dedupeKey,resolvedRecipientCount:1,createdAt:row.createdAt,recipients:{create:{schoolId:row.schoolId,recipientKey:`user:${row.userId}`,userId:row.userId,recipientRole:row.user.role,deliveryContext:'DIRECT',readAt:row.isRead?row.updatedAt:null,createdAt:row.createdAt,deliveries:{create:{channel:'IN_APP',status:'DELIVERED',provider:'database-backfill',attemptCount:1,sentAt:row.createdAt,deliveredAt:row.createdAt,createdAt:row.createdAt}}}}}});migrated+=1;}return migrated;
+};
+
+const backfillAcademic = async () => {
+  const rows=await prisma.academicNotification.findMany({include:{recipientStudent:true}});let migrated=0;
+  for(const row of rows){const dedupeKey=`LEGACY_ACADEMIC:${row.id}`;if(await prisma.notification.findFirst({where:{schoolId:row.schoolId,dedupeKey}}))continue;const role=row.recipientRole||'STUDENT';let recipientKey=row.recipientUserId?`user:${row.recipientUserId}`:role==='PARENT'&&row.recipientStudent?.parentUserId?`parent:${row.recipientStudent.parentUserId}`:`student:${row.recipientStudentId}`;if(!recipientKey||recipientKey.endsWith(':null'))continue;await prisma.notification.create({data:{schoolId:row.schoolId,type:row.type,category:row.entityType==='RESOURCE'?'RESOURCE':'HOMEWORK',title:row.title,message:row.body,actionUrl:'/homework',sourceModule:'LEGACY_ACADEMIC',sourceEntityType:row.entityType,sourceEntityId:row.entityId,status:'PUBLISHED',publishedAt:row.createdAt,isSystemGenerated:true,dedupeKey,resolvedRecipientCount:1,createdAt:row.createdAt,recipients:{create:{schoolId:row.schoolId,recipientKey,userId:row.recipientUserId,studentId:row.recipientStudentId,parentId:role==='PARENT'?row.recipientStudent?.parentUserId:null,recipientRole:role,deliveryContext:role==='PARENT'?'PARENT_OF_STUDENT':'AUTOMATED_RULE',readAt:row.readAt,createdAt:row.createdAt,context:row.recipientStudentId?{studentId:row.recipientStudentId}:undefined,deliveries:{create:{channel:'IN_APP',status:'DELIVERED',provider:'database-backfill',attemptCount:1,sentAt:row.createdAt,deliveredAt:row.createdAt,createdAt:row.createdAt}}}}}});migrated+=1;}return migrated;
+};
+
+try{const [widgets,academic]=await Promise.all([backfillWidgets(),backfillAcademic()]);console.log(`[communication-backfill] widget=${widgets}, academic=${academic}`);}finally{await prisma.$disconnect();}

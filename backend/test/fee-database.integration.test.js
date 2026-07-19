@@ -7,8 +7,26 @@ const getPrisma = async () => (await import('../src/config/prisma.client.js')).d
 
 test('fee migration created all critical accounting tables', { skip: !enabled }, async () => {
   const prisma = await getPrisma();
-  const rows = await prisma.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('FeeStructure','FeeAssignment','StudentFeeCharge','FeePayment','FeeReceipt','FeeLedgerEntry','FeeAdjustment','FeeFinancialPeriod')`;
-  assert.equal(rows.length, 8);
+  const rows = await prisma.$queryRaw`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('FeeStructure','FeeAssignment','StudentFeeCharge','FeePayment','FeeReceipt','FeeLedgerEntry','FeeAdjustment','FeeFinancialPeriod','FeeCategory','FeeInvoice','FeeInvoiceItem','FeeRefund','FeeRefundAllocation','TransportFeeRoute','TransportFeeStop','TransportFeeAssignment')`;
+  assert.equal(rows.length, 16);
+});
+
+test('pending cheques never have finalized receipts', { skip: !enabled }, async () => {
+  const prisma = await getPrisma();
+  const invalid = await prisma.feePayment.count({ where: { status: 'PENDING_CLEARANCE', receipt: { isNot: null } } });
+  assert.equal(invalid, 0);
+});
+
+test('invoice, refund and transport records remain tenant-consistent', { skip: !enabled }, async () => {
+  const prisma = await getPrisma();
+  const [invoices, refunds, transport] = await Promise.all([
+    prisma.feeInvoice.findMany({ include: { student: { select: { schoolId: true } }, items: { select: { schoolId: true } } } }),
+    prisma.feeRefund.findMany({ include: { student: { select: { schoolId: true } }, payment: { select: { schoolId: true } } } }),
+    prisma.transportFeeAssignment.findMany({ include: { student: { select: { schoolId: true } }, route: { select: { schoolId: true } } } }),
+  ]);
+  assert.ok(invoices.every((row) => row.student.schoolId === row.schoolId && row.items.every((item) => item.schoolId === row.schoolId)));
+  assert.ok(refunds.every((row) => row.student.schoolId === row.schoolId && row.payment.schoolId === row.schoolId));
+  assert.ok(transport.every((row) => row.student.schoolId === row.schoolId && row.route.schoolId === row.schoolId));
 });
 
 test('seeded fee accounts remain isolated by school', { skip: !enabled }, async () => {

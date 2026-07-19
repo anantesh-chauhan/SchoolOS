@@ -11,14 +11,23 @@ import { ensureSchoolSecurityCurriculumDefaults } from './schoolSecurityCurricul
 const SECTION_NAMES = ['A', 'B', 'C'];
 const seniorSubjects = [...new Set(SENIOR_STREAMS.flatMap((stream) => stream.subjects))];
 const classTemplates = [
-  ...CBSE_CLASS_CATALOG.filter((row) => row.className !== 'Nursery'),
+  ...CBSE_CLASS_CATALOG,
   { className: 'Class 11', classOrder: 14, subjects: seniorSubjects },
   { className: 'Class 12', classOrder: 15, subjects: seniorSubjects },
 ];
 
 const codeFor = (name) => SUBJECT_CODE_BY_NAME[name] || String(name).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
 
-export const initializeNewSchoolAcademicSetup = async (schoolId) => {
+const normalizeSectionNames = (values) => {
+  const names = [...new Set((Array.isArray(values) && values.length ? values : SECTION_NAMES)
+    .map((value) => String(value || '').trim().toUpperCase())
+    .filter(Boolean))];
+  if (!names.length || names.length > 8) throw new Error('Provide between 1 and 8 section names');
+  return names;
+};
+
+export const initializeNewSchoolAcademicSetup = async (schoolId, options = {}) => {
+  const sectionNames = normalizeSectionNames(options.sectionNames);
   const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true } });
   if (!school) throw new Error('School not found for academic initialization');
 
@@ -27,7 +36,7 @@ export const initializeNewSchoolAcademicSetup = async (schoolId) => {
   const classes = await prisma.class.findMany({ where: { schoolId, deletedAt: null }, select: { id: true, className: true, classOrder: true } });
 
   await prisma.section.createMany({
-    data: classes.flatMap((classRow) => SECTION_NAMES.map((sectionName, index) => ({ schoolId, classId: classRow.id, sectionName, sectionOrder: index + 1 }))),
+    data: classes.flatMap((classRow) => sectionNames.map((sectionName, index) => ({ schoolId, classId: classRow.id, sectionName, sectionOrder: index + 1 }))),
     skipDuplicates: true,
   });
   const sections = await prisma.section.findMany({ where: { schoolId, deletedAt: null }, select: { id: true, classId: true, sectionName: true } });
@@ -79,5 +88,5 @@ export const initializeNewSchoolAcademicSetup = async (schoolId) => {
   await prisma.sectionResource.createMany({ data: chapterResources });
 
   const securityCurriculumCalendar = await ensureSchoolSecurityCurriculumDefaults(schoolId);
-  return { schoolId, alreadyInitialized: existingClasses > 0, repaired: existingClasses > 0, classes: classes.length, sections: sections.length, sectionsPerClass: SECTION_NAMES.length, subjects: subjects.length, chapters: chapters.length, resources: commonResources.length + chapterResources.length, securityCurriculumCalendar };
+  return { schoolId, template: 'CBSE_NURSERY_TO_12', editable: true, alreadyInitialized: existingClasses > 0, repaired: existingClasses > 0, classes: classes.length, sections: sections.length, sectionsPerClass: sectionNames.length, sectionNames, subjects: subjects.length, chapters: chapters.length, resources: commonResources.length + chapterResources.length, securityCurriculumCalendar };
 };
