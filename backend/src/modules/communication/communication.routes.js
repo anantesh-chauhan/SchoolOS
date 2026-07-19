@@ -10,6 +10,7 @@ router.get('/notification-preferences', controller.getPreferences); router.patch
 router.get('/notification-templates', controller.listTemplates); router.post('/notification-templates', controller.createTemplate); router.patch('/notification-templates/:id', controller.updateTemplate); router.delete('/notification-templates/:id', controller.deleteTemplate);
 router.get('/communication-policy', controller.getPolicy); router.patch('/communication-policy', controller.updatePolicy);
 router.get('/communication/recipients', controller.recipientDirectory);
+router.get('/communication/audience-options', requireRole('SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER'), controller.audienceOptions);
 router.post('/communication/attachments', controller.registerAttachment);
 router.get('/admin/communication/summary', controller.communicationSummary); router.get('/admin/communication/delivery', controller.deliveryReport); router.get('/admin/communication/acknowledgements', controller.deliveryReport); router.get('/admin/communication/failures', controller.deliveryReport);
 router.post('/communication/jobs/run', requireRole('SCHOOL_OWNER','ADMIN'), controller.runJobs);

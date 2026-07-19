@@ -6,6 +6,7 @@ const ENUMS = {
   conversation: new Set(['DIRECT','PARENT_TEACHER','STUDENT_TEACHER','ADMIN_STAFF','FEE_SUPPORT','ACADEMIC_SUPPORT','GROUP','SYSTEM_SUPPORT']),
   message: new Set(['TEXT','IMAGE','FILE','AUDIO','SYSTEM','ANNOUNCEMENT_REFERENCE','HOMEWORK_REFERENCE','FEE_REFERENCE','ATTENDANCE_REFERENCE']),
 };
+const TARGET_ROLES = new Set(['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']);
 
 export class CommunicationError extends Error {
   constructor(message, statusCode = 400, code = 'COMMUNICATION_ERROR') {
@@ -53,8 +54,10 @@ export const validateAudienceRules = (rules) => {
     if (['DIRECT','CLASS','SECTION','SUBJECT','PARENT_OF_STUDENT','SAVED_GROUP'].includes(kind) && !entityIds.length) {
       throw new CommunicationError(`${kind} requires entityIds.`);
     }
-    if (kind === 'ROLE' && !role) throw new CommunicationError('ROLE requires role.');
-    return { kind, role, entityIds, metadata: rule?.metadata && typeof rule.metadata === 'object' ? rule.metadata : null };
+    if (kind === 'ROLE' && (!role || !TARGET_ROLES.has(role))) throw new CommunicationError('ROLE requires a valid school role.');
+    const metadata = rule?.metadata && typeof rule.metadata === 'object' ? rule.metadata : null;
+    if (metadata?.roles && (!Array.isArray(metadata.roles) || metadata.roles.some((value) => !['STUDENT','PARENT'].includes(String(value).toUpperCase())))) throw new CommunicationError('Audience recipient groups can only contain STUDENT or PARENT.');
+    return { kind, role, entityIds, metadata: metadata ? { ...metadata, ...(metadata.roles ? { roles: [...new Set(metadata.roles.map((value) => String(value).toUpperCase()))] } : {}) } : null };
   });
 };
 

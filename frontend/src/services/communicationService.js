@@ -1,14 +1,19 @@
 import apiClient from './api';
 
 const data = (response) => response.data.data;
+export const NOTIFICATIONS_CHANGED_EVENT = 'schoolos:notifications-changed';
+const notificationsChanged = (result) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+  return result;
+};
 export const communicationService = {
   notifications: (params = {}) => apiClient.get('/notifications', { params }).then(data),
   unreadCount: () => apiClient.get('/notifications/unread-count').then(data),
   notification: (id) => apiClient.get(`/notifications/${id}`).then(data),
-  read: (id) => apiClient.patch(`/notifications/${id}/read`).then(data),
-  readAll: () => apiClient.patch('/notifications/read-all').then(data),
-  acknowledge: (id, note = '') => apiClient.patch(`/notifications/${id}/acknowledge`, { note }).then(data),
-  archive: (id) => apiClient.patch(`/notifications/${id}/archive`).then(data),
+  read: (id) => apiClient.patch(`/notifications/${id}/read`).then(data).then(notificationsChanged),
+  readAll: () => apiClient.patch('/notifications/read-all').then(data).then(notificationsChanged),
+  acknowledge: (id, note = '') => apiClient.patch(`/notifications/${id}/acknowledge`, { note }).then(data).then(notificationsChanged),
+  archive: (id) => apiClient.patch(`/notifications/${id}/archive`).then(data).then(notificationsChanged),
   announcements: (params = {}) => apiClient.get('/announcements', { params }).then(data),
   announcement: (id) => apiClient.get(`/announcements/${id}`).then(data),
   createAnnouncement: (payload) => apiClient.post('/announcements', payload).then(data),
@@ -23,6 +28,7 @@ export const communicationService = {
   readConversation: (id) => apiClient.patch(`/conversations/${id}/read`).then(data),
   closeConversation: (id) => apiClient.post(`/conversations/${id}/close`).then(data),
   directory: (params = {}) => apiClient.get('/communication/recipients', { params }).then(data),
+  audienceOptions: () => apiClient.get('/communication/audience-options').then(data),
   preferences: () => apiClient.get('/notification-preferences').then(data),
   updatePreferences: (preferences) => apiClient.patch('/notification-preferences', { preferences }).then(data),
   templates: () => apiClient.get('/notification-templates').then(data),

@@ -9,7 +9,7 @@ const page = (query) => ({ skip: (Math.max(1, Number(query.page) || 1) - 1) * Ma
 const ensureManager = (user) => { if (!['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER'].includes(user.role)) throw new CommunicationError('You cannot manage announcements.', 403); };
 
 export const listNotifications = run((req) => notifications.listNotifications(req.user, req.query));
-export const unreadCount = run(async (req) => ({ count: await prisma.notificationRecipient.count({ where: { schoolId: req.user.schoolId, recipientKey: notifications.principalKey(req.user), readAt: null, archivedAt: null, notification: { status: 'PUBLISHED', deletedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } } }) }));
+export const unreadCount = run(async (req) => ({ count: await notifications.countUnreadNotifications(req.user) }));
 export const getNotification = run((req) => notifications.getNotification(req.user, req.params.id));
 export const readNotification = run((req) => notifications.updateRecipientState(req.user, req.params.id, 'read', null, req));
 export const readAllNotifications = run((req) => notifications.markAllRead(req.user));
@@ -58,6 +58,8 @@ export const recipientDirectory = run(async(req)=>{
   else { users=await prisma.user.findMany({where:{...userWhere,role:{in:['ADMIN','SCHOOL_OWNER','TEACHER']}},select:{id:true,name:true,role:true},take:100}); }
   return [...users.map(row=>({key:`user:${row.id}`,name:row.name,role:row.role})),...students.flatMap(row=>[{key:`student:${row.id}`,name:`${row.studentFirstName} ${row.studentLastName||''}`.trim(),role:'STUDENT'},...(row.parentUserId?[{key:`parent:${row.parentUserId}`,name:`${row.fatherName} · parent of ${row.studentFirstName}`,role:'PARENT'}]:[])])];
 });
+
+export const audienceOptions = run((req) => notifications.audienceOptions(req.user));
 
 export const registerAttachment = run(async(req)=>{
   const policy=await prisma.communicationPolicy.upsert({where:{schoolId:req.user.schoolId},create:{schoolId:req.user.schoolId},update:{}});const mimeType=String(req.body.mimeType||'').toLowerCase(),fileSize=Number(req.body.fileSize),originalName=String(req.body.originalName||'').trim(),fileUrl=String(req.body.fileUrl||'').trim();

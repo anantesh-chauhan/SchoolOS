@@ -22,11 +22,13 @@
     "seed:teacher-dashboard": "node prisma/seedTeacherDashboardData.js",
     "seed:homework": "node prisma/seedHomeworkResources.js",
     "seed:communication": "node prisma/seedCommunication.js",
+    "seed:communication-demo-additive": "node prisma/seedCommunicationNotificationDemo.js",
     "backfill:communication": "node prisma/backfillLegacyCommunication.js",
     "seed:class-teachers": "node prisma/seedClassTeachers.js",
     "seed:official-resources": "node prisma/seedOfficialChapterResources.js",
     "seed:cbse-weekly-slots": "node prisma/seedCbseWeeklySlots.js",
     "seed:security-curriculum-calendar": "node prisma/seedSecurityCurriculumCalendar.js",
+    "seed:academic-calendar-events": "node prisma/seedAcademicCalendarEvents.js",
     "school:initialize": "node prisma/initializeNewSchool.js"
   },
   "keywords": [
