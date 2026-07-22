@@ -51,6 +51,14 @@ const StudentAttendancePage = lazy(() => import('./pages/attendance/StudentAtten
 const TeacherAttendancePage = lazy(() => import('./pages/attendance/TeacherAttendancePage'));
 const MyAttendancePage = lazy(() => import('./pages/attendance/MyAttendancePage'));
 const AcademicCalendarPage = lazy(() => import('./pages/attendance/AcademicCalendarPage'));
+const AttendanceDashboardPage = lazy(() => import('./pages/attendance/AttendanceDashboardPage'));
+const MonthlyClassAttendancePage = lazy(() => import('./pages/attendance/MonthlyClassAttendancePage'));
+const StudentAttendanceProfilePage = lazy(() => import('./pages/attendance/StudentAttendanceProfilePage'));
+const EmployeeMonthlyAttendancePage = lazy(() => import('./pages/attendance/EmployeeMonthlyAttendancePage'));
+const AttendanceCorrectionsPage = lazy(() => import('./pages/attendance/AttendanceCorrectionsPage'));
+const AttendanceSettingsPage = lazy(() => import('./pages/attendance/AttendanceSettingsPage'));
+const AttendanceAuditPage = lazy(() => import('./pages/attendance/AttendanceAuditPage'));
+const AttendanceCorrectionRequestPage = lazy(() => import('./pages/attendance/AttendanceCorrectionRequestPage'));
 const WeeklySlotManagementPage = lazy(() => import('./pages/admin/WeeklySlotManagementPage'));
 const TimetableBuilderPage = lazy(() => import('./pages/admin/TimetableBuilderPage'));
 const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableReconciliationPage'));
@@ -121,6 +129,14 @@ export default function App() {
           <Route path="/communication" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><CommunicationWorkspacePage /></ProtectedRoute>} />
           <Route path="/dashboard/hr" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><HRWorkspacePage /></ProtectedRoute>} />
           <Route path="/my/hr" element={<ProtectedRoute allowedRoles={['HR','TEACHER','STAFF']}><EmployeeSelfServicePage /></ProtectedRoute>} />
+          <Route path="/attendance" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><AttendanceDashboardPage /></ProtectedRoute>} />
+          <Route path="/attendance/students/class/:classId/section/:sectionId/month/:month" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','TEACHER']}><MonthlyClassAttendancePage /></ProtectedRoute>} />
+          <Route path="/attendance/students/:studentId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','TEACHER','STUDENT','PARENT']}><StudentAttendanceProfilePage /></ProtectedRoute>} />
+          <Route path="/attendance/employees/month/:month" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><EmployeeMonthlyAttendancePage /></ProtectedRoute>} />
+          <Route path="/attendance/corrections" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><AttendanceCorrectionsPage /></ProtectedRoute>} />
+          <Route path="/attendance/settings" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><AttendanceSettingsPage /></ProtectedRoute>} />
+          <Route path="/attendance/audit" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><AttendanceAuditPage /></ProtectedRoute>} />
+          <Route path="/attendance/request-correction" element={<ProtectedRoute allowedRoles={['STUDENT','PARENT','TEACHER','STAFF','HR']}><AttendanceCorrectionRequestPage /></ProtectedRoute>} />
           <Route path="/support/my-reports" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><MyReportsPage /></ProtectedRoute>} />
           <Route path="/platform/issues" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><IssueManagementPage /></ProtectedRoute>} />
 

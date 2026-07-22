@@ -164,12 +164,15 @@ export const teacherService = {
 };
 
 export const attendanceService = {
+  metadata: async () => (await apiClient.get('/attendance/metadata')).data,
+  updateSettings: async (payload) => (await apiClient.put('/attendance/settings', payload)).data,
+  saveStatus: async (payload) => (await apiClient.put('/attendance/statuses', payload)).data,
   studentRoster: async (params = {}) => {
     const response = await apiClient.get('/attendance/students', { params });
     return response.data;
   },
   saveStudentAttendance: async (payload) => {
-    const response = await apiClient.post('/attendance/students', payload);
+    const response = await apiClient.post('/attendance/student-register', payload);
     return response.data;
   },
   teacherRoster: async (params = {}) => {
@@ -208,6 +211,18 @@ export const attendanceService = {
     const response = await apiClient.get('/attendance/teacher-register', { params });
     return response.data;
   },
+  monthlyClassReport: async ({ classId, sectionId, month, ...params }) => (await apiClient.get(`/attendance/students/class/${classId}/section/${sectionId}/month/${month}`, { params })).data,
+  studentProfile: async (studentId, params = {}) => (await apiClient.get(`/attendance/students/${studentId}/profile`, { params })).data,
+  employeeMonth: async (month, params = {}) => (await apiClient.get(`/attendance/employees/month/${month}`, { params })).data,
+  saveEmployeeAttendance: async (payload) => (await apiClient.post('/attendance/employees', payload)).data,
+  corrections: async (params = {}) => (await apiClient.get('/attendance/corrections', { params })).data,
+  requestCorrection: async (payload) => (await apiClient.post('/attendance/corrections', payload)).data,
+  reviewCorrection: async (id, payload) => (await apiClient.patch(`/attendance/corrections/${id}`, payload)).data,
+  dashboard: async () => (await apiClient.get('/attendance/dashboard')).data,
+  lock: async (payload) => (await apiClient.post('/attendance/locks', payload)).data,
+  unlock: async (id, payload) => (await apiClient.post(`/attendance/locks/${id}/unlock`, payload)).data,
+  audit: async (params = {}) => (await apiClient.get('/attendance/audit', { params })).data,
+  exportCsv: async (kind, month) => (await apiClient.get('/attendance/export.csv', { params: { kind, month }, responseType: 'blob' })).data,
 };
 
 export const userService = {

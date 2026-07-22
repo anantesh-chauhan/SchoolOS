@@ -120,6 +120,20 @@ export const requireSchoolAdminOrClassTeacher = async (user, params) => {
   return { allowed: true, ...result, isAdmin: false };
 };
 
+export const requireSchoolAdminOrAssignedTeacherForSection = async (user, { schoolId, classId, sectionId }) => {
+  if (isSchoolAdmin(user)) {
+    assertSameSchool(user, schoolId);
+    return { allowed: true, isAdmin: true, canMark: true };
+  }
+  if (user?.role !== 'TEACHER') throw new AuthorizationError('Only school admins or assigned teachers can view this attendance.', 403);
+  assertSameSchool(user, schoolId);
+  const teacher = await getTeacherForUser(user);
+  if (!teacher) throw new AuthorizationError('Teacher profile not found for this user.', 403);
+  const assignment = await prisma.teacherAssignment.findFirst({ where: { schoolId, teacherId: teacher.id, classId, sectionId, isActive: true, OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }] } });
+  if (!assignment) throw new AuthorizationError('You are not assigned to this section.', 403);
+  return { allowed: true, teacher, assignment, isAdmin: false, canMark: ['CLASS_TEACHER', 'BOTH'].includes(assignment.roleType) };
+};
+
 export const canManageSectionSubject = async (user, params) => {
   if (isSchoolAdmin(user)) {
     assertSameSchool(user, params.schoolId);

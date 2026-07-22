@@ -31,6 +31,7 @@
     "seed:academic-staffing": "node prisma/seedAcademicStaffing.js",
     "seed:security-curriculum-calendar": "node prisma/seedSecurityCurriculumCalendar.js",
     "seed:academic-calendar-events": "node prisma/seedAcademicCalendarEvents.js",
+    "seed:attendance": "node prisma/seedAttendanceManagement.js",
     "school:initialize": "node prisma/initializeNewSchool.js"
   },
   "keywords": [

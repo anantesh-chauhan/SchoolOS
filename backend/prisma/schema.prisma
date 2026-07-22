@@ -194,6 +194,16 @@ model School {
   employeeLeaveApplications  EmployeeLeaveApplication[]
   employeePayrolls           EmployeePayroll[]
   hrAuditLogs                HrAuditLog[]
+  attendanceStatuses         AttendanceStatusDefinition[]
+  attendanceRule             AttendanceRule?
+  attendanceDailyRegisters   AttendanceDailyRegister[]
+  attendanceCorrections      AttendanceCorrectionRequest[]
+  attendanceAuditLogs        AttendanceAuditLog[]
+  attendanceLocks            AttendanceLock[]
+  attendanceMonthlySnapshots AttendanceMonthlySnapshot[]
+  attendanceNotificationLogs AttendanceNotificationLog[]
+  schoolWorkingDays          SchoolWorkingDay[]
+  studentEnrollmentHistory   StudentEnrollmentHistory[]
   createdAt                  DateTime                        @default(now())
   updatedAt                  DateTime                        @updatedAt
 
@@ -1448,6 +1458,7 @@ model Student {
   homeworkAudiences         HomeworkAudience[]
   homeworkSubmissions       HomeworkSubmission[]
   academicNotifications     AcademicNotification[]
+  enrollmentHistory         StudentEnrollmentHistory[]
 
   @@unique([studentUserId])
   @@unique([parentUserId])
@@ -1772,18 +1783,25 @@ model StudentAcademicHistory {
 }
 
 model StudentAttendance {
-  id              String           @id @default(cuid())
+  id              String    @id @default(cuid())
   schoolId        String
   classId         String
   sectionId       String
   studentId       String
   attendanceDate  DateTime
   academicSession String
-  status          AttendanceStatus @default(PRESENT)
+  status          String    @default("PRESENT")
   remarks         String?
   markedById      String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  attendanceUnits Decimal   @default(1) @db.Decimal(4, 2)
+  enrollmentId    String?
+  leaveReference  String?
+  submittedById   String?
+  submittedAt     DateTime?
+  lockedAt        DateTime?
+  revision        Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   class    Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -1796,19 +1814,21 @@ model StudentAttendance {
   @@index([schoolId, studentId, attendanceDate])
   @@index([schoolId, studentId, academicSession])
   @@index([schoolId, markedById])
+  @@index([schoolId, academicSession, attendanceDate, status])
+  @@index([enrollmentId, attendanceDate])
 }
 
 model TeacherAttendance {
-  id              String           @id @default(cuid())
+  id              String   @id @default(cuid())
   schoolId        String
   teacherId       String
   attendanceDate  DateTime
   academicSession String
-  status          AttendanceStatus @default(PRESENT)
+  status          String   @default("PRESENT")
   remarks         String?
   markedById      String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacher  Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
@@ -1964,28 +1984,34 @@ model EmployeeLeaveApplication {
 }
 
 model EmployeeAttendance {
-  id               String                   @id @default(cuid())
+  id               String             @id @default(cuid())
   schoolId         String
   employeeId       String
   attendanceDate   DateTime
-  status           EmployeeAttendanceStatus @default(PRESENT)
-  source           AttendanceSource         @default(MANUAL)
+  status           String             @default("PRESENT")
+  source           AttendanceSource   @default(MANUAL)
   checkIn          DateTime?
   checkOut         DateTime?
-  minutesLate      Int                      @default(0)
-  minutesEarlyExit Int                      @default(0)
+  minutesLate      Int                @default(0)
+  minutesEarlyExit Int                @default(0)
   remarks          String?
   sourceReference  String?
   markedById       String?
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-  school           School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  employee         Employee                 @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  attendanceUnits  Decimal            @default(1) @db.Decimal(4, 2)
+  salaryImpactDays Decimal            @default(0) @db.Decimal(5, 2)
+  approvalStatus   LeaveRequestStatus @default(APPROVED)
+  leaveReference   String?
+  lockedAt         DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  school           School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  employee         Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@unique([schoolId, employeeId, attendanceDate])
   @@index([schoolId, attendanceDate, status])
   @@index([schoolId, employeeId, attendanceDate])
   @@index([source, sourceReference])
+  @@index([schoolId, attendanceDate, salaryImpactDays])
 }
 
 model EmployeePayroll {
@@ -2039,6 +2065,219 @@ model HrAuditLog {
 
   @@index([schoolId, createdAt])
   @@index([schoolId, entityType, entityId])
+}
+
+model AttendanceStatusDefinition {
+  id               String   @id @default(cuid())
+  schoolId         String
+  code             String
+  displayName      String
+  shortLabel       String
+  countsAsPresent  Boolean  @default(false)
+  countsAsAbsent   Boolean  @default(false)
+  attendanceWeight Decimal  @default(0) @db.Decimal(4, 2)
+  affectsSalary    Boolean  @default(false)
+  requiresApproval Boolean  @default(false)
+  requiresRemark   Boolean  @default(false)
+  audience         String   @default("BOTH")
+  badgeStyle       String   @default("slate")
+  excludedFromWork Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  displayOrder     Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, audience, isActive])
+}
+
+model AttendanceRule {
+  id                              String    @id @default(cuid())
+  schoolId                        String    @unique
+  timezone                        String    @default("Asia/Kolkata")
+  academicSessionStart            DateTime?
+  academicSessionEnd              DateTime?
+  weeklyOffDays                   Int[]     @default([0])
+  markingDeadline                 String    @default("10:30")
+  correctionWindowHours           Int       @default(48)
+  studentMinimumPercentage        Decimal   @default(75) @db.Decimal(5, 2)
+  employeeMinimumPercentage       Decimal   @default(85) @db.Decimal(5, 2)
+  halfDayWeight                   Decimal   @default(0.5) @db.Decimal(4, 2)
+  lateWeight                      Decimal   @default(1) @db.Decimal(4, 2)
+  approvedLeaveWeight             Decimal   @default(0) @db.Decimal(4, 2)
+  medicalLeaveWeight              Decimal   @default(0) @db.Decimal(4, 2)
+  consecutiveAbsenceAlertDays     Int       @default(3)
+  parentAbsenceNotifications      Boolean   @default(true)
+  studentNotifications            Boolean   @default(true)
+  requiresFinalSubmission         Boolean   @default(true)
+  automaticMonthEndLock           Boolean   @default(false)
+  correctionsRequireAdminApproval Boolean   @default(true)
+  payrollIntegrationEnabled       Boolean   @default(false)
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+  school                          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceDailyRegister {
+  id              String    @id @default(cuid())
+  schoolId        String
+  academicSession String
+  classId         String
+  sectionId       String
+  attendanceDate  DateTime
+  state           String    @default("DRAFT")
+  markedCount     Int       @default(0)
+  submittedById   String?
+  submittedAt     DateTime?
+  lockedById      String?
+  lockedAt        DateTime?
+  lockReason      String?
+  version         Int       @default(1)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, classId, sectionId, attendanceDate])
+  @@index([schoolId, academicSession, attendanceDate, state])
+}
+
+model AttendanceCorrectionRequest {
+  id                   String    @id @default(cuid())
+  schoolId             String
+  personType           String
+  personId             String
+  attendanceDate       DateTime
+  studentAttendanceId  String?
+  employeeAttendanceId String?
+  existingStatus       String
+  requestedStatus      String
+  reason               String
+  evidenceUrl          String?
+  status               String    @default("PENDING")
+  requestedById        String
+  reviewedById         String?
+  reviewedAt           DateTime?
+  reviewRemark         String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  school               School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt])
+  @@index([schoolId, personType, personId, attendanceDate])
+}
+
+model AttendanceAuditLog {
+  id                String   @id @default(cuid())
+  schoolId          String
+  actorId           String?
+  actorRole         String?
+  action            String
+  entityType        String
+  entityId          String?
+  oldValue          Json?
+  newValue          Json?
+  reason            String?
+  approvalReference String?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+model AttendanceLock {
+  id                String    @id @default(cuid())
+  schoolId          String
+  academicSession   String
+  scope             String
+  scopeKey          String
+  periodStart       DateTime
+  periodEnd         DateTime
+  lockedById        String
+  lockedAt          DateTime  @default(now())
+  unlockReason      String?
+  approvalReference String?
+  unlockedById      String?
+  unlockedAt        DateTime?
+  isActive          Boolean   @default(true)
+  school            School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, scope, scopeKey, periodStart, periodEnd, isActive])
+  @@index([schoolId, academicSession, scope, isActive])
+}
+
+model AttendanceMonthlySnapshot {
+  id              String   @id @default(cuid())
+  schoolId        String
+  academicSession String
+  subjectType     String
+  subjectId       String
+  month           DateTime
+  summary         Json
+  ruleVersion     String?
+  rebuiltAt       DateTime @default(now())
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, academicSession, subjectType, subjectId, month])
+  @@index([schoolId, month, subjectType])
+}
+
+model AttendanceNotificationLog {
+  id             String    @id @default(cuid())
+  schoolId       String
+  eventType      String
+  subjectType    String
+  subjectId      String
+  attendanceDate DateTime?
+  dedupeKey      String
+  recipientCount Int       @default(0)
+  createdAt      DateTime  @default(now())
+  school         School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, eventType, createdAt])
+}
+
+model SchoolWorkingDay {
+  id                String   @id @default(cuid())
+  schoolId          String
+  academicSession   String
+  calendarDate      DateTime
+  calendarType      String   @default("STUDENT")
+  classId           String?
+  sectionId         String?
+  isWorkingDay      Boolean  @default(true)
+  eligibleDayWeight Decimal  @default(1) @db.Decimal(4, 2)
+  reason            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, calendarDate, calendarType, classId, sectionId])
+  @@index([schoolId, academicSession, calendarDate, calendarType])
+}
+
+model StudentEnrollmentHistory {
+  id              String    @id @default(cuid())
+  schoolId        String
+  studentId       String
+  academicSession String
+  classId         String
+  sectionId       String
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  exitReason      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, studentId, classId, sectionId, effectiveFrom])
+  @@index([schoolId, classId, sectionId, academicSession, effectiveFrom])
+  @@index([schoolId, studentId, effectiveFrom, effectiveTo])
 }
 
 model AcademicCalendarDay {
@@ -3533,6 +3772,12 @@ enum EmployeeAttendanceStatus {
   OFFICIAL_DUTY
   LATE
   EARLY_EXIT
+  UNPAID_LEAVE
+  TRAINING
+  ON_DUTY
+  COMPENSATORY_OFF
+  WEEKLY_OFF
+  NOT_MARKED
 }
 
 enum AttendanceSource {
@@ -4082,6 +4327,13 @@ enum AttendanceStatus {
   LATE
   HALF_DAY
   LEAVE
+  APPROVED_LEAVE
+  UNAPPROVED_LEAVE
+  MEDICAL_LEAVE
+  OFFICIAL_DUTY
+  HOLIDAY
+  WEEKLY_OFF
+  NOT_MARKED
 }
 
 enum CalendarDayType {

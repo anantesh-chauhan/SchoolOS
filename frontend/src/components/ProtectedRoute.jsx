@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../services/authService";
 
@@ -7,7 +7,6 @@ const ProtectedRoute = ({
   children,
   allowedRoles = null,
 }) => {
-  const location = useLocation();
   const [loading, setLoading] =
     useState(true);
 
@@ -40,16 +39,21 @@ const ProtectedRoute = ({
 
         }
 
+        // Session data can originate from older accounts where role casing was
+        // persisted differently. Route access must compare canonical roles.
+        const role = String(user.role || '').trim().toUpperCase();
+        const permittedRoles = allowedRoles?.map((item) => String(item).trim().toUpperCase());
+
         if (
-          allowedRoles &&
-          !allowedRoles.includes(user.role)
+          permittedRoles &&
+          !permittedRoles.includes(role)
         ) {
 
           setIsAuthorized(false);
 
           const fallback =
             authService.getDashboardRouteByRole(
-              user.role
+              role
             );
 
           setRedirectPath(
@@ -60,19 +64,6 @@ const ProtectedRoute = ({
 
           return;
 
-        }
-
-        if (user.mustChangePassword && !location.pathname.includes('/profile')) {
-          const profileRoutes = {
-            SCHOOL_OWNER: '/dashboard/school/profile', ADMIN: '/dashboard/admin/profile',
-            CURRICULUM_MANAGER: '/dashboard/curriculum/profile', TEACHER: '/dashboard/teacher/profile',
-            FEE_MANAGER: '/dashboard/fee-manager/profile',
-            HR: '/dashboard/hr',
-            STUDENT: '/dashboard/student/profile', PARENT: '/dashboard/parent/profile', STAFF: '/dashboard/staff/profile',
-          };
-          setIsAuthorized(false);
-          setRedirectPath(profileRoutes[user.role] || '/login');
-          return;
         }
 
         setIsAuthorized(true);
@@ -109,7 +100,7 @@ const ProtectedRoute = ({
 
     };
 
-  }, [allowedRoles, location.pathname]);
+  }, [allowedRoles]);
 
   /* ======================================
      Premium Loading Screen

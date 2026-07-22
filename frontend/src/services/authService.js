@@ -110,7 +110,7 @@ export const authService = {
   },
 
   getDashboardRouteByRole: (role) => {
-    return roleRoutes[role] || '/login';
+    return roleRoutes[String(role || '').trim().toUpperCase()] || '/login';
   },
 
   validateSession: async () => {

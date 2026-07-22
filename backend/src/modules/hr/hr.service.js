@@ -16,13 +16,16 @@ export const nextEmployeeId = async (tx, schoolId) => {
 const paid = new Set(['PRESENT','PAID_LEAVE','CASUAL_LEAVE','MEDICAL_LEAVE','EARNED_LEAVE','MATERNITY_LEAVE','PATERNITY_LEAVE','HOLIDAY','WORK_FROM_HOME','OFFICIAL_DUTY','LATE','EARLY_EXIT']);
 export const attendanceSummary = async (tx, schoolId, employee, month) => {
   const range = monthRange(month); const from = employee.joiningDate > range.start ? dateOnly(employee.joiningDate) : range.start;
-  const [rows, holidays, policy] = await Promise.all([
+  const [rows, holidays, policy, attendanceRule, overrides] = await Promise.all([
     tx.employeeAttendance.findMany({ where: { schoolId, employeeId: employee.id, attendanceDate: { gte: range.start, lt: range.end } } }),
     tx.academicCalendarDay.findMany({ where: { schoolId, calendarDate: { gte: range.start, lt: range.end }, dayType: { in: ['HOLIDAY','WEEKLY_OFF','VACATION'] } }, select: { calendarDate: true } }),
     tx.hrLeavePolicy.findUnique({ where: { schoolId } }),
+    tx.attendanceRule.findUnique({ where: { schoolId } }),
+    tx.schoolWorkingDay.findMany({ where: { schoolId, calendarType: 'EMPLOYEE', calendarDate: { gte: range.start, lt: range.end } } }),
   ]);
-  const holidayKeys = new Set(holidays.map((r) => r.calendarDate.toISOString().slice(0,10))); let workingDays = 0;
-  for (let day = new Date(from); day < range.end; day.setUTCDate(day.getUTCDate()+1)) if ((policy?.includeWeeklyOff || ![0,6].includes(day.getUTCDay())) && !holidayKeys.has(day.toISOString().slice(0,10))) workingDays += 1;
+  const holidayKeys = new Set(holidays.map((r) => r.calendarDate.toISOString().slice(0,10))), overrideByDate = new Map(overrides.map((r) => [r.calendarDate.toISOString().slice(0,10), r])); let workingDays = 0;
+  const weeklyOffDays = attendanceRule?.weeklyOffDays || [0];
+  for (let day = new Date(from); day < range.end && (!employee.exitDate || day <= dateOnly(employee.exitDate)); day.setUTCDate(day.getUTCDate()+1)) { const key=day.toISOString().slice(0,10),override=overrideByDate.get(key);if(override?override.isWorkingDay:((policy?.includeWeeklyOff||!weeklyOffDays.includes(day.getUTCDay()))&&!holidayKeys.has(key)))workingDays+=Number(override?.eligibleDayWeight||1); }
   const counts = {}; rows.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
   let payableDays = rows.reduce((sum, row) => sum + (paid.has(row.status) ? 1 : row.status === 'HALF_DAY' ? .5 : 0), 0);
   const latePenalty = policy?.lateEntriesPerDay ? Math.floor((counts.LATE || 0) / policy.lateEntriesPerDay) : 0; payableDays = Math.max(0, Math.min(workingDays, payableDays - latePenalty));

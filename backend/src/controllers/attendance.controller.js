@@ -4,10 +4,11 @@ import {
   assertTeacherIsClassTeacherForSection,
   isSchoolAdmin,
   requireSchoolAdminOrClassTeacher,
+  requireSchoolAdminOrAssignedTeacherForSection,
   sendAuthorizationError,
 } from '../utils/teacherAuthorization.util.js';
 
-const VALID_ATTENDANCE_STATUSES = new Set(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE']);
+const VALID_ATTENDANCE_STATUSES = new Set(['PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'LEAVE', 'APPROVED_LEAVE', 'UNAPPROVED_LEAVE', 'MEDICAL_LEAVE', 'OFFICIAL_DUTY', 'HOLIDAY', 'WEEKLY_OFF', 'NOT_MARKED']);
 const VALID_DAY_TYPES = new Set(['WORKING_DAY', 'HOLIDAY', 'WEEKLY_OFF', 'EXAM', 'EVENT', 'VACATION']);
 
 const normalizeDate = (value) => {
@@ -51,12 +52,14 @@ const getSectionOr404 = async ({ schoolId, classId, sectionId }) => {
   return section;
 };
 
-const getSectionStudents = async (section) => prisma.student.findMany({
+const getSectionStudents = async (section, effectiveDate = normalizeDate(new Date())) => prisma.student.findMany({
   where: {
     schoolId: section.schoolId,
-    className: section.class.className,
-    section: section.sectionName,
     isActive: true,
+    OR: [
+      { className: section.class.className, section: section.sectionName, OR: [{ admissionDate: null }, { admissionDate: { lte: effectiveDate } }] },
+      { enrollmentHistory: { some: { classId: section.classId, sectionId: section.id, effectiveFrom: { lte: effectiveDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveDate } }] } } },
+    ],
   },
   orderBy: [{ serialNo: 'asc' }, { studentFirstName: 'asc' }],
 });
@@ -72,10 +75,10 @@ export const getStudentAttendanceRoster = async (req, res) => {
     }
 
     const section = await getSectionOr404({ schoolId, classId, sectionId });
-    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    const access = await requireSchoolAdminOrAssignedTeacherForSection(req.user, { schoolId, classId, sectionId });
 
     const [students, attendanceRows, classTeacher] = await Promise.all([
-      getSectionStudents(section),
+      getSectionStudents(section, attendanceDate),
       prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate } }),
       prisma.teacherAssignment.findFirst({
         where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER', 'BOTH'] } },
@@ -89,7 +92,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
       success: true,
       data: {
         date: attendanceDate,
-        canMark: req.user.role === 'TEACHER',
+        canMark: access.canMark,
         class: section.class,
         section: { id: section.id, sectionName: section.sectionName, sectionOrder: section.sectionOrder },
         classTeacher: classTeacher?.teacher || null,
@@ -100,7 +103,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
             admissionNo: student.admissionNo,
             name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '),
             rollNumber: student.rollNumber,
-            status: attendance?.status || 'PRESENT',
+            status: attendance?.status || 'NOT_MARKED',
             remarks: attendance?.remarks || '',
             attendanceId: attendance?.id || null,
           };
@@ -119,8 +122,8 @@ export const getStudentAttendanceRoster = async (req, res) => {
 
 export const markStudentAttendance = async (req, res) => {
   try {
-    if (req.user.role !== 'TEACHER') {
-      return res.status(403).json({ success: false, message: 'Only the class teacher can mark student attendance' });
+    if (!['TEACHER', 'ADMIN', 'SCHOOL_OWNER'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Only the class teacher or school administration can mark student attendance' });
     }
 
     const schoolId = req.user.schoolId;
@@ -132,8 +135,8 @@ export const markStudentAttendance = async (req, res) => {
     }
 
     const section = await getSectionOr404({ schoolId, classId, sectionId });
-    await assertTeacherIsClassTeacherForSection(req.user, { schoolId, classId, sectionId });
-    const students = await getSectionStudents(section);
+    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    const students = await getSectionStudents(section, attendanceDate);
     const studentIds = new Set(students.map((student) => student.id));
 
     const normalizedRecords = records.map((record) => ({
@@ -329,7 +332,7 @@ export const getClassAttendanceMonth = async (req, res) => {
       return res.status(400).json({ success: false, message: 'classId, sectionId and month (YYYY-MM) are required' });
     }
     const section = await getSectionOr404({ schoolId, classId, sectionId });
-    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    await requireSchoolAdminOrAssignedTeacherForSection(req.user, { schoolId, classId, sectionId });
     const [students, rows, calendar] = await Promise.all([
       getSectionStudents(section),
       prisma.studentAttendance.findMany({
@@ -387,7 +390,7 @@ export const getClassMonthlyRegister = async (req, res) => {
     const range = monthRange(req.query.month);
     if (!schoolId || !classId || !sectionId || !range) return res.status(400).json({ success: false, message: 'classId, sectionId and month are required' });
     const section = await getSectionOr404({ schoolId, classId, sectionId });
-    await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId, sectionId });
+    await requireSchoolAdminOrAssignedTeacherForSection(req.user, { schoolId, classId, sectionId });
     const [students, rows] = await Promise.all([
       getSectionStudents(section),
       prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate: { gte: range.start, lt: range.end } }, select: { studentId: true, status: true } }),
