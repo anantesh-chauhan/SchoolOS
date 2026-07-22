@@ -11,6 +11,7 @@ import {
   updateTeacherResource,
   getTeacherAssignmentDetail,
   getTeacherAssignmentChapter,
+  getMyTeacherWorkload,
   getTeacherAssignmentStudent,
 } from '../controllers/teacherDashboard.controller.js';
 
@@ -20,6 +21,7 @@ router.use(authMiddleware);
 router.use(requireRole('TEACHER', 'ADMIN', 'SCHOOL_OWNER'));
 
 router.get('/dashboard', getTeacherDashboard);
+router.get('/workload', getMyTeacherWorkload);
 router.get('/assignments', getTeacherAssignments);
 router.get('/assignments/:assignmentId', getTeacherAssignmentDetail);
 router.get('/assignments/:assignmentId/chapters/:chapterId', getTeacherAssignmentChapter);

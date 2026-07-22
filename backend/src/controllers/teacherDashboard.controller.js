@@ -6,10 +6,23 @@ import {
   requireSchoolAdminOrAssignedTeacher,
   sendAuthorizationError,
 } from '../utils/teacherAuthorization.util.js';
+import { getTeacherWorkloads } from '../services/academicStaffing.service.js';
 
 
 const VALID_PROGRESS_STATUSES = new Set(['NOT_STARTED', 'ONGOING', 'COMPLETED']);
 const VALID_RESOURCE_TYPES = new Set(['NOTE', 'LINK', 'PDF', 'IMAGE', 'VIDEO', 'ASSIGNMENT', 'OTHER']);
+
+export const getMyTeacherWorkload = async (req, res) => {
+  try {
+    if (req.user.role !== 'TEACHER') return res.status(403).json({ success: false, message: 'Teacher workload is available only to the signed-in teacher' });
+    const teacher = await getTeacherForUser(req.user);
+    if (!teacher) return res.status(404).json({ success: false, message: 'Teacher profile not found' });
+    const [workload] = await getTeacherWorkloads({ schoolId: req.user.schoolId, academicSessionId: req.query.academicSessionId, teacherId: teacher.id });
+    return res.json({ success: true, data: workload });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load workload' });
+  }
+};
 
 const normalizeProgressStatus = (status) => {
   const normalized = String(status || '').trim().toUpperCase().replace(/\s+/g, '_');

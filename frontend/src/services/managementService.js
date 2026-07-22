@@ -272,3 +272,18 @@ export const timetableService = {
     return response.data;
   },
 };
+
+export const academicStaffingService = {
+  config: async (params = {}) => (await apiClient.get('/academic-config', { params })).data,
+  updateConfig: async (payload) => (await apiClient.patch('/academic-config', payload)).data,
+  weeklySlots: async (params = {}) => (await apiClient.get('/curriculum/weekly-slots', { params })).data,
+  updateSlot: async ({ id, ...payload }) => (await apiClient.patch(`/curriculum/weekly-slots/${id}`, payload)).data,
+  applyTemplate: async (payload) => (await apiClient.post('/curriculum/weekly-slots/apply-template', payload)).data,
+  resetDefaults: async (payload = {}) => (await apiClient.post('/curriculum/weekly-slots/reset-defaults', payload)).data,
+  autoAllocate: async (payload = {}) => (await apiClient.post('/teacher-assignments/auto-allocate', payload)).data,
+  replaceTeacher: async ({ id, ...payload }) => (await apiClient.patch(`/teacher-assignments/${id}`, payload)).data,
+  classTeachers: async (params = {}) => (await apiClient.get('/class-teacher-assignments', { params })).data,
+  saveClassTeacher: async (payload) => (await apiClient.post('/class-teacher-assignments', payload)).data,
+  workloads: async (params = {}) => (await apiClient.get('/teacher-workload', { params })).data,
+  audit: async (params = {}) => (await apiClient.get('/academic-staffing/audit', { params })).data,
+};

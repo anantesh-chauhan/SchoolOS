@@ -11,6 +11,7 @@ const { disconnectTenantIsolationSeed, seedTenantIsolationDemo } = await import(
 const { disconnectPlatformOwnerSeed, seedPlatformOwner } = await import('./seedPlatformOwner.js');
 const { disconnectHomeworkSeed, seedHomeworkResources } = await import('./seedHomeworkResources.js');
 const { disconnectCommunicationSeed, seedCommunication } = await import('./seedCommunication.js');
+const { disconnectAcademicStaffingSeed, seedAcademicStaffing } = await import('./seedAcademicStaffing.js');
 
 const prisma = new PrismaClient();
 const demoPassword = 'admin123';
@@ -124,6 +125,7 @@ try {
   await seedPlatformOwner();
   await ensureDemoFoundation();
   await seedAcademicData();
+  await seedAcademicStaffing();
   await seedTenantIsolationDemo();
   await seedHomeworkResources();
   await seedCommunication();
@@ -134,4 +136,5 @@ try {
   await disconnectPlatformOwnerSeed();
   await disconnectHomeworkSeed();
   await disconnectCommunicationSeed();
+  await disconnectAcademicStaffingSeed();
 }

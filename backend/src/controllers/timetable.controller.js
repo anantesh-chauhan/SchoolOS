@@ -1,5 +1,6 @@
 import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
+import { DEFAULT_ACADEMIC_CONFIGURATION, isTeacherEligible, resolveAcademicContext } from '../services/academicStaffing.service.js';
 
 
 const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -18,6 +19,14 @@ const DAILY_TEMPLATE = [
 ];
 
 const CLASS_SLOT_CAPACITY = DAYS.length * 8;
+const getTimetableLimits = async (schoolId, academicYear) => {
+  try {
+    const session = await prisma.academicSession.findFirst({ where: { schoolId, name: academicYear } });
+    return (await resolveAcademicContext(schoolId, session?.id)).config;
+  } catch {
+    return DEFAULT_ACADEMIC_CONFIGURATION;
+  }
+};
 
 const getClassNumber = (className) => {
   const match = String(className || '').match(/class\s*(\d+)/i);
@@ -540,6 +549,7 @@ export const assignSlot = async (req, res) => {
       include: {
         timetable: true,
         section: true,
+        class: true,
       },
     });
 
@@ -584,15 +594,19 @@ export const assignSlot = async (req, res) => {
       });
     }
 
-    const teacher = await prisma.teacher.findFirst({ where: { id: resolvedTeacherId, schoolId } });
+    const teacher = await prisma.teacher.findFirst({ where: { id: resolvedTeacherId, schoolId, isActive: true, deletedAt: null }, include: { qualifications: true } });
     if (!teacher) {
       return res.status(404).json({ success: false, message: 'Teacher not found in this school' });
+    }
+    if (!isTeacherEligible({ teacher, subject, className: slot.class.className, requiresPractical: Boolean(subject.isLab) })) {
+      return res.status(409).json({ success: false, message: 'Teacher is not qualified or class-level eligible for this subject' });
     }
 
     if (!sectionSubject) {
       return res.status(409).json({ success: false, message: 'Subject is not mapped to this section' });
     }
 
+    const limits = await getTimetableLimits(schoolId, slot.timetable.academicYear);
     const [teacherClash, teacherDailyCount, teacherWeeklyCount, subjectWeeklyCount] = await Promise.all([
       prisma.timetableSlot.findFirst({
         where: {
@@ -619,7 +633,7 @@ export const assignSlot = async (req, res) => {
         where: {
           schoolId,
           teacherId: resolvedTeacherId,
-          timetableId: slot.timetableId,
+          timetable: { academicYear: slot.timetable.academicYear },
           slotType: 'PERIOD',
           subjectId: { not: null },
           id: { not: slot.id },
@@ -640,12 +654,12 @@ export const assignSlot = async (req, res) => {
       return res.status(409).json({ success: false, message: 'Teacher clash detected at this time slot' });
     }
 
-    if (teacherDailyCount >= 6) {
-      return res.status(409).json({ success: false, message: 'Teacher daily load cannot exceed 6 periods' });
+    if (teacherDailyCount >= limits.maximumTeacherPeriodsPerDay) {
+      return res.status(409).json({ success: false, message: `Teacher daily load cannot exceed ${limits.maximumTeacherPeriodsPerDay} periods` });
     }
 
-    if (teacherWeeklyCount >= 7) {
-      return res.status(409).json({ success: false, message: 'Teacher maximum weekly load cannot exceed 7 periods in this timetable' });
+    if (teacherWeeklyCount >= Math.min(teacher.maximumPeriodsPerWeek || limits.maximumTeacherPeriodsPerWeek, limits.maximumTeacherPeriodsPerWeek)) {
+      return res.status(409).json({ success: false, message: `Teacher maximum weekly load cannot exceed ${Math.min(teacher.maximumPeriodsPerWeek || limits.maximumTeacherPeriodsPerWeek, limits.maximumTeacherPeriodsPerWeek)} periods` });
     }
 
     if (requirement && subjectWeeklyCount >= requirement.periodsPerWeek) {
@@ -740,6 +754,7 @@ export const validateTimetable = async (req, res) => {
     if (!timetable) {
       return res.status(404).json({ success: false, message: 'Timetable not found' });
     }
+    const limits = await getTimetableLimits(schoolId, timetable.academicYear);
 
     const [progress, teacherDailyLoadRows, teacherWeeklyLoadRows, emptyPeriodCount] = await Promise.all([
       getRequirementProgress(timetable),
@@ -747,7 +762,7 @@ export const validateTimetable = async (req, res) => {
         by: ['teacherId', 'dayOfWeek'],
         where: {
           schoolId,
-          timetableId: id,
+          timetable: { academicYear: timetable.academicYear },
           slotType: 'PERIOD',
           teacherId: { not: null },
         },
@@ -757,7 +772,7 @@ export const validateTimetable = async (req, res) => {
         by: ['teacherId'],
         where: {
           schoolId,
-          timetableId: id,
+          timetable: { academicYear: timetable.academicYear },
           slotType: 'PERIOD',
           teacherId: { not: null },
         },
@@ -785,7 +800,7 @@ export const validateTimetable = async (req, res) => {
     }
 
     for (const row of teacherDailyLoadRows) {
-      if (row._count._all > 6) {
+      if (row._count._all > limits.maximumTeacherPeriodsPerDay) {
         issues.push({
           type: 'TEACHER_DAILY_OVERLOAD',
           message: `Teacher ${row.teacherId} has ${row._count._all} periods on ${row.dayOfWeek}`,
@@ -794,7 +809,7 @@ export const validateTimetable = async (req, res) => {
     }
 
     for (const row of teacherWeeklyLoadRows) {
-      if (row._count._all > 7) {
+      if (row._count._all > limits.maximumTeacherPeriodsPerWeek) {
         issues.push({
           type: 'TEACHER_WEEKLY_OVERLOAD',
           message: `Teacher ${row.teacherId} has ${row._count._all} periods in the week`,

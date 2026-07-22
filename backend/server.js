@@ -26,6 +26,7 @@ import issueReportRoutes from './src/modules/issue-report/issueReport.routes.js'
 import studentPortalRoutes from './src/modules/student/studentPortal.routes.js';
 import securityRoutes from './src/routes/security.js';
 import curriculumRoutes from './src/routes/curriculum.js';
+import academicStaffingRoutes from './src/routes/academicStaffing.js';
 import feeRoutes from './src/modules/fees/fee.routes.js';
 import homeworkRoutes from './src/modules/homework/homework.routes.js';
 import communicationRoutes from './src/modules/communication/communication.routes.js';
@@ -112,6 +113,7 @@ app.use('/api', issueReportRoutes);
 app.use('/api/student', studentPortalRoutes);
 app.use('/api', securityRoutes);
 app.use('/api/curriculum', curriculumRoutes);
+app.use('/api', academicStaffingRoutes);
 app.use('/api/fees', feeRoutes);
 app.use('/api', homeworkRoutes);
 app.use('/api', communicationRoutes);

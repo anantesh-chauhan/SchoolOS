@@ -13,20 +13,20 @@ datasource db {
 
 // User Model
 model User {
-  id                       String                   @id @default(cuid())
-  email                    String                   @unique
+  id                       String                     @id @default(cuid())
+  email                    String                     @unique
   password                 String
   name                     String
   contactEmail             String?
-  role                     Role                     @default(STUDENT)
+  role                     Role                       @default(STUDENT)
   schoolId                 String?
   classId                  String?
   sectionId                String?
   employeeId               String?
   joiningYear              Int?
-  school                   School?                  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
-  class                    Class?                   @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
-  section                  Section?                 @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
+  school                   School?                    @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  class                    Class?                     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
+  section                  Section?                   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
   activityEnrollments      ActivityEnrollment[]
   widgetPreferences        UserWidgetPreference[]
   widgetTodos              UserWidgetTodo[]
@@ -36,20 +36,21 @@ model User {
   widgetActivities         UserWidgetActivity[]
   loginStreaks             UserLoginStreak[]
   createdSystemContents    SystemContent[]
-  createdChapterPolls      ChapterPoll[]            @relation("ChapterPollCreatedByAdmin")
-  compiledChapterSummaries ChapterAnalysisSummary[] @relation("ChapterAnalysisCompiledByAdmin")
-  markedStudentAttendances StudentAttendance[]      @relation("StudentAttendanceMarkedBy")
-  markedTeacherAttendances TeacherAttendance[]      @relation("TeacherAttendanceMarkedBy")
-  reportedIssues           IssueReport[]            @relation("IssueReporter")
-  assignedIssues           IssueReport[]            @relation("IssueAssignee")
+  createdChapterPolls      ChapterPoll[]              @relation("ChapterPollCreatedByAdmin")
+  compiledChapterSummaries ChapterAnalysisSummary[]   @relation("ChapterAnalysisCompiledByAdmin")
+  markedStudentAttendances StudentAttendance[]        @relation("StudentAttendanceMarkedBy")
+  markedTeacherAttendances TeacherAttendance[]        @relation("TeacherAttendanceMarkedBy")
+  reportedIssues           IssueReport[]              @relation("IssueReporter")
+  assignedIssues           IssueReport[]              @relation("IssueAssignee")
   issueMessages            IssueReportMessage[]
-  issueAuditActions        IssueReportAudit[]       @relation("IssueAuditActor")
-  createdHomework          Homework[]               @relation("HomeworkCreator")
-  reviewedSubmissions      HomeworkSubmission[]     @relation("SubmissionReviewer")
-  uploadedAcademicFiles    AcademicAttachment[]     @relation("AcademicAttachmentUploader")
-  academicAuditActions     AcademicContentAudit[]   @relation("AcademicContentAuditActor")
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
+  issueAuditActions        IssueReportAudit[]         @relation("IssueAuditActor")
+  createdHomework          Homework[]                 @relation("HomeworkCreator")
+  reviewedSubmissions      HomeworkSubmission[]       @relation("SubmissionReviewer")
+  uploadedAcademicFiles    AcademicAttachment[]       @relation("AcademicAttachmentUploader")
+  academicAuditActions     AcademicContentAudit[]     @relation("AcademicContentAuditActor")
+  staffingAuditActions     AcademicStaffingAuditLog[] @relation("AcademicStaffingAuditActor")
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
 
   // Optional profile fields (backwards-compatible additions)
   profileImage                String?
@@ -75,119 +76,126 @@ model User {
 
 // School Model
 model School {
-  id                        String                     @id @default(cuid())
-  schoolName                String
-  schoolCode                String                     @unique
-  slug                      String                     @unique
-  address                   String
-  logoUrl                   String?
-  city                      String
-  state                     String
-  phone                     String
-  email                     String
-  status                    SchoolStatus               @default(ACTIVE)
-  theme                     Json?
-  config                    Json?
-  users                     User[]
-  classes                   Class[]
-  sections                  Section[]
-  subjects                  Subject[]
-  chapters                  Chapter[]
-  chapterProgress           ChapterProgress[]
-  sectionResources          SectionResource[]
-  subjectWeeklyRequirements SubjectWeeklyRequirement[]
-  teachers                  Teacher[]
-  teacherAssignments        TeacherAssignment[]
-  timetables                Timetable[]
-  timetableSlots            TimetableSlot[]
-  galleryGroups             GalleryGroup[]
-  galleryPhotos             GalleryPhoto[]
-  settings                  SchoolSettings?
-  academicLevels            AcademicLevel[]
-  streams                   Stream[]
-  streamSubjects            StreamSubject[]
-  classStreams              ClassStream[]
-  subjectComponents         SubjectComponent[]
-  activities                Activity[]
-  activityEnrollments       ActivityEnrollment[]
-  periodDefinitions         PeriodDefinition[]
-  teacherSubjects           TeacherSubject[]
-  labRooms                  LabRoom[]
-  labSubjectRules           LabSubjectRule[]
-  widgetPreferences         UserWidgetPreference[]
-  widgetTodos               UserWidgetTodo[]
-  widgetNotes               UserWidgetNote[]
-  widgetBookmarks           UserWidgetBookmark[]
-  widgetNotifications       UserWidgetNotification[]
-  widgetActivities          UserWidgetActivity[]
-  loginStreaks              UserLoginStreak[]
-  systemContents            SystemContent[]
-  students                  Student[]
-  chapterPolls              ChapterPoll[]
-  studentChapterVotes       StudentChapterVote[]
-  teacherStudentEvaluations TeacherStudentEvaluation[]
-  chapterAnalysisSummaries  ChapterAnalysisSummary[]
-  chapterAssessments        ChapterAssessment[]
-  chapterAssessmentResults  ChapterAssessmentResult[]
-  studentChapterMasteries   StudentChapterMastery[]
-  learningGaps              LearningGap[]
-  learningInterventions     LearningIntervention[]
-  studentAttendances        StudentAttendance[]
-  teacherAttendances        TeacherAttendance[]
-  academicCalendarDays      AcademicCalendarDay[]
-  issueReports              IssueReport[]
-  securityQuestions         UserSecurityQuestion[]
-  passwordResetTokens       PasswordResetToken[]
-  securityAuditLogs         SecurityAuditLog[]
-  curricula                 Curriculum[]
-  curriculumVersions        CurriculumVersion[]
-  publishers                Publisher[]
-  books                     Book[]
-  curriculumUnits           CurriculumUnit[]
-  curriculumAuditLogs       CurriculumAuditLog[]
-  feeModuleSetting          FeeModuleSetting?
-  feeStructures             FeeStructure[]
-  feeComponents             FeeComponent[]
-  feeAssignments            FeeAssignment[]
-  studentFeeAccounts        StudentFeeAccount[]
-  feeCharges                StudentFeeCharge[]
-  feePayments               FeePayment[]
-  feeReceipts               FeeReceipt[]
-  feeLedgerEntries          FeeLedgerEntry[]
-  feeAdjustments            FeeAdjustment[]
-  feeApprovalRequests       FeeApprovalRequest[]
-  feeReminders              FeeReminder[]
-  feeAuditLogs              FeeAuditLog[]
-  feeScholarships           FeeScholarship[]
-  feeNotificationTemplates  FeeNotificationTemplate[]
-  feeDailyCashClosings      FeeDailyCashClosing[]
-  feeFinancialPeriods       FeeFinancialPeriod[]
-  feeDocuments              FeeDocument[]
-  feeFamilyLinks            FeeFamilyLink[]
-  feeCategories             FeeCategory[]
-  feeInvoices               FeeInvoice[]
-  feeInvoiceItems           FeeInvoiceItem[]
-  feeRefunds                FeeRefund[]
-  feeRefundAllocations      FeeRefundAllocation[]
-  transportFeeRoutes        TransportFeeRoute[]
-  transportFeeStops         TransportFeeStop[]
-  transportFeeAssignments   TransportFeeAssignment[]
-  homework                  Homework[]
-  homeworkAudiences         HomeworkAudience[]
-  homeworkSubmissions       HomeworkSubmission[]
-  academicAttachments       AcademicAttachment[]
-  academicLinks             AcademicExternalLink[]
-  academicNotifications     AcademicNotification[]
-  academicContentAudits     AcademicContentAudit[]
-  homeworkModuleSetting     HomeworkModuleSetting?
-  employees                 Employee[]
-  hrLeavePolicy             HrLeavePolicy?
-  employeeAttendances       EmployeeAttendance[]
-  employeeLeaveApplications EmployeeLeaveApplication[]
-  employeePayrolls          EmployeePayroll[]
-  hrAuditLogs               HrAuditLog[]
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  id                         String                          @id @default(cuid())
+  schoolName                 String
+  schoolCode                 String                          @unique
+  slug                       String                          @unique
+  address                    String
+  logoUrl                    String?
+  city                       String
+  state                      String
+  phone                      String
+  email                      String
+  status                     SchoolStatus                    @default(ACTIVE)
+  theme                      Json?
+  config                     Json?
+  users                      User[]
+  classes                    Class[]
+  sections                   Section[]
+  subjects                   Subject[]
+  chapters                   Chapter[]
+  chapterProgress            ChapterProgress[]
+  sectionResources           SectionResource[]
+  subjectWeeklyRequirements  SubjectWeeklyRequirement[]
+  academicSessions           AcademicSession[]
+  academicConfigurations     AcademicConfiguration[]
+  weeklySubjectSlotTemplates WeeklySubjectSlotTemplate[]
+  sectionSubjectAllocations  SectionSubjectAllocation[]
+  sectionClassTeachers       SectionClassTeacherAssignment[]
+  teacherQualifications      TeacherQualification[]
+  staffingAuditLogs          AcademicStaffingAuditLog[]
+  teachers                   Teacher[]
+  teacherAssignments         TeacherAssignment[]
+  timetables                 Timetable[]
+  timetableSlots             TimetableSlot[]
+  galleryGroups              GalleryGroup[]
+  galleryPhotos              GalleryPhoto[]
+  settings                   SchoolSettings?
+  academicLevels             AcademicLevel[]
+  streams                    Stream[]
+  streamSubjects             StreamSubject[]
+  classStreams               ClassStream[]
+  subjectComponents          SubjectComponent[]
+  activities                 Activity[]
+  activityEnrollments        ActivityEnrollment[]
+  periodDefinitions          PeriodDefinition[]
+  teacherSubjects            TeacherSubject[]
+  labRooms                   LabRoom[]
+  labSubjectRules            LabSubjectRule[]
+  widgetPreferences          UserWidgetPreference[]
+  widgetTodos                UserWidgetTodo[]
+  widgetNotes                UserWidgetNote[]
+  widgetBookmarks            UserWidgetBookmark[]
+  widgetNotifications        UserWidgetNotification[]
+  widgetActivities           UserWidgetActivity[]
+  loginStreaks               UserLoginStreak[]
+  systemContents             SystemContent[]
+  students                   Student[]
+  chapterPolls               ChapterPoll[]
+  studentChapterVotes        StudentChapterVote[]
+  teacherStudentEvaluations  TeacherStudentEvaluation[]
+  chapterAnalysisSummaries   ChapterAnalysisSummary[]
+  chapterAssessments         ChapterAssessment[]
+  chapterAssessmentResults   ChapterAssessmentResult[]
+  studentChapterMasteries    StudentChapterMastery[]
+  learningGaps               LearningGap[]
+  learningInterventions      LearningIntervention[]
+  studentAttendances         StudentAttendance[]
+  teacherAttendances         TeacherAttendance[]
+  academicCalendarDays       AcademicCalendarDay[]
+  issueReports               IssueReport[]
+  securityQuestions          UserSecurityQuestion[]
+  passwordResetTokens        PasswordResetToken[]
+  securityAuditLogs          SecurityAuditLog[]
+  curricula                  Curriculum[]
+  curriculumVersions         CurriculumVersion[]
+  publishers                 Publisher[]
+  books                      Book[]
+  curriculumUnits            CurriculumUnit[]
+  curriculumAuditLogs        CurriculumAuditLog[]
+  feeModuleSetting           FeeModuleSetting?
+  feeStructures              FeeStructure[]
+  feeComponents              FeeComponent[]
+  feeAssignments             FeeAssignment[]
+  studentFeeAccounts         StudentFeeAccount[]
+  feeCharges                 StudentFeeCharge[]
+  feePayments                FeePayment[]
+  feeReceipts                FeeReceipt[]
+  feeLedgerEntries           FeeLedgerEntry[]
+  feeAdjustments             FeeAdjustment[]
+  feeApprovalRequests        FeeApprovalRequest[]
+  feeReminders               FeeReminder[]
+  feeAuditLogs               FeeAuditLog[]
+  feeScholarships            FeeScholarship[]
+  feeNotificationTemplates   FeeNotificationTemplate[]
+  feeDailyCashClosings       FeeDailyCashClosing[]
+  feeFinancialPeriods        FeeFinancialPeriod[]
+  feeDocuments               FeeDocument[]
+  feeFamilyLinks             FeeFamilyLink[]
+  feeCategories              FeeCategory[]
+  feeInvoices                FeeInvoice[]
+  feeInvoiceItems            FeeInvoiceItem[]
+  feeRefunds                 FeeRefund[]
+  feeRefundAllocations       FeeRefundAllocation[]
+  transportFeeRoutes         TransportFeeRoute[]
+  transportFeeStops          TransportFeeStop[]
+  transportFeeAssignments    TransportFeeAssignment[]
+  homework                   Homework[]
+  homeworkAudiences          HomeworkAudience[]
+  homeworkSubmissions        HomeworkSubmission[]
+  academicAttachments        AcademicAttachment[]
+  academicLinks              AcademicExternalLink[]
+  academicNotifications      AcademicNotification[]
+  academicContentAudits      AcademicContentAudit[]
+  homeworkModuleSetting      HomeworkModuleSetting?
+  employees                  Employee[]
+  hrLeavePolicy              HrLeavePolicy?
+  employeeAttendances        EmployeeAttendance[]
+  employeeLeaveApplications  EmployeeLeaveApplication[]
+  employeePayrolls           EmployeePayroll[]
+  hrAuditLogs                HrAuditLog[]
+  createdAt                  DateTime                        @default(now())
+  updatedAt                  DateTime                        @updatedAt
 
   @@index([schoolName])
   @@index([city, state])
@@ -333,42 +341,96 @@ model SchoolSettings {
   @@index([schoolId])
 }
 
+model AcademicSession {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  school                  School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicConfiguration   AcademicConfiguration?
+  slotTemplates           WeeklySubjectSlotTemplate[]
+  sectionAllocations      SectionSubjectAllocation[]
+  classTeacherAssignments SectionClassTeacherAssignment[]
+  teacherAssignments      TeacherAssignment[]
+  auditLogs               AcademicStaffingAuditLog[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive])
+}
+
+model AcademicConfiguration {
+  id                            String   @id @default(cuid())
+  schoolId                      String
+  academicSessionId             String   @unique
+  workingDaysPerWeek            Int      @default(6)
+  periodsPerDay                 Int      @default(8)
+  totalPeriodsPerWeek           Int      @default(48)
+  defaultPeriodDurationMinutes  Int      @default(40)
+  shortBreakAfterPeriod         Int?
+  lunchBreakAfterPeriod         Int?
+  maximumTeacherPeriodsPerDay   Int      @default(7)
+  maximumTeacherPeriodsPerWeek  Int      @default(36)
+  minimumTeacherFreePeriodsWeek Int      @default(6)
+  targetTeacherPeriodsPerWeek   Int      @default(30)
+  classTeacherRequired          Boolean  @default(true)
+  classTeacherDutyPeriods       Int      @default(1)
+  prePrimaryAssistantRequired   Boolean  @default(false)
+  primaryGeneralistModel        Boolean  @default(true)
+  saturdayWorking               Boolean  @default(true)
+  timetableGenerationEnabled    Boolean  @default(true)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  school          School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, academicSessionId])
+  @@index([schoolId])
+}
+
 model Class {
-  id                        String                     @id @default(cuid())
-  className                 String
-  classOrder                Int
-  schoolId                  String
-  academicLevelId           String?
-  school                    School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  academicLevel             AcademicLevel?             @relation(fields: [academicLevelId], references: [id], onDelete: SetNull)
-  sections                  Section[]
-  users                     User[]                     @relation("ClassUsers")
-  classSubjects             ClassSubject[]
-  subjectWeeklyRequirements SubjectWeeklyRequirement[]
-  teacherAssignments        TeacherAssignment[]
-  timetables                Timetable[]
-  timetableSlots            TimetableSlot[]
-  classStreams              ClassStream[]
-  teacherSubjects           TeacherSubject[]
-  chapters                  Chapter[]
-  chapterProgress           ChapterProgress[]
-  sectionResources          SectionResource[]
-  chapterPolls              ChapterPoll[]
-  studentChapterVotes       StudentChapterVote[]
-  teacherStudentEvaluations TeacherStudentEvaluation[]
-  chapterAnalysisSummaries  ChapterAnalysisSummary[]
-  chapterAssessments        ChapterAssessment[]
-  chapterAssessmentResults  ChapterAssessmentResult[]
-  studentChapterMasteries   StudentChapterMastery[]
-  learningGaps              LearningGap[]
-  learningInterventions     LearningIntervention[]
-  studentAttendances        StudentAttendance[]
-  books                     Book[]
-  curriculumUnits           CurriculumUnit[]
-  homework                  Homework[]
-  deletedAt                 DateTime?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  id                         String                      @id @default(cuid())
+  className                  String
+  classOrder                 Int
+  schoolId                   String
+  academicLevelId            String?
+  school                     School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicLevel              AcademicLevel?              @relation(fields: [academicLevelId], references: [id], onDelete: SetNull)
+  sections                   Section[]
+  users                      User[]                      @relation("ClassUsers")
+  classSubjects              ClassSubject[]
+  subjectWeeklyRequirements  SubjectWeeklyRequirement[]
+  teacherAssignments         TeacherAssignment[]
+  weeklySubjectSlotTemplates WeeklySubjectSlotTemplate[]
+  sectionSubjectAllocations  SectionSubjectAllocation[]
+  timetables                 Timetable[]
+  timetableSlots             TimetableSlot[]
+  classStreams               ClassStream[]
+  teacherSubjects            TeacherSubject[]
+  chapters                   Chapter[]
+  chapterProgress            ChapterProgress[]
+  sectionResources           SectionResource[]
+  chapterPolls               ChapterPoll[]
+  studentChapterVotes        StudentChapterVote[]
+  teacherStudentEvaluations  TeacherStudentEvaluation[]
+  chapterAnalysisSummaries   ChapterAnalysisSummary[]
+  chapterAssessments         ChapterAssessment[]
+  chapterAssessmentResults   ChapterAssessmentResult[]
+  studentChapterMasteries    StudentChapterMastery[]
+  learningGaps               LearningGap[]
+  learningInterventions      LearningIntervention[]
+  studentAttendances         StudentAttendance[]
+  books                      Book[]
+  curriculumUnits            CurriculumUnit[]
+  homework                   Homework[]
+  deletedAt                  DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
   @@unique([schoolId, className])
   @@unique([schoolId, classOrder])
@@ -377,19 +439,21 @@ model Class {
 }
 
 model Section {
-  id                        String                     @id @default(cuid())
+  id                        String                          @id @default(cuid())
   sectionName               String
   sectionOrder              Int
   classId                   String
   schoolId                  String
   streamId                  String?
-  class                     Class                      @relation(fields: [classId], references: [id], onDelete: Cascade)
-  school                    School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  stream                    Stream?                    @relation(fields: [streamId], references: [id], onDelete: SetNull)
-  users                     User[]                     @relation("SectionUsers")
+  class                     Class                           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  school                    School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  stream                    Stream?                         @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  users                     User[]                          @relation("SectionUsers")
   sectionSubjects           SectionSubject[]
   subjectWeeklyRequirements SubjectWeeklyRequirement[]
   teacherAssignments        TeacherAssignment[]
+  sectionSubjectAllocations SectionSubjectAllocation[]
+  sectionClassTeachers      SectionClassTeacherAssignment[]
   timetables                Timetable[]
   timetableSlots            TimetableSlot[]
   classStreams              ClassStream[]
@@ -409,8 +473,8 @@ model Section {
   studentAttendances        StudentAttendance[]
   homework                  Homework[]
   deletedAt                 DateTime?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  createdAt                 DateTime                        @default(now())
+  updatedAt                 DateTime                        @updatedAt
 
   @@unique([classId, sectionName])
   @@unique([classId, sectionOrder])
@@ -420,48 +484,51 @@ model Section {
 }
 
 model Subject {
-  id                        String                     @id @default(cuid())
-  subjectName               String
-  subjectCode               String
-  parentSubjectId           String?
-  subjectType               SubjectType                @default(CORE)
-  isLab                     Boolean                    @default(false)
-  isOptional                Boolean                    @default(false)
-  displayOrder              Int                        @default(0)
-  category                  SubjectCategory?
-  stream                    StreamType?
-  isCustom                  Boolean                    @default(false)
-  schoolId                  String
-  school                    School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  parentSubject             Subject?                   @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id], onDelete: SetNull)
-  childSubjects             Subject[]                  @relation("SubjectHierarchy")
-  classSubjects             ClassSubject[]
-  sectionSubjects           SectionSubject[]
-  subjectWeeklyRequirements SubjectWeeklyRequirement[]
-  teacherAssignments        TeacherAssignment[]
-  timetableSlots            TimetableSlot[]
-  subjectComponents         SubjectComponent[]
-  streamSubjects            StreamSubject[]
-  teacherSubjects           TeacherSubject[]
-  labRules                  LabSubjectRule[]
-  chapters                  Chapter[]
-  chapterProgress           ChapterProgress[]
-  sectionResources          SectionResource[]
-  chapterPolls              ChapterPoll[]
-  studentChapterVotes       StudentChapterVote[]
-  teacherStudentEvaluations TeacherStudentEvaluation[]
-  chapterAnalysisSummaries  ChapterAnalysisSummary[]
-  chapterAssessments        ChapterAssessment[]
-  chapterAssessmentResults  ChapterAssessmentResult[]
-  studentChapterMasteries   StudentChapterMastery[]
-  learningGaps              LearningGap[]
-  learningInterventions     LearningIntervention[]
-  books                     Book[]
-  curriculumUnits           CurriculumUnit[]
-  homework                  Homework[]
-  deletedAt                 DateTime?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  id                         String                      @id @default(cuid())
+  subjectName                String
+  subjectCode                String
+  parentSubjectId            String?
+  subjectType                SubjectType                 @default(CORE)
+  isLab                      Boolean                     @default(false)
+  isOptional                 Boolean                     @default(false)
+  displayOrder               Int                         @default(0)
+  category                   SubjectCategory?
+  stream                     StreamType?
+  isCustom                   Boolean                     @default(false)
+  schoolId                   String
+  school                     School                      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  parentSubject              Subject?                    @relation("SubjectHierarchy", fields: [parentSubjectId], references: [id], onDelete: SetNull)
+  childSubjects              Subject[]                   @relation("SubjectHierarchy")
+  classSubjects              ClassSubject[]
+  sectionSubjects            SectionSubject[]
+  subjectWeeklyRequirements  SubjectWeeklyRequirement[]
+  teacherAssignments         TeacherAssignment[]
+  weeklySubjectSlotTemplates WeeklySubjectSlotTemplate[]
+  sectionSubjectAllocations  SectionSubjectAllocation[]
+  teacherQualifications      TeacherQualification[]
+  timetableSlots             TimetableSlot[]
+  subjectComponents          SubjectComponent[]
+  streamSubjects             StreamSubject[]
+  teacherSubjects            TeacherSubject[]
+  labRules                   LabSubjectRule[]
+  chapters                   Chapter[]
+  chapterProgress            ChapterProgress[]
+  sectionResources           SectionResource[]
+  chapterPolls               ChapterPoll[]
+  studentChapterVotes        StudentChapterVote[]
+  teacherStudentEvaluations  TeacherStudentEvaluation[]
+  chapterAnalysisSummaries   ChapterAnalysisSummary[]
+  chapterAssessments         ChapterAssessment[]
+  chapterAssessmentResults   ChapterAssessmentResult[]
+  studentChapterMasteries    StudentChapterMastery[]
+  learningGaps               LearningGap[]
+  learningInterventions      LearningIntervention[]
+  books                      Book[]
+  curriculumUnits            CurriculumUnit[]
+  homework                   Homework[]
+  deletedAt                  DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
   @@unique([schoolId, subjectName])
   @@unique([schoolId, subjectCode])
@@ -557,7 +624,7 @@ model SectionSubject {
 }
 
 model Teacher {
-  id                        String                     @id @default(cuid())
+  id                        String                          @id @default(cuid())
   teacherName               String
   email                     String
   phone                     String
@@ -565,25 +632,39 @@ model Teacher {
   joiningYear               Int?
   qualification             String?
   specialization            String?
-  subjectsHandled           String[]                   @default([])
+  subjectsHandled           String[]                        @default([])
+  designation               String?
+  teacherCategory           TeacherCategory                 @default(TGT)
+  eligibleClassFrom         Int                             @default(1)
+  eligibleClassTo           Int                             @default(12)
+  canBeClassTeacher         Boolean                         @default(true)
+  canTeachPractical         Boolean                         @default(false)
+  maximumPeriodsPerDay      Int                             @default(7)
+  maximumPeriodsPerWeek     Int                             @default(36)
+  targetPeriodsPerWeek      Int                             @default(30)
+  employmentType            EmploymentType                  @default(PERMANENT)
+  isActive                  Boolean                         @default(true)
   schoolId                  String
-  school                    School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school                    School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherAssignments        TeacherAssignment[]
+  qualifications            TeacherQualification[]
+  sectionSubjectAllocations SectionSubjectAllocation[]
+  classTeacherAssignments   SectionClassTeacherAssignment[]
   chapterProgress           ChapterProgress[]
   sectionResources          SectionResource[]
   chapterPolls              ChapterPoll[]
   teacherStudentEvaluations TeacherStudentEvaluation[]
   chapterAnalysisSummaries  ChapterAnalysisSummary[]
   chapterAssessments        ChapterAssessment[]
-  learningInterventions     LearningIntervention[]     @relation("InterventionAssignedTeacher")
+  learningInterventions     LearningIntervention[]          @relation("InterventionAssignedTeacher")
   teacherAttendances        TeacherAttendance[]
   homework                  Homework[]
   teacherSubjects           TeacherSubject[]
   timetableSlots            TimetableSlot[]
   employee                  Employee?
   deletedAt                 DateTime?
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  createdAt                 DateTime                        @default(now())
+  updatedAt                 DateTime                        @updatedAt
 
   @@unique([schoolId, email])
   @@unique([schoolId, employeeId])
@@ -592,32 +673,164 @@ model Teacher {
 }
 
 model TeacherAssignment {
-  id            String                    @id @default(cuid())
-  teacherId     String
-  subjectId     String
-  classId       String
-  sectionId     String
-  schoolId      String
-  roleType      TeacherAssignmentRoleType @default(SUBJECT_TEACHER)
-  isActive      Boolean                   @default(true)
-  isTemporary   Boolean                   @default(false)
-  effectiveFrom DateTime                  @default(now())
-  effectiveTo   DateTime?
-  createdAt     DateTime                  @default(now())
-  updatedAt     DateTime                  @updatedAt
+  id                String                    @id @default(cuid())
+  teacherId         String
+  subjectId         String
+  classId           String
+  sectionId         String
+  schoolId          String
+  academicSessionId String?
+  weeklySlots       Int                       @default(0)
+  roleType          TeacherAssignmentRoleType @default(SUBJECT_TEACHER)
+  status            AssignmentStatus          @default(ACTIVE)
+  isActive          Boolean                   @default(true)
+  isTemporary       Boolean                   @default(false)
+  effectiveFrom     DateTime                  @default(now())
+  effectiveTo       DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
 
-  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
-  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher         Teacher          @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject         Subject          @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  class           Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section         Section          @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession? @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
 
-  @@unique([schoolId, teacherId, classId, sectionId, subjectId])
+  @@unique([schoolId, classId, sectionId, subjectId])
   @@index([teacherId])
   @@index([schoolId, teacherId, isActive])
   @@index([schoolId, sectionId])
   @@index([schoolId, subjectId])
   @@index([schoolId, classId, sectionId])
+  @@index([schoolId, academicSessionId, isActive])
+}
+
+model TeacherQualification {
+  id                String   @id @default(cuid())
+  schoolId          String
+  teacherId         String
+  subjectId         String
+  isPreferred       Boolean  @default(false)
+  canTeachPractical Boolean  @default(false)
+  createdAt         DateTime @default(now())
+
+  school  School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  teacher Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, teacherId, subjectId])
+  @@index([schoolId, subjectId])
+}
+
+model WeeklySubjectSlotTemplate {
+  id                String           @id @default(cuid())
+  schoolId          String
+  academicSessionId String
+  classId           String
+  subjectId         String
+  minimumSlots      Int
+  recommendedSlots  Int
+  maximumSlots      Int
+  theorySlots       Int              @default(0)
+  practicalSlots    Int              @default(0)
+  labDoublePeriods  Int              @default(0)
+  isCore            Boolean          @default(false)
+  isOptional        Boolean          @default(false)
+  isActivity        Boolean          @default(false)
+  isRemedial        Boolean          @default(false)
+  sourceType        CurriculumSource @default(CBSE_DEFAULT)
+  notes             String?
+  isActive          Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  school          School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+  class           Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject         Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, academicSessionId, classId, subjectId])
+  @@index([schoolId, academicSessionId, classId])
+}
+
+model SectionSubjectAllocation {
+  id                          String                    @id @default(cuid())
+  schoolId                    String
+  academicSessionId           String
+  classId                     String
+  sectionId                   String
+  subjectId                   String
+  teacherId                   String?
+  weeklySlots                 Int
+  theorySlots                 Int                       @default(0)
+  practicalSlots              Int                       @default(0)
+  remedialSlots               Int                       @default(0)
+  assignmentType              TeacherAssignmentRoleType @default(SUBJECT_TEACHER)
+  status                      AllocationStatus          @default(DRAFT)
+  workloadContribution        Int                       @default(0)
+  timetableEligible           Boolean                   @default(true)
+  requiresLab                 Boolean                   @default(false)
+  requiresDoublePeriod        Boolean                   @default(false)
+  maxSameSubjectPeriodsPerDay Int                       @default(2)
+  minimumDistributionDays     Int                       @default(3)
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+
+  school          School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+  class           Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section         Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject         Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher         Teacher?        @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([schoolId, academicSessionId, sectionId, subjectId])
+  @@index([schoolId, academicSessionId, teacherId])
+  @@index([schoolId, status])
+}
+
+model SectionClassTeacherAssignment {
+  id                String           @id @default(cuid())
+  schoolId          String
+  academicSessionId String
+  sectionId         String
+  teacherId         String
+  isPrimary         Boolean          @default(true)
+  startDate         DateTime
+  endDate           DateTime?
+  status            AssignmentStatus @default(ACTIVE)
+  dutyPeriods       Int              @default(1)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  school          School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession @relation(fields: [academicSessionId], references: [id], onDelete: Cascade)
+  section         Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  teacher         Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, academicSessionId, sectionId, isPrimary])
+  @@index([schoolId, academicSessionId, teacherId])
+}
+
+model AcademicStaffingAuditLog {
+  id                String   @id @default(cuid())
+  schoolId          String
+  academicSessionId String?
+  actorUserId       String?
+  action            String
+  entityType        String
+  entityId          String?
+  previousValue     Json?
+  newValue          Json?
+  reason            String?
+  createdAt         DateTime @default(now())
+
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession AcademicSession? @relation(fields: [academicSessionId], references: [id], onDelete: SetNull)
+  actor           User?            @relation("AcademicStaffingAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, academicSessionId, createdAt])
+  @@index([schoolId, entityType, entityId])
 }
 
 model ChapterProgress {
@@ -712,13 +925,14 @@ model SubjectWeeklyRequirement {
 }
 
 model Timetable {
-  id           String   @id @default(cuid())
-  classId      String
-  sectionId    String
-  schoolId     String
-  academicYear String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  classId              String
+  sectionId            String
+  schoolId             String
+  academicYear         String
+  requiresRegeneration Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   class   Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
   section Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
@@ -3778,6 +3992,43 @@ enum TeacherAssignmentRoleType {
   SUBJECT_TEACHER
   CLASS_TEACHER
   BOTH
+  CO_TEACHER
+  PRACTICAL_TEACHER
+  LAB_ASSISTANT
+  REMEDIAL_TEACHER
+  ACTIVITY_TEACHER
+  SUBSTITUTE_TEACHER
+}
+
+enum TeacherCategory {
+  PRE_PRIMARY
+  PRE_PRIMARY_ASSISTANT
+  PRT
+  TGT
+  PGT
+  SPECIALIST
+}
+
+enum CurriculumSource {
+  CBSE_DEFAULT
+  NCERT_ALIGNED
+  SCHOOL_CUSTOM
+  IMPORTED
+}
+
+enum AllocationStatus {
+  DRAFT
+  TEACHER_REQUIRED
+  READY
+  TIMETABLED
+  CONFLICTED
+  INACTIVE
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  INACTIVE
+  ENDED
 }
 
 enum ChapterProgressStatus {
