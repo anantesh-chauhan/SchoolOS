@@ -29,6 +29,7 @@ import {
   BellRing,
   Briefcase,
   WalletCards,
+  Activity,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -148,6 +149,9 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
           { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
+          { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
+          { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
         ],
       },
       {
@@ -199,6 +203,9 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
           { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
+          { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
+          { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
         ],
       },
       {
@@ -238,6 +245,8 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'Books & Chapters', icon: BookOpenCheck, href: '/dashboard/curriculum/manage' },
         { label: 'Weekly Slots', icon: Layers, href: '/dashboard/admin/weekly-slots' },
         { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+        { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
+        { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
       ] },
       { group: 'Account', icon: Settings, items: [
         { label: 'My Profile', icon: UserRound, href: '/dashboard/curriculum/profile' },
@@ -273,6 +282,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
           { label: 'Poll Management', icon: MessageSquare, href: '/teacher/polls' },
           { label: 'Student Performance', icon: Users, href: '/teacher/performance' },
+          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
         ],
       },
       { group: 'Class Management', icon: Users, items: [
@@ -301,6 +311,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Request Correction', icon: ClipboardCheck, href: '/attendance/request-correction' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+          { label: 'Academic Progress', icon: Activity, href: '/analytics/students' },
           { label: 'Children Fees', icon: BadgeIndianRupee, href: '/parent/fees' },
           { label: 'Family Fee Summary', icon: BadgeIndianRupee, href: '/parent/fees/family' },
         ],
@@ -328,6 +339,7 @@ const DashboardLayout = ({ children, role }) => {
         group: 'Academics', icon: BookOpen, items: [
           { label: 'My Subjects', icon: BookOpen, href: '/student/subjects' },
           { label: 'My Performance', icon: BookOpenCheck, href: '/student/performance' },
+          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
         ],
       },

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { BookOpen, CheckCircle2, ClipboardCheck, FileText, MessageSquare, School, TrendingUp, Users } from 'lucide-react';
+import { Activity, BookOpen, CheckCircle2, ClipboardCheck, FileText, MessageSquare, School, TrendingUp, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { teacherDashboardService } from '../../services/teacherDashboardService';
@@ -22,6 +22,7 @@ export default function TeacherDashboard() {
     { title: 'My classes & subjects', description: 'Manage chapters, common resources and students', to: '/teacher/assignments', icon: School },
     { title: 'Poll management', description: `${activePolls.length} active polls`, to: '/teacher/polls', icon: MessageSquare },
     { title: 'Student performance', description: 'Open subject-wise student summaries', to: '/teacher/performance', icon: TrendingUp },
+    { title: 'Academic intelligence', description: 'Explainable risk, weak chapters and interventions', to: '/analytics/students', icon: Activity },
     ...(classTeacher ? [{ title: 'Class attendance', description: `Mark attendance for Class ${classTeacher.className} ${classTeacher.sectionName}`, to: '/teacher/attendance', icon: ClipboardCheck }] : []),
     { title: 'My attendance', description: 'View your personal attendance history', to: '/dashboard/teacher/my-attendance', icon: CheckCircle2 },
   ];

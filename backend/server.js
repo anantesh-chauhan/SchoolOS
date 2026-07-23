@@ -31,6 +31,8 @@ import feeRoutes from './src/modules/fees/fee.routes.js';
 import homeworkRoutes from './src/modules/homework/homework.routes.js';
 import communicationRoutes from './src/modules/communication/communication.routes.js';
 import hrRoutes from './src/modules/hr/hr.routes.js';
+import analyticsRoutes from './src/modules/analytics/analytics.routes.js';
+import { analyticsInvalidationMiddleware } from './src/modules/analytics/analytics.invalidation.js';
 import { processScheduled, processQueuedDeliveries } from './src/modules/communication/communication.service.js';
 
 const app = express();
@@ -41,6 +43,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(analyticsInvalidationMiddleware);
 
 // Health Check Endpoint (without database)
 app.get('/health', (req, res) => {
@@ -118,6 +121,7 @@ app.use('/api/fees', feeRoutes);
 app.use('/api', homeworkRoutes);
 app.use('/api', communicationRoutes);
 app.use('/api/hr', hrRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 
 // 404 Handler

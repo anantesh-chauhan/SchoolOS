@@ -20,9 +20,25 @@ const audit = (tx, user, action, entityType, entityId, before, after) => tx.acad
 } });
 
 const moduleSettings = (schoolId) => prisma.homeworkModuleSetting.upsert({ where: { schoolId }, create: { schoolId }, update: {} });
+const jsonSnapshot = (value) => JSON.parse(JSON.stringify(value));
+const assertCanModify = (user, content, reason) => {
+  if (user.role === 'TEACHER' && content.createdByUserId !== user.id) throw new HomeworkError('Teachers can only modify content they created', 403, 'NOT_CONTENT_OWNER');
+  if (['ADMIN', 'SCHOOL_OWNER'].includes(user.role) && content.createdByUserId && content.createdByUserId !== user.id && !String(reason || '').trim()) {
+    throw new HomeworkError('A reason is required when modifying another user’s content', 400, 'MODIFICATION_REASON_REQUIRED');
+  }
+};
+const saveVersion = async (tx, user, type, id, snapshot, reason) => {
+  const where = type === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id };
+  const version = await tx.resourceVersion.count({ where }) + 1;
+  return tx.resourceVersion.create({ data: { schoolId: user.schoolId, ...where, version, snapshot: jsonSnapshot(snapshot), reason: String(reason || '').trim() || null, createdByUserId: user.id } });
+};
 
 export const validateCurriculumScope = async (user, scope, { requireManage = true } = {}) => {
   if (!user?.schoolId) throw new HomeworkError('School context is required', 403, 'TENANT_REQUIRED');
+  if (!scope.classId || !scope.sectionId || !scope.subjectId) {
+    if (requireManage && elevatedRoles.has(user.role)) return { section: null, subject: null, chapter: null, teacher: null, assignment: null };
+    throw new HomeworkError('A teacher-managed target requires a class, section, and subject', 403, 'INCOMPLETE_TEACHER_SCOPE');
+  }
   const section = await prisma.section.findFirst({ where: { id: scope.sectionId, classId: scope.classId, schoolId: user.schoolId, deletedAt: null }, include: { class: true } });
   if (!section) throw new HomeworkError('Section does not belong to the selected class and school', 400, 'INVALID_SECTION_CLASS');
   const subject = await prisma.subject.findFirst({ where: { id: scope.subjectId, schoolId: user.schoolId, deletedAt: null } });
@@ -64,14 +80,20 @@ export const getCreationContext = async (user) => {
   const chapters = scopes.length ? await prisma.chapter.findMany({ where: { schoolId: user.schoolId, deletedAt: null,
     OR: scopes.map(scope => ({ subjectId: scope.subjectId, OR: [{ classId: null }, { classId: scope.classId }], AND: [{ OR: [{ sectionId: null }, { sectionId: scope.sectionId }] }] })) },
     select: { id: true, classId: true, sectionId: true, subjectId: true, chapterName: true, chapterNumber: true }, orderBy: { chapterNumber: 'asc' } }) : [];
-  const [sessions, school] = await Promise.all([
+  const [sessions, school, contentTypes, categories, settings] = await Promise.all([
     prisma.student.findMany({ where: { schoolId: user.schoolId, isActive: true }, distinct: ['session'], select: { session: true }, orderBy: { session: 'desc' } }),
     prisma.school.findUnique({ where: { id: user.schoolId }, select: { config: true } }),
+    prisma.academicContentType.findMany({ where: { schoolId: user.schoolId, active: true }, orderBy: { displayName: 'asc' } }),
+    prisma.resourceCategory.findMany({ where: { schoolId: user.schoolId, active: true }, orderBy: { name: 'asc' } }),
+    moduleSettings(user.schoolId),
   ]);
   const sessionValues = sessions.map(x => x.session);
   const configuredSession = school?.config && typeof school.config === 'object' ? school.config.academicSession : null;
   if (configuredSession && !sessionValues.includes(configuredSession)) sessionValues.unshift(configuredSession);
-  return { scopes, chapters, sessions: sessionValues };
+  const studentOr = scopes.map(scope => ({ className: scope.className, section: scope.sectionName }));
+  const students = await prisma.student.findMany({ where: { schoolId: user.schoolId, isActive: true, ...(user.role === 'TEACHER' ? { OR: studentOr.length ? studentOr : [{ id: '__none__' }] } : {}) },
+    select: { id: true, studentFirstName: true, studentLastName: true, className: true, section: true, rollNumber: true }, orderBy: [{ className: 'asc' }, { section: 'asc' }, { rollNumber: 'asc' }], take: 1000 });
+  return { scopes, chapters, sessions: sessionValues, students, contentTypes, categories, settings };
 };
 
 export const listLinkedChildren = async (user) => {
@@ -89,10 +111,101 @@ const validateAudienceStudents = async (schoolId, section, studentIds) => {
   return students;
 };
 
+const validateTaxonomy = async (schoolId, value) => {
+  const [contentType, category] = await Promise.all([
+    value.contentTypeCode ? prisma.academicContentType.findFirst({ where: { schoolId, code: value.contentTypeCode, active: true } }) : null,
+    value.categoryId ? prisma.resourceCategory.findFirst({ where: { schoolId, id: value.categoryId, active: true } }) : null,
+  ]);
+  if (value.categoryId && !category) throw new HomeworkError('The selected category is not active in this school', 400, 'INVALID_CATEGORY');
+  if (contentType && value.audienceScope === 'WHOLE_SCHOOL' && !contentType.canBeSchoolWide) throw new HomeworkError('This content type cannot be published school-wide', 400, 'CONTENT_TYPE_SCOPE_FORBIDDEN');
+  return contentType;
+};
+
+const attachTags = async (tx, user, kind, contentId, tagNames) => {
+  for (const rawName of tagNames || []) {
+    const name = String(rawName).trim().slice(0, 60); const normalizedName = name.toLowerCase().replace(/\s+/g, ' ');
+    if (!normalizedName) continue;
+    const tag = await tx.resourceTag.upsert({ where: { schoolId_normalizedName: { schoolId: user.schoolId, normalizedName } }, update: { name, active: true }, create: { schoolId: user.schoolId, name, normalizedName } });
+    await tx.resourceTagAssignment.create({ data: { schoolId: user.schoolId, tagId: tag.id, ...(kind === 'HOMEWORK' ? { homeworkId: contentId } : { resourceId: contentId }) } });
+  }
+};
+
+const validateContentTargets = async (user, audienceScope, targets) => {
+  if (!elevatedRoles.has(user.role) && user.role !== 'TEACHER') throw new HomeworkError('You cannot manage academic content', 403);
+  if (user.role === 'TEACHER' && ['WHOLE_SCHOOL', 'SELECTED_CLASSES', 'ENTIRE_CLASS'].includes(audienceScope)) {
+    throw new HomeworkError('Teachers cannot publish to whole-school or class-wide audiences', 403, 'TEACHER_AUDIENCE_FORBIDDEN');
+  }
+  if (audienceScope === 'WHOLE_SCHOOL') {
+    if (!elevatedRoles.has(user.role)) throw new HomeworkError('Only administrators and curriculum managers may publish school-wide content', 403);
+    return { targets: [{ scope: 'WHOLE_SCHOOL', classId: null, sectionId: null, subjectId: null, chapterId: null, studentId: null }], anchor: {}, studentCount: await prisma.student.count({ where: { schoolId: user.schoolId, isActive: true } }) };
+  }
+
+  const normalized = [];
+  for (const target of targets) {
+    const row = { ...target, scope: audienceScope };
+    if (target.studentId) {
+      const student = await prisma.student.findFirst({ where: { id: target.studentId, schoolId: user.schoolId, isActive: true } });
+      if (!student) throw new HomeworkError('A selected student is outside this school or inactive', 400, 'INVALID_TARGET_STUDENT');
+      const classRow = await prisma.class.findFirst({ where: { schoolId: user.schoolId, className: student.className, deletedAt: null } });
+      const sectionRow = classRow ? await prisma.section.findFirst({ where: { schoolId: user.schoolId, classId: classRow.id, sectionName: student.section || '', deletedAt: null } }) : null;
+      row.classId = row.classId || classRow?.id || null;
+      row.sectionId = row.sectionId || sectionRow?.id || null;
+    }
+    if (row.classId) {
+      const classRow = await prisma.class.findFirst({ where: { id: row.classId, schoolId: user.schoolId, deletedAt: null } });
+      if (!classRow) throw new HomeworkError('A target class does not belong to this school', 400, 'INVALID_TARGET_CLASS');
+    }
+    if (row.sectionId) {
+      const section = await prisma.section.findFirst({ where: { id: row.sectionId, classId: row.classId, schoolId: user.schoolId, deletedAt: null } });
+      if (!section) throw new HomeworkError('A target section does not belong to its class and school', 400, 'INVALID_TARGET_SECTION');
+    }
+    if (row.subjectId) {
+      if (!row.sectionId && user.role === 'TEACHER') throw new HomeworkError('Teachers must choose each assigned section for subject content', 403, 'TEACHER_SECTION_REQUIRED');
+      if (row.sectionId) await validateCurriculumScope(user, row);
+      else {
+        const subject = await prisma.subject.findFirst({ where: { id: row.subjectId, schoolId: user.schoolId, deletedAt: null } });
+        const mapping = await prisma.classSubject.findFirst({ where: { classId: row.classId, subjectId: row.subjectId } });
+        if (!subject || !mapping) throw new HomeworkError('A target subject is not assigned to its class', 400, 'INVALID_TARGET_SUBJECT');
+        if (row.chapterId) {
+          const chapter = await prisma.chapter.findFirst({ where: { id: row.chapterId, schoolId: user.schoolId, subjectId: row.subjectId, deletedAt: null } });
+          if (!chapter) throw new HomeworkError('A target chapter does not belong to its subject', 400, 'INVALID_TARGET_CHAPTER');
+        }
+      }
+    } else if (user.role === 'TEACHER') {
+      throw new HomeworkError('Teacher targets require a subject assignment', 403, 'TEACHER_SUBJECT_REQUIRED');
+    }
+    normalized.push(row);
+  }
+  const anchor = normalized[0] || {};
+  const audience = await studentsForTargetRows(user.schoolId, normalized);
+  return { targets: normalized, anchor, studentCount: audience.length };
+};
+
+const studentsForTargetRows = async (schoolId, targets, academicSession) => {
+  if (!targets?.length) return [];
+  if (targets.some(target => target.scope === 'WHOLE_SCHOOL')) return prisma.student.findMany({ where: { schoolId, isActive: true, ...(academicSession ? { session: academicSession } : {}) }, select: { id: true, studentUserId: true, parentUserId: true } });
+  const directIds = targets.map(target => target.studentId).filter(Boolean);
+  const classIds = [...new Set(targets.map(target => target.classId).filter(Boolean))];
+  const sectionIds = [...new Set(targets.map(target => target.sectionId).filter(Boolean))];
+  const [classes, sections] = await Promise.all([
+    classIds.length ? prisma.class.findMany({ where: { schoolId, id: { in: classIds } }, select: { id: true, className: true } }) : [],
+    sectionIds.length ? prisma.section.findMany({ where: { schoolId, id: { in: sectionIds } }, select: { id: true, sectionName: true, classId: true } }) : [],
+  ]);
+  const classNames = new Map(classes.map(row => [row.id, row.className]));
+  const sectionNames = new Map(sections.map(row => [row.id, row.sectionName]));
+  const ors = targets.filter(target => !target.studentId).map(target => ({
+    ...(target.classId ? { className: classNames.get(target.classId) || '__none__' } : {}),
+    ...(target.sectionId ? { section: sectionNames.get(target.sectionId) || '__none__' } : {}),
+  }));
+  return prisma.student.findMany({ where: { schoolId, isActive: true, ...(academicSession ? { session: academicSession } : {}), OR: [
+    ...(directIds.length ? [{ id: { in: directIds } }] : []), ...ors,
+  ] }, distinct: ['id'], select: { id: true, studentUserId: true, parentUserId: true } });
+};
+
 const contentInclude = {
   class: { select: { id: true, className: true } }, section: { select: { id: true, sectionName: true } },
   subject: { select: { id: true, subjectName: true, subjectCode: true } }, chapter: { select: { id: true, chapterName: true, chapterNumber: true } },
-  creator: { select: { id: true, name: true } }, attachments: true, externalLinks: true,
+  creator: { select: { id: true, name: true } }, attachments: true, externalLinks: true, targets: true,
 };
 
 export const createHomework = async (user, body) => {
@@ -100,29 +213,41 @@ export const createHomework = async (user, body) => {
   const parsed = validateHomeworkInput(body);
   if (parsed.errors.length) throw new HomeworkError(parsed.errors.join('. '), 400, 'VALIDATION_ERROR');
   const settings = await moduleSettings(user.schoolId);
+  const contentType = await validateTaxonomy(user.schoolId, parsed.value);
   if (!settings.enabled) throw new HomeworkError('The homework module is disabled for this school', 403, 'MODULE_DISABLED');
-  const scope = await validateCurriculumScope(user, parsed.value);
-  await validateAudienceStudents(user.schoolId, scope.section, parsed.value.studentIds);
-  const checkedFiles = validateAttachments(parsed.value.attachments, settings);
+  const approvalRequired = user.role === 'TEACHER' && settings.moderationMode === 'APPROVAL_REQUIRED' && parsed.value.status === 'PUBLISHED';
+  if (approvalRequired) parsed.value.status = 'DRAFT';
+  if (parsed.value.audienceScope === 'WHOLE_SCHOOL' && parsed.value.status === 'PUBLISHED' && body.confirmWholeSchool !== true) throw new HomeworkError('Whole-school publication requires confirmWholeSchool=true', 409, 'WHOLE_SCHOOL_CONFIRMATION');
+  const targeting = await validateContentTargets(user, parsed.value.audienceScope, parsed.value.targets);
+  const scope = targeting.anchor.sectionId && targeting.anchor.subjectId ? await validateCurriculumScope(user, targeting.anchor) : { teacher: null, assignment: null };
+  const checkedFiles = validateAttachments(parsed.value.attachments, { ...settings, maximumUploadBytes: contentType?.maximumFileBytes || settings.maximumUploadBytes,
+    allowedMimeTypes: contentType?.allowedMimeTypes?.length ? contentType.allowedMimeTypes : settings.allowedMimeTypes });
   if (checkedFiles.errors.length) throw new HomeworkError(checkedFiles.errors.join('. '), 400, 'INVALID_ATTACHMENT');
   if (parsed.value.status === 'PUBLISHED') parsed.value.scheduledAt = null;
   if (parsed.value.status === 'SCHEDULED' && !parsed.value.scheduledAt) throw new HomeworkError('scheduledAt is required for scheduled homework');
   const data = { ...parsed.value };
-  delete data.studentIds; delete data.externalLinks; delete data.attachments;
+  delete data.studentIds; delete data.externalLinks; delete data.attachments; delete data.targets; delete data.tagNames;
+  data.classId = targeting.anchor.classId || null; data.sectionId = targeting.anchor.sectionId || null;
+  data.subjectId = targeting.anchor.subjectId || null; data.chapterId = targeting.anchor.chapterId || null;
+  data.audienceMode = parsed.value.audienceScope === 'SELECTED_STUDENTS' ? 'SELECTED_STUDENTS' : 'ENTIRE_SECTION';
   data.schoolId = user.schoolId; data.createdByUserId = user.id; data.createdByRole = user.role;
   data.teacherAssignmentId = scope.assignment?.id || null;
   data.publishedAt = data.status === 'PUBLISHED' ? now() : null;
   const result = await prisma.$transaction(async (tx) => {
     const homework = await tx.homework.create({ data });
-    if (parsed.value.studentIds.length) await tx.homeworkAudience.createMany({ data: parsed.value.studentIds.map(studentId => ({ schoolId: user.schoolId, homeworkId: homework.id, studentId,
+    await tx.resourceTarget.createMany({ data: targeting.targets.map(target => ({ ...target, schoolId: user.schoolId, homeworkId: homework.id })) });
+    const selectedStudentIds = targeting.targets.map(target => target.studentId).filter(Boolean);
+    if (selectedStudentIds.length) await tx.homeworkAudience.createMany({ data: selectedStudentIds.map(studentId => ({ schoolId: user.schoolId, homeworkId: homework.id, studentId,
       kind: parsed.value.audienceMode === 'ENTIRE_SECTION_WITH_EXCLUSIONS' ? 'EXCLUDE' : 'INCLUDE' })) });
     if (checkedFiles.value.length) await tx.academicAttachment.createMany({ data: checkedFiles.value.map(file => ({ ...file, schoolId: user.schoolId, homeworkId: homework.id, uploadedByUserId: user.id })) });
     if (parsed.value.externalLinks.length) await tx.academicExternalLink.createMany({ data: parsed.value.externalLinks.map(link => ({ ...link, schoolId: user.schoolId, homeworkId: homework.id })) });
+    await attachTags(tx, user, 'HOMEWORK', homework.id, parsed.value.tagNames);
+    if (approvalRequired) await tx.resourceModeration.create({ data: { schoolId: user.schoolId, homeworkId: homework.id, status: 'PENDING_REVIEW', submittedByUserId: user.id } });
     await audit(tx, user, 'HOMEWORK_CREATED', 'HOMEWORK', homework.id, null, homework);
     return homework;
   });
   if (result.status === 'PUBLISHED') await notifyHomeworkAudience(result.id, user, 'HOMEWORK_PUBLISHED');
-  return prisma.homework.findUnique({ where: { id: result.id }, include: contentInclude });
+  return { ...(await prisma.homework.findUnique({ where: { id: result.id }, include: contentInclude })), audiencePreview: { studentCount: targeting.studentCount } };
 };
 
 const teacherScopeFilter = async (user) => {
@@ -148,15 +273,36 @@ const resolvePortalStudent = async (user, requestedId) => {
   return student;
 };
 
-const studentVisibilityWhere = (student) => ({
-  schoolId: student.schoolId, academicSession: student.session, status: 'PUBLISHED', deletedAt: null,
-  publishedAt: { lte: now() }, class: { className: student.className }, section: { sectionName: student.section || '' },
-  OR: [
-    { audienceMode: 'ENTIRE_SECTION', audiences: { none: { studentId: student.id, kind: 'EXCLUDE' } } },
-    { audienceMode: 'ENTIRE_SECTION_WITH_EXCLUSIONS', audiences: { none: { studentId: student.id, kind: 'EXCLUDE' } } },
-    { audienceMode: 'SELECTED_STUDENTS', audiences: { some: { studentId: student.id, kind: 'INCLUDE' } } },
-  ],
-});
+const studentVisibilityWhere = async (student, parent = false) => {
+  const classRow = await prisma.class.findFirst({ where: { schoolId: student.schoolId, className: student.className, deletedAt: null }, select: { id: true } });
+  const sectionRow = classRow ? await prisma.section.findFirst({ where: { schoolId: student.schoolId, classId: classRow.id, sectionName: student.section || '', deletedAt: null }, select: { id: true } }) : null;
+  const explicitSubjects = await prisma.studentSubjectEnrollment.findMany({ where: { schoolId: student.schoolId, studentId: student.id, academicSession: student.session, isActive: true,
+    effectiveFrom: { lte: now() }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, select: { subjectId: true } });
+  const mappedSubjects = !explicitSubjects.length && classRow ? await prisma.subject.findMany({ where: { schoolId: student.schoolId, deletedAt: null, OR: [
+    { classSubjects: { some: { classId: classRow.id } } }, ...(sectionRow ? [{ sectionSubjects: { some: { sectionId: sectionRow.id } } }] : []),
+  ] }, select: { id: true } }) : [];
+  const subjectIds = (explicitSubjects.length ? explicitSubjects : mappedSubjects).map(row => row.subjectId || row.id);
+  const targetOr = [{ scope: 'WHOLE_SCHOOL' }, { studentId: student.id }, ...(classRow ? [
+    { classId: classRow.id, sectionId: null, subjectId: null },
+    ...(sectionRow ? [{ classId: classRow.id, sectionId: sectionRow.id, subjectId: null }] : []),
+    ...(subjectIds.length ? [{ classId: classRow.id, sectionId: null, subjectId: { in: subjectIds } }, ...(sectionRow ? [{ classId: classRow.id, sectionId: sectionRow.id, subjectId: { in: subjectIds } }] : [])] : []),
+  ] : [])];
+  return {
+    schoolId: student.schoolId, academicSession: student.session, status: 'PUBLISHED', deletedAt: null,
+    publishedAt: { lte: now() }, AND: [
+      { OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }] },
+      ...(parent ? [{ parentVisibility: true }] : []),
+      { OR: [
+        { targets: { some: { OR: targetOr } } },
+        { targets: { none: {} }, class: { className: student.className }, section: { sectionName: student.section || '' }, OR: [
+          { audienceMode: 'ENTIRE_SECTION', audiences: { none: { studentId: student.id, kind: 'EXCLUDE' } } },
+          { audienceMode: 'ENTIRE_SECTION_WITH_EXCLUSIONS', audiences: { none: { studentId: student.id, kind: 'EXCLUDE' } } },
+          { audienceMode: 'SELECTED_STUDENTS', audiences: { some: { studentId: student.id, kind: 'INCLUDE' } } },
+        ] },
+      ] },
+    ],
+  };
+};
 
 const displayState = (homework, submissions) => {
   const latest = submissions?.[0];
@@ -183,7 +329,7 @@ export const listHomework = async (user, query = {}) => {
   if (['STUDENT', 'PARENT'].includes(user.role)) {
     student = await resolvePortalStudent(user, query.studentId);
     if (user.role === 'PARENT' && !(await moduleSettings(user.schoolId)).parentVisibility) throw new HomeworkError('Parent homework visibility is disabled', 403);
-    where = studentVisibilityWhere(student);
+    where = await studentVisibilityWhere(student, user.role === 'PARENT');
   } else {
     if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
     where = { schoolId: user.schoolId, deletedAt: null, ...(await teacherScopeFilter(user)) };
@@ -201,7 +347,7 @@ export const listHomework = async (user, query = {}) => {
 
 export const getHomework = async (user, id, requestedStudentId) => {
   let where = { id, schoolId: user.schoolId, deletedAt: null }; let student = null;
-  if (['STUDENT', 'PARENT'].includes(user.role)) { student = await resolvePortalStudent(user, requestedStudentId); where = { ...where, ...studentVisibilityWhere(student) }; }
+  if (['STUDENT', 'PARENT'].includes(user.role)) { student = await resolvePortalStudent(user, requestedStudentId); where = { ...where, ...(await studentVisibilityWhere(student, user.role === 'PARENT')) }; }
   else if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
   const homework = await prisma.homework.findFirst({ where, include: { ...contentInclude, audiences: true, submissions: student ? { where: { studentId: student.id }, select: { ...portalSubmissionSelect, attachments: true }, orderBy: { attemptNumber: 'desc' } } : false } });
   if (!homework) throw new HomeworkError('Homework not found', 404);
@@ -214,6 +360,7 @@ export const getHomework = async (user, id, requestedStudentId) => {
 export const updateHomework = async (user, id, body) => {
   const existing = await prisma.homework.findFirst({ where: { id, schoolId: user.schoolId, deletedAt: null } });
   if (!existing) throw new HomeworkError('Homework not found', 404);
+  assertCanModify(user, existing, body.reason);
   await validateCurriculumScope(user, existing);
   const parsed = validateHomeworkInput({ ...existing, ...body }, { partial: true });
   if (parsed.errors.length) throw new HomeworkError(parsed.errors.join('. '));
@@ -221,32 +368,38 @@ export const updateHomework = async (user, id, body) => {
   const allowed = ['title','description','instructions','priority','estimatedMinutes','maximumMarks','passingMarks','allowLateSubmission','submissionInstructions','dueAt'];
   const data = Object.fromEntries(allowed.filter(key => body[key] !== undefined).map(key => [key, parsed.value[key]]));
   if (existing.status === 'PUBLISHED') data.updatedAfterPublish = true;
-  const updated = await prisma.$transaction(async tx => { const row = await tx.homework.update({ where: { id }, data }); await audit(tx, user, 'HOMEWORK_UPDATED', 'HOMEWORK', id, existing, row); return row; });
+  const updated = await prisma.$transaction(async tx => { await saveVersion(tx, user, 'HOMEWORK', id, existing, body.reason); const row = await tx.homework.update({ where: { id }, data }); await audit(tx, user, 'HOMEWORK_UPDATED', 'HOMEWORK', id, existing, row); return row; });
   if (existing.status === 'PUBLISHED') await notifyHomeworkAudience(id, user, body.dueAt ? 'HOMEWORK_DUE_DATE_CHANGED' : 'HOMEWORK_UPDATED');
   return updated;
 };
 
-export const transitionHomework = async (user, id, action) => {
+export const transitionHomework = async (user, id, action, options = {}) => {
   const existing = await prisma.homework.findFirst({ where: { id, schoolId: user.schoolId, deletedAt: null }, include: { _count: { select: { submissions: true } } } });
   if (!existing) throw new HomeworkError('Homework not found', 404);
+  assertCanModify(user, existing, options.reason);
   await validateCurriculumScope(user, existing);
   const map = { publish: 'PUBLISHED', close: 'CLOSED', archive: 'ARCHIVED', cancel: 'CANCELLED' };
   const status = map[action]; if (!status) throw new HomeworkError('Invalid transition');
+  if (status === 'PUBLISHED' && existing.audienceScope === 'WHOLE_SCHOOL' && options.confirmWholeSchool !== true) throw new HomeworkError('Whole-school publication requires confirmation', 409, 'WHOLE_SCHOOL_CONFIRMATION');
   const data = { status, ...(status === 'PUBLISHED' ? { publishedAt: now(), scheduledAt: null } : {}), ...(status === 'CLOSED' ? { closedAt: now() } : {}), ...(status === 'ARCHIVED' ? { archivedAt: now() } : {}) };
-  const updated = await prisma.$transaction(async tx => { const row = await tx.homework.update({ where: { id }, data }); await audit(tx, user, `HOMEWORK_${status}`, 'HOMEWORK', id, existing, row); return row; });
+  const updated = await prisma.$transaction(async tx => { await saveVersion(tx, user, 'HOMEWORK', id, existing, options.reason); const row = await tx.homework.update({ where: { id }, data }); await audit(tx, user, `HOMEWORK_${status}`, 'HOMEWORK', id, existing, row); return row; });
   if (['PUBLISHED','CANCELLED'].includes(status)) await notifyHomeworkAudience(id, user, `HOMEWORK_${status}`);
   return updated;
 };
 
-export const deleteHomework = async (user, id) => {
+export const deleteHomework = async (user, id, options = {}) => {
   const row = await prisma.homework.findFirst({ where: { id, schoolId: user.schoolId }, include: { _count: { select: { submissions: true } } } });
   if (!row) throw new HomeworkError('Homework not found', 404);
+  assertCanModify(user, row, options.reason);
   await validateCurriculumScope(user, row);
   if (row._count.submissions || row.status !== 'DRAFT') throw new HomeworkError('Published homework or homework with submissions must be cancelled or archived', 409);
   await prisma.homework.update({ where: { id }, data: { deletedAt: now() } });
 };
 
 const audienceStudents = async (homework) => {
+  const targets = homework.targets || await prisma.resourceTarget.findMany({ where: { schoolId: homework.schoolId, homeworkId: homework.id } });
+  if (targets.length) return studentsForTargetRows(homework.schoolId, targets, homework.academicSession);
+  if (!homework.class || !homework.section) return [];
   const base = { schoolId: homework.schoolId, className: homework.class.className, section: homework.section.sectionName, session: homework.academicSession, isActive: true };
   if (homework.audienceMode === 'SELECTED_STUDENTS') base.homeworkAudiences = { some: { homeworkId: homework.id, kind: 'INCLUDE' } };
   else base.homeworkAudiences = { none: { homeworkId: homework.id, kind: 'EXCLUDE' } };
@@ -254,7 +407,7 @@ const audienceStudents = async (homework) => {
 };
 
 export const notifyHomeworkAudience = async (homeworkId, actor, type) => {
-  const homework = await prisma.homework.findFirst({ where: { id: homeworkId, schoolId: actor.schoolId }, include: { class: true, section: true } });
+  const homework = await prisma.homework.findFirst({ where: { id: homeworkId, schoolId: actor.schoolId }, include: { class: true, section: true, targets: true } });
   if (!homework) return;
   const students = await audienceStudents(homework);
   const title = type === 'HOMEWORK_PUBLISHED' ? 'New homework' : type === 'HOMEWORK_CANCELLED' ? 'Homework cancelled' : 'Homework updated';
@@ -311,36 +464,73 @@ export const reviewSubmission = async (user, homeworkId, submissionId, body) => 
   return updated;
 };
 
+const resourceVisibilityWhere = async (student, parent = false) => {
+  const classRow = await prisma.class.findFirst({ where: { schoolId: student.schoolId, className: student.className, deletedAt: null }, select: { id: true } });
+  const sectionRow = classRow ? await prisma.section.findFirst({ where: { schoolId: student.schoolId, classId: classRow.id, sectionName: student.section || '', deletedAt: null }, select: { id: true } }) : null;
+  const explicitSubjects = await prisma.studentSubjectEnrollment.findMany({ where: { schoolId: student.schoolId, studentId: student.id, academicSession: student.session, isActive: true,
+    effectiveFrom: { lte: now() }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, select: { subjectId: true } });
+  const mappedSubjects = !explicitSubjects.length && classRow ? await prisma.subject.findMany({ where: { schoolId: student.schoolId, deletedAt: null, OR: [
+    { classSubjects: { some: { classId: classRow.id } } }, ...(sectionRow ? [{ sectionSubjects: { some: { sectionId: sectionRow.id } } }] : []),
+  ] }, select: { id: true } }) : [];
+  const subjectIds = (explicitSubjects.length ? explicitSubjects : mappedSubjects).map(row => row.subjectId || row.id);
+  const targetOr = [{ scope: 'WHOLE_SCHOOL' }, { studentId: student.id }, ...(classRow ? [
+    { classId: classRow.id, sectionId: null, subjectId: null }, ...(sectionRow ? [{ classId: classRow.id, sectionId: sectionRow.id, subjectId: null }] : []),
+    ...(subjectIds.length ? [{ classId: classRow.id, sectionId: null, subjectId: { in: subjectIds } }, ...(sectionRow ? [{ classId: classRow.id, sectionId: sectionRow.id, subjectId: { in: subjectIds } }] : [])] : []),
+  ] : [])];
+  return { schoolId: student.schoolId, deletedAt: null, status: 'PUBLISHED', isVisibleToStudents: true, publishedAt: { lte: now() }, AND: [
+    { OR: [{ academicSession: null }, { academicSession: student.session }] },
+    { OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }] },
+    ...(parent ? [{ parentVisibility: true }] : []),
+    { OR: [
+      { targets: { some: { OR: targetOr } } },
+      { targets: { none: {} }, class: { className: student.className }, section: { sectionName: student.section || '' } },
+    ] },
+  ] };
+};
+
 export const listResources = async (user, query = {}) => {
   const paging = pageArgs(query); let where = { schoolId: user.schoolId, deletedAt: null };
-  if (['STUDENT','PARENT'].includes(user.role)) { const student = await resolvePortalStudent(user, query.studentId); where = { ...where, academicSession: student.session,
-    status: 'PUBLISHED', isVisibleToStudents: true, publishedAt: { lte: now() }, class: { className: student.className }, section: { sectionName: student.section || '' } }; }
-  else where = { ...where, ...(await teacherScopeFilter(user)) };
+  if (['STUDENT','PARENT'].includes(user.role)) { if (user.role === 'PARENT' && !(await moduleSettings(user.schoolId)).parentVisibility) throw new HomeworkError('Parent resource visibility is disabled', 403); const student = await resolvePortalStudent(user, query.studentId); where = await resourceVisibilityWhere(student, user.role === 'PARENT'); }
+  else { if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403); where = { ...where, ...(await teacherScopeFilter(user)) }; }
   if (query.subjectId) where.subjectId = query.subjectId; if (query.chapterId) where.chapterId = query.chapterId; if (query.resourceType) where.resourceType = query.resourceType;
-  const include = { class: { select: { className: true } }, section: { select: { sectionName: true } }, subject: { select: { subjectName: true } }, chapter: { select: { chapterName: true } }, attachments: true, externalLinks: true };
+  const include = { class: { select: { className: true } }, section: { select: { sectionName: true } }, subject: { select: { subjectName: true } }, chapter: { select: { chapterName: true } }, attachments: true, externalLinks: true, targets: true };
   const [items,total] = await Promise.all([prisma.sectionResource.findMany({ where, include, orderBy: [{ isFeatured: 'desc' }, { publishedAt: 'desc' }], skip: paging.skip, take: paging.take }), prisma.sectionResource.count({ where })]);
   return { items, pagination: { page: paging.page, pageSize: paging.pageSize, total } };
 };
 
 export const createResource = async (user, body) => {
   const parsed = validateResourceInput(body); if (parsed.errors.length) throw new HomeworkError(parsed.errors.join('. '));
-  const scope = await validateCurriculumScope(user, parsed.value); const settings = await moduleSettings(user.schoolId);
-  const files = validateAttachments(parsed.value.attachments, settings); if (files.errors.length) throw new HomeworkError(files.errors.join('. '));
-  const { links, attachments, ...value } = parsed.value;
+  if (parsed.value.audienceScope === 'WHOLE_SCHOOL' && parsed.value.status === 'PUBLISHED' && body.confirmWholeSchool !== true) throw new HomeworkError('Whole-school publication requires confirmWholeSchool=true', 409, 'WHOLE_SCHOOL_CONFIRMATION');
+  if (parsed.value.status === 'SCHEDULED' && (!parsed.value.scheduledAt || Number.isNaN(parsed.value.scheduledAt.getTime()))) throw new HomeworkError('A valid scheduledAt is required for scheduled resources');
+  const targeting = await validateContentTargets(user, parsed.value.audienceScope, parsed.value.targets);
+  const scope = targeting.anchor.sectionId && targeting.anchor.subjectId ? await validateCurriculumScope(user, targeting.anchor) : { teacher: null };
+  const settings = await moduleSettings(user.schoolId);
+  const contentType = await validateTaxonomy(user.schoolId, parsed.value);
+  const approvalRequired = user.role === 'TEACHER' && settings.moderationMode === 'APPROVAL_REQUIRED' && parsed.value.status === 'PUBLISHED';
+  if (approvalRequired) parsed.value.status = 'DRAFT';
+  const files = validateAttachments(parsed.value.attachments, { ...settings, maximumUploadBytes: contentType?.maximumFileBytes || settings.maximumUploadBytes,
+    allowedMimeTypes: contentType?.allowedMimeTypes?.length ? contentType.allowedMimeTypes : settings.allowedMimeTypes }); if (files.errors.length) throw new HomeworkError(files.errors.join('. '));
+  const { links, attachments, targets, tagNames, ...value } = parsed.value;
+  value.classId = targeting.anchor.classId || null; value.sectionId = targeting.anchor.sectionId || null;
+  value.subjectId = targeting.anchor.subjectId || null; value.chapterId = targeting.anchor.chapterId || null;
   const resource = await prisma.$transaction(async tx => { const row = await tx.sectionResource.create({ data: { ...value, schoolId: user.schoolId, teacherId: scope.teacher?.id || null,
     createdByUserId: user.id, createdByRole: user.role, isVisibleToStudents: value.status === 'PUBLISHED', publishedAt: value.status === 'PUBLISHED' ? now() : null } });
+    await tx.resourceTarget.createMany({ data: targeting.targets.map(target => ({ ...target, schoolId: user.schoolId, resourceId: row.id })) });
     if (files.value.length) await tx.academicAttachment.createMany({ data: files.value.map(file => ({ ...file, schoolId: user.schoolId, resourceId: row.id, uploadedByUserId: user.id })) });
     if (links.length) await tx.academicExternalLink.createMany({ data: links.map(link => ({ ...link, schoolId: user.schoolId, resourceId: row.id })) });
+    await attachTags(tx, user, 'RESOURCE', row.id, tagNames);
+    if (approvalRequired) await tx.resourceModeration.create({ data: { schoolId: user.schoolId, resourceId: row.id, status: 'PENDING_REVIEW', submittedByUserId: user.id } });
     await audit(tx, user, 'RESOURCE_CREATED', 'RESOURCE', row.id, null, row); return row; });
   if (resource.status === 'PUBLISHED') await notifyResourceAudience(resource.id, user, 'RESOURCE_PUBLISHED');
-  return resource;
+  return { ...resource, audiencePreview: { studentCount: targeting.studentCount } };
 };
 
 const notifyResourceAudience = async (resourceId, actor, type) => {
-  const resource = await prisma.sectionResource.findFirst({ where: { id: resourceId, schoolId: actor.schoolId }, include: { class: true, section: true } });
+  const resource = await prisma.sectionResource.findFirst({ where: { id: resourceId, schoolId: actor.schoolId }, include: { class: true, section: true, targets: true } });
   if (!resource) return;
-  const students = await prisma.student.findMany({ where: { schoolId: actor.schoolId, className: resource.class.className, section: resource.section.sectionName,
-    ...(resource.academicSession ? { session: resource.academicSession } : {}), isActive: true }, select: { id: true } });
+  const students = resource.targets.length ? await studentsForTargetRows(actor.schoolId, resource.targets, resource.academicSession) : resource.class && resource.section
+    ? await prisma.student.findMany({ where: { schoolId: actor.schoolId, className: resource.class.className, section: resource.section.sectionName,
+      ...(resource.academicSession ? { session: resource.academicSession } : {}), isActive: true }, select: { id: true } }) : [];
   await createSystemNotification({ schoolId: actor.schoolId, type, category: 'RESOURCE', title: 'New learning resource', message: resource.title, actionUrl: '/homework', sourceModule: 'HOMEWORK', sourceEntityType: 'RESOURCE', sourceEntityId: resource.id, dedupeKey: `${type}:${resource.id}:${resource.updatedAt.getTime()}`, students: students.map((student) => student.id) });
 };
 
@@ -348,9 +538,10 @@ export const getResource = async (user, id, requestedStudentId) => {
   let where = { id, schoolId: user.schoolId, deletedAt: null };
   if (['STUDENT','PARENT'].includes(user.role)) {
     const student = await resolvePortalStudent(user, requestedStudentId);
-    where = { ...where, academicSession: student.session, status: 'PUBLISHED', isVisibleToStudents: true, publishedAt: { lte: now() }, class: { className: student.className }, section: { sectionName: student.section || '' } };
+    where = { id, ...(await resourceVisibilityWhere(student, user.role === 'PARENT')) };
   }
-  const row = await prisma.sectionResource.findFirst({ where, include: { class: true, section: true, subject: true, chapter: true, attachments: true, externalLinks: true } });
+  else if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
+  const row = await prisma.sectionResource.findFirst({ where, include: { class: true, section: true, subject: true, chapter: true, attachments: true, externalLinks: true, targets: true } });
   if (!row) throw new HomeworkError('Resource not found', 404);
   if (staffRoles.has(user.role)) await validateCurriculumScope(user, row);
   return row;
@@ -359,31 +550,153 @@ export const getResource = async (user, id, requestedStudentId) => {
 export const updateResource = async (user, id, body) => {
   const existing = await prisma.sectionResource.findFirst({ where: { id, schoolId: user.schoolId, deletedAt: null } });
   if (!existing) throw new HomeworkError('Resource not found', 404);
+  assertCanModify(user, existing, body.reason);
   await validateCurriculumScope(user, existing);
   const data = {};
   if (body.title !== undefined) { data.title = String(body.title).trim().slice(0, 200); if (!data.title) throw new HomeworkError('title is required'); }
   if (body.description !== undefined) data.description = String(body.description || '').trim() || null;
   if (body.isFeatured !== undefined) data.isFeatured = Boolean(body.isFeatured);
   if (body.isDownloadable !== undefined) data.isDownloadable = Boolean(body.isDownloadable);
-  const updated = await prisma.$transaction(async tx => { const row = await tx.sectionResource.update({ where: { id }, data }); await audit(tx, user, 'RESOURCE_UPDATED', 'RESOURCE', id, existing, row); return row; });
+  const updated = await prisma.$transaction(async tx => { await saveVersion(tx, user, 'RESOURCE', id, existing, body.reason); const row = await tx.sectionResource.update({ where: { id }, data }); await audit(tx, user, 'RESOURCE_UPDATED', 'RESOURCE', id, existing, row); return row; });
   return updated;
 };
 
-export const transitionResource = async (user, id, action) => {
+export const transitionResource = async (user, id, action, options = {}) => {
   const existing = await prisma.sectionResource.findFirst({ where: { id, schoolId: user.schoolId, deletedAt: null } });
-  if (!existing) throw new HomeworkError('Resource not found', 404); await validateCurriculumScope(user, existing);
-  const status = action === 'publish' ? 'PUBLISHED' : action === 'archive' ? 'ARCHIVED' : null; if (!status) throw new HomeworkError('Invalid resource transition');
-  const updated = await prisma.$transaction(async tx => { const row = await tx.sectionResource.update({ where: { id }, data: { status, isVisibleToStudents: status === 'PUBLISHED', ...(status === 'PUBLISHED' ? { publishedAt: now(), scheduledAt: null } : {}) } });
+  if (!existing) throw new HomeworkError('Resource not found', 404); assertCanModify(user, existing, options.reason); await validateCurriculumScope(user, existing);
+  const status = action === 'publish' || action === 'restore' ? 'PUBLISHED' : action === 'archive' ? 'ARCHIVED' : null; if (!status) throw new HomeworkError('Invalid resource transition');
+  if (action === 'publish' && existing.audienceScope === 'WHOLE_SCHOOL' && options.confirmWholeSchool !== true) throw new HomeworkError('Whole-school publication requires confirmation', 409, 'WHOLE_SCHOOL_CONFIRMATION');
+  const updated = await prisma.$transaction(async tx => { await saveVersion(tx, user, 'RESOURCE', id, existing, options.reason); const row = await tx.sectionResource.update({ where: { id }, data: { status, isVisibleToStudents: status === 'PUBLISHED', archivedAt: status === 'ARCHIVED' ? now() : null, ...(status === 'PUBLISHED' ? { publishedAt: existing.publishedAt || now(), scheduledAt: null } : {}) } });
     await audit(tx, user, `RESOURCE_${status}`, 'RESOURCE', id, existing, row); return row; });
   if (status === 'PUBLISHED') await notifyResourceAudience(id, user, 'RESOURCE_PUBLISHED');
   return updated;
 };
 
-export const deleteResource = async (user, id) => {
+export const deleteResource = async (user, id, options = {}) => {
   const existing = await prisma.sectionResource.findFirst({ where: { id, schoolId: user.schoolId, deletedAt: null } });
-  if (!existing) throw new HomeworkError('Resource not found', 404); await validateCurriculumScope(user, existing);
+  if (!existing) throw new HomeworkError('Resource not found', 404); assertCanModify(user, existing, options.reason); await validateCurriculumScope(user, existing);
   if (existing.status !== 'DRAFT') throw new HomeworkError('Published resources must be archived', 409);
   await prisma.sectionResource.update({ where: { id }, data: { deletedAt: now(), isVisibleToStudents: false } });
+};
+
+export const previewAudience = async (user, body) => {
+  if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
+  const parsed = validateResourceInput({ ...body, title: body.title || 'Audience preview', resourceType: body.resourceType || 'OTHER' });
+  if (parsed.errors.length) throw new HomeworkError(parsed.errors.join('. '), 400, 'VALIDATION_ERROR');
+  const result = await validateContentTargets(user, parsed.value.audienceScope, parsed.value.targets);
+  const students = await studentsForTargetRows(user.schoolId, result.targets, body.academicSession);
+  const parentKeys = new Set(students.filter(student => student.parentUserId).map(student => student.parentUserId));
+  const familyLinks = students.length ? await prisma.feeFamilyLink.findMany({ where: { schoolId: user.schoolId, studentId: { in: students.map(student => student.id) }, active: true }, select: { parentUserId: true } }) : [];
+  familyLinks.forEach(link => parentKeys.add(link.parentUserId));
+  return { scope: parsed.value.audienceScope, targets: result.targets, studentCount: students.length, parentCount: body.parentVisibility === false ? 0 : parentKeys.size,
+    requiresWholeSchoolConfirmation: parsed.value.audienceScope === 'WHOLE_SCHOOL' };
+};
+
+const contentRecord = async (user, kind, id, studentId) => {
+  if (!['HOMEWORK','RESOURCE'].includes(kind)) throw new HomeworkError('Invalid content kind');
+  return kind === 'HOMEWORK' ? getHomework(user, id, studentId) : getResource(user, id, studentId);
+};
+
+export const recordActivity = async (user, kind, id, activity, body = {}) => {
+  const normalizedKind = String(kind || '').toUpperCase();
+  const normalizedActivity = String(activity || '').toUpperCase();
+  if (!['HOMEWORK','RESOURCE'].includes(normalizedKind)) throw new HomeworkError('Invalid content kind');
+  if (!['VIEW','DOWNLOAD','BOOKMARK','ACKNOWLEDGMENT','COMPLETION','HELPFUL','BROKEN_LINK'].includes(normalizedActivity)) throw new HomeworkError('Invalid activity');
+  if (user.role !== 'STUDENT') throw new HomeworkError('Student access required', 403);
+  const student = await resolvePortalStudent(user); await contentRecord(user, normalizedKind, id);
+  const contentKey = normalizedKind === 'HOMEWORK' ? { homeworkId: id, resourceId: null } : { resourceId: id, homeworkId: null };
+  const existing = await prisma.resourceActivity.findFirst({ where: { schoolId: user.schoolId, studentId: student.id, kind: normalizedActivity, ...contentKey } });
+  if (normalizedActivity === 'BOOKMARK' && body.active === false) {
+    if (existing) await prisma.resourceActivity.delete({ where: { id: existing.id } });
+    return { active: false };
+  }
+  const timestamp = now();
+  const row = existing ? await prisma.resourceActivity.update({ where: { id: existing.id }, data: { count: { increment: normalizedActivity === 'VIEW' || normalizedActivity === 'DOWNLOAD' ? 1 : 0 }, lastAt: timestamp, metadata: body.metadata || undefined } })
+    : await prisma.resourceActivity.create({ data: { schoolId: user.schoolId, studentId: student.id, kind: normalizedActivity, ...contentKey, metadata: body.metadata || undefined } });
+  return { active: true, activity: row };
+};
+
+export const listVersions = async (user, kind, id) => {
+  const normalizedKind = String(kind).toUpperCase(); await contentRecord(user, normalizedKind, id);
+  if (!staffRoles.has(user.role)) throw new HomeworkError('Version history is available to authorized staff', 403);
+  return prisma.resourceVersion.findMany({ where: { schoolId: user.schoolId, ...(normalizedKind === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id }) }, orderBy: { version: 'desc' } });
+};
+
+export const createComment = async (user, kind, id, body) => {
+  const normalizedKind = String(kind).toUpperCase();
+  if (!['HOMEWORK','RESOURCE'].includes(normalizedKind)) throw new HomeworkError('Invalid content kind');
+  const student = ['STUDENT','PARENT'].includes(user.role) ? await resolvePortalStudent(user, body.studentId) : null;
+  await contentRecord(user, normalizedKind, id, student?.id);
+  const text = String(body.body || '').trim().slice(0, 4000); if (!text) throw new HomeworkError('Question or reply text is required');
+  return prisma.resourceComment.create({ data: { schoolId: user.schoolId, ...(normalizedKind === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id }),
+    studentId: student?.id || null, authorUserId: user.id || null, parentId: user.role === 'PARENT' ? user.id : null, body: text,
+    isPrivate: body.isPrivate !== false, replyToId: body.replyToId || null, status: body.status === 'RESOLVED' ? 'RESOLVED' : 'OPEN' } });
+};
+
+export const listComments = async (user, kind, id, requestedStudentId) => {
+  const normalizedKind = String(kind).toUpperCase(); const student = ['STUDENT','PARENT'].includes(user.role) ? await resolvePortalStudent(user, requestedStudentId) : null;
+  await contentRecord(user, normalizedKind, id, student?.id);
+  const where = { schoolId: user.schoolId, ...(normalizedKind === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id }),
+    ...(student ? { OR: [{ isPrivate: false }, { studentId: student.id }] } : {}) };
+  return prisma.resourceComment.findMany({ where, orderBy: { createdAt: 'asc' } });
+};
+
+export const getEngagement = async (user, kind, id) => {
+  const normalizedKind = String(kind).toUpperCase(); const content = await contentRecord(user, normalizedKind, id);
+  if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
+  const key = normalizedKind === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id };
+  const targets = content.targets || await prisma.resourceTarget.findMany({ where: { schoolId: user.schoolId, ...key } });
+  const students = await studentsForTargetRows(user.schoolId, targets, content.academicSession);
+  const activity = await prisma.resourceActivity.groupBy({ by: ['kind'], where: { schoolId: user.schoolId, ...key }, _count: { _all: true }, _sum: { count: true } });
+  const submissions = normalizedKind === 'HOMEWORK' ? await prisma.homeworkSubmission.groupBy({ by: ['status'], where: { schoolId: user.schoolId, homeworkId: id }, _count: { _all: true } }) : [];
+  return { assignedStudents: students.length, activity, submissions };
+};
+
+export const duplicateResource = async (user, id, body = {}) => {
+  const source = await getResource(user, id); if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
+  const payload = { ...source, ...body, title: body.title || `${source.title} (copy)`, status: 'DRAFT', scheduledAt: null,
+    targets: body.targets || source.targets.map(({ classId, sectionId, subjectId, chapterId, studentId }) => ({ classId, sectionId, subjectId, chapterId, studentId })),
+    attachments: source.attachments.map(file => ({ fileName: file.fileName, originalName: file.originalName, fileUrl: file.fileUrl, publicId: file.publicId, mimeType: file.mimeType, fileSize: file.fileSize, attachmentType: file.attachmentType })),
+    externalLinks: source.externalLinks.map(link => ({ label: link.label, url: link.url })) };
+  return createResource(user, payload);
+};
+
+export const submitForModeration = async (user, kind, id) => {
+  const normalizedKind = String(kind).toUpperCase(); const content = await contentRecord(user, normalizedKind, id);
+  if (!staffRoles.has(user.role)) throw new HomeworkError('Forbidden', 403); assertCanModify(user, content);
+  const key = normalizedKind === 'HOMEWORK' ? { homeworkId: id } : { resourceId: id };
+  const active = await prisma.resourceModeration.findFirst({ where: { schoolId: user.schoolId, ...key, status: { in: ['PENDING_REVIEW','CHANGES_REQUESTED'] } }, orderBy: { createdAt: 'desc' } });
+  if (active?.status === 'PENDING_REVIEW') throw new HomeworkError('This content is already pending review', 409, 'DUPLICATE_MODERATION_REQUEST');
+  return prisma.resourceModeration.create({ data: { schoolId: user.schoolId, ...key, status: 'PENDING_REVIEW', submittedByUserId: user.id } });
+};
+
+export const listModeration = async (user, query = {}) => {
+  if (!elevatedRoles.has(user.role)) throw new HomeworkError('Forbidden', 403);
+  return prisma.resourceModeration.findMany({ where: { schoolId: user.schoolId, ...(query.status ? { status: String(query.status).toUpperCase() } : {}) },
+    include: { homework: { select: { id: true, title: true, createdByUserId: true } }, resource: { select: { id: true, title: true, createdByUserId: true } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+};
+
+export const reviewModeration = async (user, moderationId, body) => {
+  if (!elevatedRoles.has(user.role)) throw new HomeworkError('Only administrators and curriculum managers can review content', 403);
+  const moderation = await prisma.resourceModeration.findFirst({ where: { id: moderationId, schoolId: user.schoolId } });
+  if (!moderation) throw new HomeworkError('Moderation request not found', 404);
+  const status = String(body.status || '').toUpperCase();
+  if (!['APPROVED','REJECTED','CHANGES_REQUESTED'].includes(status)) throw new HomeworkError('Invalid moderation decision');
+  const reviewedAt = now();
+  const result = await prisma.$transaction(async tx => {
+    const row = await tx.resourceModeration.update({ where: { id: moderation.id }, data: { status, reviewedByUserId: user.id, reviewComment: String(body.reviewComment || '').trim() || null, reviewedAt } });
+    if (status === 'APPROVED' && body.publish === true) {
+      if (moderation.homeworkId) await tx.homework.update({ where: { id: moderation.homeworkId }, data: { status: 'PUBLISHED', publishedAt: reviewedAt, scheduledAt: null } });
+      else await tx.sectionResource.update({ where: { id: moderation.resourceId }, data: { status: 'PUBLISHED', publishedAt: reviewedAt, scheduledAt: null, isVisibleToStudents: true } });
+    }
+    await audit(tx, user, `MODERATION_${status}`, moderation.homeworkId ? 'HOMEWORK' : 'RESOURCE', moderation.homeworkId || moderation.resourceId, moderation, row);
+    return row;
+  });
+  if (status === 'APPROVED' && body.publish === true) {
+    if (moderation.homeworkId) await notifyHomeworkAudience(moderation.homeworkId, user, 'HOMEWORK_PUBLISHED');
+    else await notifyResourceAudience(moderation.resourceId, user, 'RESOURCE_PUBLISHED');
+  }
+  return result;
 };
 
 export const getAnalytics = async (user) => {

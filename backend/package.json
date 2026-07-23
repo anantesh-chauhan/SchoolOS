@@ -32,7 +32,8 @@
     "seed:security-curriculum-calendar": "node prisma/seedSecurityCurriculumCalendar.js",
     "seed:academic-calendar-events": "node prisma/seedAcademicCalendarEvents.js",
     "seed:attendance": "node prisma/seedAttendanceManagement.js",
-    "school:initialize": "node prisma/initializeNewSchool.js"
+    "school:initialize": "node prisma/initializeNewSchool.js",
+    "seed:analytics": "node prisma/seedAnalytics.js"
   },
   "keywords": [
     "schoolos",

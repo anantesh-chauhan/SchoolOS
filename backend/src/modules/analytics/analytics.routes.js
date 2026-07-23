@@ -1,0 +1,50 @@
+import { Router } from 'express';
+import { authMiddleware, requireRole } from '../../middleware/auth.middleware.js';
+import * as controller from './analytics.controller.js';
+import { ANALYTICS_ROLES, STAFF_ANALYTICS_ROLES } from './analytics.constants.js';
+
+const router = Router();
+router.use(authMiddleware);
+const analyticsAccess = requireRole(...ANALYTICS_ROLES);
+const staffAccess = requireRole(...STAFF_ANALYTICS_ROLES);
+const adminAccess = requireRole('SCHOOL_OWNER', 'ADMIN');
+
+router.get('/students', analyticsAccess, controller.listStudents);
+router.get('/students/:studentId', analyticsAccess, controller.studentOverview);
+router.get('/students/:studentId/overview', analyticsAccess, controller.studentOverview);
+router.get('/students/:studentId/subjects', analyticsAccess, controller.studentSubjects);
+router.get('/students/:studentId/subjects/:subjectId', analyticsAccess, controller.studentSubject);
+router.get('/students/:studentId/subjects/:subjectId/chapters/:chapterId', analyticsAccess, controller.studentChapter);
+router.get('/students/:studentId/chapters/:chapterId', analyticsAccess, controller.studentChapter);
+router.get('/students/:studentId/trends', analyticsAccess, controller.studentTrends);
+router.get('/students/:studentId/risk', analyticsAccess, controller.studentRisk);
+router.get('/students/:studentId/recommendations', analyticsAccess, controller.studentRecommendations);
+router.get('/students/:studentId/interventions', analyticsAccess, controller.studentInterventions);
+router.get('/reports/students/:studentId.:format', analyticsAccess, controller.studentReport);
+router.get('/reports/students/:studentId/subjects/:subjectId.:format', analyticsAccess, controller.subjectReport);
+router.get('/reports/students/:studentId/subjects/:subjectId/chapters/:chapterId.:format', analyticsAccess, controller.chapterReport);
+router.get('/reports/classes/:classId.:format', staffAccess, controller.institutionReport);
+router.get('/reports/sections/:sectionId.:format', staffAccess, controller.institutionReport);
+router.get('/reports/school.:format', requireRole('SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER'), controller.institutionReport);
+router.get('/classes/:classId', staffAccess, controller.classOverview);
+router.get('/sections/:sectionId', staffAccess, controller.sectionOverview);
+router.get('/school/overview', requireRole('SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER'), controller.schoolOverview);
+
+router.get('/configuration', staffAccess, controller.configuration);
+router.patch('/configuration', adminAccess, controller.updateConfiguration);
+router.post('/snapshots', adminAccess, controller.createSnapshot);
+router.post('/interventions', staffAccess, controller.createIntervention);
+router.patch('/interventions/:id', staffAccess, controller.updateIntervention);
+router.post('/resources/:resourceId/engagement', requireRole('STUDENT'), controller.recordResourceEngagement);
+router.get('/risk-rules', staffAccess, controller.riskRules);
+router.post('/risk-rules', adminAccess, controller.saveRiskRule);
+router.patch('/risk-rules/:id', adminAccess, controller.saveRiskRule);
+router.get('/chapters/:chapterId/learning-outcomes', staffAccess, controller.learningOutcomes);
+router.post('/chapters/:chapterId/learning-outcomes', staffAccess, controller.saveLearningOutcome);
+router.patch('/chapters/:chapterId/learning-outcomes/:id', staffAccess, controller.saveLearningOutcome);
+router.put('/assessments/:assessmentId/components', staffAccess, controller.saveAssessmentComponents);
+router.put('/assessments/:assessmentId/component-scores', staffAccess, controller.saveComponentScores);
+router.post('/status-overrides', adminAccess, controller.createStatusOverride);
+router.post('/jobs/notifications', adminAccess, controller.runNotificationChecks);
+
+export default router;

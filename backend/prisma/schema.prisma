@@ -181,12 +181,22 @@ model School {
   transportFeeStops          TransportFeeStop[]
   transportFeeAssignments    TransportFeeAssignment[]
   homework                   Homework[]
+  studentSubjectEnrollments  StudentSubjectEnrollment[]
   homeworkAudiences          HomeworkAudience[]
   homeworkSubmissions        HomeworkSubmission[]
   academicAttachments        AcademicAttachment[]
   academicLinks              AcademicExternalLink[]
   academicNotifications      AcademicNotification[]
   academicContentAudits      AcademicContentAudit[]
+  resourceTargets            ResourceTarget[]
+  resourceVersions           ResourceVersion[]
+  resourceActivities         ResourceActivity[]
+  resourceComments           ResourceComment[]
+  resourceModerations        ResourceModeration[]
+  academicContentTypes       AcademicContentType[]
+  resourceCategories         ResourceCategory[]
+  resourceTags               ResourceTag[]
+  resourceTagAssignments     ResourceTagAssignment[]
   homeworkModuleSetting      HomeworkModuleSetting?
   employees                  Employee[]
   hrLeavePolicy              HrLeavePolicy?
@@ -204,6 +214,8 @@ model School {
   attendanceNotificationLogs AttendanceNotificationLog[]
   schoolWorkingDays          SchoolWorkingDay[]
   studentEnrollmentHistory   StudentEnrollmentHistory[]
+  analyticsConfiguration     AnalyticsConfiguration?
+  analyticsRiskRules         AnalyticsRiskRule[]
   createdAt                  DateTime                        @default(now())
   updatedAt                  DateTime                        @updatedAt
 
@@ -438,6 +450,7 @@ model Class {
   books                      Book[]
   curriculumUnits            CurriculumUnit[]
   homework                   Homework[]
+  resourceTargets            ResourceTarget[]
   deletedAt                  DateTime?
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
@@ -481,10 +494,11 @@ model Section {
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
   studentAttendances        StudentAttendance[]
-  homework                  Homework[]
+  resourceTargets           ResourceTarget[]
   deletedAt                 DateTime?
   createdAt                 DateTime                        @default(now())
   updatedAt                 DateTime                        @updatedAt
+  Homework                  Homework[]
 
   @@unique([classId, sectionName])
   @@unique([classId, sectionOrder])
@@ -536,9 +550,11 @@ model Subject {
   books                      Book[]
   curriculumUnits            CurriculumUnit[]
   homework                   Homework[]
+  resourceTargets            ResourceTarget[]
   deletedAt                  DateTime?
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
+  StudentSubjectEnrollment   StudentSubjectEnrollment[]
 
   @@unique([schoolId, subjectName])
   @@unique([schoolId, subjectCode])
@@ -591,6 +607,8 @@ model Chapter {
   learningGaps              LearningGap[]
   learningInterventions     LearningIntervention[]
   homework                  Homework[]
+  resourceTargets           ResourceTarget[]
+  learningOutcomes          LearningOutcome[]
   curriculumVersion         CurriculumVersion?         @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
   book                      Book?                      @relation(fields: [bookId], references: [id], onDelete: SetNull)
   unit                      CurriculumUnit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
@@ -668,7 +686,6 @@ model Teacher {
   chapterAssessments        ChapterAssessment[]
   learningInterventions     LearningIntervention[]          @relation("InterventionAssignedTeacher")
   teacherAttendances        TeacherAttendance[]
-  homework                  Homework[]
   teacherSubjects           TeacherSubject[]
   timetableSlots            TimetableSlot[]
   employee                  Employee?
@@ -873,11 +890,13 @@ model ChapterProgress {
 model SectionResource {
   id                  String                @id @default(cuid())
   schoolId            String
-  classId             String
-  sectionId           String
-  subjectId           String
+  classId             String?
+  sectionId           String?
+  subjectId           String?
   chapterId           String?
   teacherId           String?
+  categoryId          String?
+  contentTypeCode     String?
   title               String
   description         String?
   resourceType        SectionResourceType   @default(NOTE)
@@ -892,24 +911,43 @@ model SectionResource {
   scheduledAt         DateTime?
   isFeatured          Boolean               @default(false)
   isDownloadable      Boolean               @default(true)
+  audienceScope       AcademicAudienceScope @default(SELECTED_SECTIONS)
+  parentVisibility    Boolean               @default(true)
+  priority            HomeworkPriority      @default(NORMAL)
+  language            String?
+  curriculumSource    String?
+  difficultyLevel     String?
+  estimatedMinutes    Int?
+  expiresAt           DateTime?
+  archivedAt          DateTime?
   deletedAt           DateTime?
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
-  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  class         Class                  @relation(fields: [classId], references: [id], onDelete: Cascade)
-  section       Section                @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  subject       Subject                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  chapter       Chapter?               @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  teacher       Teacher?               @relation(fields: [teacherId], references: [id], onDelete: SetNull)
-  attachments   AcademicAttachment[]
-  externalLinks AcademicExternalLink[]
+  school         School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class          Class?                  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  section        Section?                @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  subject        Subject?                @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  chapter        Chapter?                @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  teacher        Teacher?                @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  attachments    AcademicAttachment[]
+  externalLinks  AcademicExternalLink[]
+  targets        ResourceTarget[]
+  versions       ResourceVersion[]
+  activities     ResourceActivity[]
+  comments       ResourceComment[]
+  moderation     ResourceModeration[]
+  tagAssignments ResourceTagAssignment[]
+  category       ResourceCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  engagementEvents ResourceEngagementEvent[]
 
   @@index([schoolId, classId, sectionId, subjectId])
   @@index([schoolId, teacherId])
   @@index([schoolId, chapterId])
   @@index([schoolId, isVisibleToStudents])
   @@index([schoolId, academicSession, status, publishedAt])
+  @@index([schoolId, audienceScope, status])
+  @@index([schoolId, expiresAt])
 }
 
 model SubjectWeeklyRequirement {
@@ -1459,6 +1497,9 @@ model Student {
   homeworkSubmissions       HomeworkSubmission[]
   academicNotifications     AcademicNotification[]
   enrollmentHistory         StudentEnrollmentHistory[]
+  subjectEnrollments        StudentSubjectEnrollment[]
+  resourceTargets           ResourceTarget[]
+  resourceActivities        ResourceActivity[]
 
   @@unique([studentUserId])
   @@unique([parentUserId])
@@ -1637,6 +1678,7 @@ model ChapterAssessment {
   teacher Teacher?                  @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   poll    ChapterPoll?              @relation(fields: [pollId], references: [id], onDelete: SetNull)
   results ChapterAssessmentResult[]
+  components AssessmentComponent[]
 
   @@index([schoolId, classId, sectionId, subjectId])
   @@index([schoolId, chapterId])
@@ -1740,6 +1782,11 @@ model LearningIntervention {
   chapterId            String
   studentId            String
   assignedTeacherId    String?
+  createdByUserId      String?
+  assignedToUserId     String?
+  interventionType     String             @default("REMEDIAL_CLASS")
+  title                String?
+  priority             String             @default("MEDIUM")
   reason               String
   recommendedAction    String
   status               InterventionStatus @default(PLANNED)
@@ -1747,6 +1794,10 @@ model LearningIntervention {
   dueDate              DateTime?
   completedAt          DateTime?
   notes                String?
+  outcome              String?
+  followUpDate         DateTime?
+  parentVisible        Boolean            @default(false)
+  confidentialNotes    String?
   reassessmentRequired Boolean            @default(true)
   beforeScore          Float?
   afterScore           Float?
@@ -1765,6 +1816,7 @@ model LearningIntervention {
   @@index([schoolId, studentId, status])
   @@index([schoolId, assignedTeacherId, status])
   @@index([schoolId, classId, sectionId, subjectId, chapterId])
+  @@index([schoolId, createdAt])
 }
 
 model StudentAcademicHistory {
@@ -2280,6 +2332,26 @@ model StudentEnrollmentHistory {
   @@index([schoolId, studentId, effectiveFrom, effectiveTo])
 }
 
+model StudentSubjectEnrollment {
+  id              String    @id @default(cuid())
+  schoolId        String
+  studentId       String
+  subjectId       String
+  academicSession String
+  effectiveFrom   DateTime  @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject         Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subjectId, academicSession])
+  @@index([schoolId, subjectId, isActive])
+  @@index([schoolId, studentId, academicSession, isActive])
+}
+
 model AcademicCalendarDay {
   id                   String          @id @default(cuid())
   schoolId             String
@@ -2500,6 +2572,10 @@ model HomeworkModuleSetting {
   marksVisible                 Boolean  @default(true)
   feedbackVisible              Boolean  @default(true)
   resourceDownloadAllowed      Boolean  @default(true)
+  moderationMode               String   @default("DIRECT")
+  classTeacherPublication      Boolean  @default(false)
+  zipUploadsEnabled            Boolean  @default(false)
+  defaultParentVisibility      Boolean  @default(true)
   createdAt                    DateTime @default(now())
   updatedAt                    DateTime @updatedAt
   school                       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
@@ -2511,11 +2587,13 @@ model Homework {
   academicSession        String
   createdByUserId        String?
   createdByRole          Role
-  classId                String
-  sectionId              String
-  subjectId              String
+  classId                String?
+  sectionId              String?
+  subjectId              String?
   chapterId              String?
   teacherAssignmentId    String?
+  categoryId             String?
+  contentTypeCode        String?
   title                  String
   description            String?
   instructions           String?
@@ -2541,30 +2619,40 @@ model Homework {
   closedAt               DateTime?
   status                 AcademicContentStatus @default(DRAFT)
   audienceMode           HomeworkAudienceMode  @default(ENTIRE_SECTION)
+  audienceScope          AcademicAudienceScope @default(SELECTED_SECTIONS)
+  parentVisibility       Boolean               @default(true)
+  expiresAt              DateTime?
   updatedAfterPublish    Boolean               @default(false)
   archivedAt             DateTime?
   deletedAt              DateTime?
   createdAt              DateTime              @default(now())
   updatedAt              DateTime              @updatedAt
 
-  school        School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  creator       User?                  @relation("HomeworkCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  class         Class                  @relation(fields: [classId], references: [id], onDelete: Restrict)
-  section       Section                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
-  subject       Subject                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
-  chapter       Chapter?               @relation(fields: [chapterId], references: [id], onDelete: SetNull)
-  audiences     HomeworkAudience[]
-  submissions   HomeworkSubmission[]
-  attachments   AcademicAttachment[]
-  externalLinks AcademicExternalLink[]
-  Teacher       Teacher?               @relation(fields: [teacherId], references: [id])
-  teacherId     String?
+  school         School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  creator        User?                   @relation("HomeworkCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  class          Class?                  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section        Section?                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject        Subject?                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapter        Chapter?                @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  audiences      HomeworkAudience[]
+  submissions    HomeworkSubmission[]
+  attachments    AcademicAttachment[]
+  externalLinks  AcademicExternalLink[]
+  targets        ResourceTarget[]
+  versions       ResourceVersion[]
+  activities     ResourceActivity[]
+  comments       ResourceComment[]
+  moderation     ResourceModeration[]
+  tagAssignments ResourceTagAssignment[]
+  category       ResourceCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([schoolId, academicSession, status, publishedAt])
   @@index([schoolId, classId, sectionId, subjectId])
   @@index([schoolId, chapterId])
   @@index([schoolId, createdByUserId])
   @@index([schoolId, dueAt])
+  @@index([schoolId, audienceScope, status])
+  @@index([schoolId, expiresAt])
 }
 
 model HomeworkAudience {
@@ -2692,6 +2780,188 @@ model AcademicContentAudit {
 
   @@index([schoolId, entityType, entityId, createdAt])
   @@index([schoolId, actorUserId, createdAt])
+}
+
+// One normalized target represents one audience rule. A content item has one
+// or more rows; whole-school content uses a row without a narrower target.
+model ResourceTarget {
+  id         String                @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  scope      AcademicAudienceScope
+  classId    String?
+  sectionId  String?
+  subjectId  String?
+  chapterId  String?
+  studentId  String?
+  createdAt  DateTime              @default(now())
+  homework   Homework?             @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource?      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class      Class?                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section    Section?              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject    Subject?              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapter    Chapter?              @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  student    Student?              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, scope])
+  @@index([schoolId, classId, sectionId])
+  @@index([schoolId, subjectId, chapterId])
+  @@index([schoolId, studentId])
+  @@index([homeworkId])
+  @@index([resourceId])
+}
+
+model ResourceVersion {
+  id              String           @id @default(cuid())
+  schoolId        String
+  homeworkId      String?
+  resourceId      String?
+  version         Int
+  snapshot        Json
+  reason          String?
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+  homework        Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource        SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, version])
+  @@unique([resourceId, version])
+  @@index([schoolId, createdAt])
+}
+
+model ResourceActivity {
+  id         String               @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  studentId  String
+  kind       ResourceActivityKind
+  count      Int                  @default(1)
+  firstAt    DateTime             @default(now())
+  lastAt     DateTime             @default(now())
+  metadata   Json?
+  homework   Homework?            @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource?     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId, kind])
+  @@unique([resourceId, studentId, kind])
+  @@index([schoolId, kind, lastAt])
+}
+
+model ResourceComment {
+  id           String            @id @default(cuid())
+  schoolId     String
+  homeworkId   String?
+  resourceId   String?
+  studentId    String?
+  authorUserId String?
+  parentId     String?
+  body         String
+  isPrivate    Boolean           @default(true)
+  status       String            @default("OPEN")
+  replyToId    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  homework     Homework?         @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource     SectionResource?  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  replyTo      ResourceComment?  @relation("ResourceCommentThread", fields: [replyToId], references: [id], onDelete: Cascade)
+  replies      ResourceComment[] @relation("ResourceCommentThread")
+  school       School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt])
+}
+
+model ResourceModeration {
+  id                String                   @id @default(cuid())
+  schoolId          String
+  homeworkId        String?
+  resourceId        String?
+  status            ResourceModerationStatus
+  submittedByUserId String?
+  reviewedByUserId  String?
+  reviewComment     String?
+  createdAt         DateTime                 @default(now())
+  reviewedAt        DateTime?
+  homework          Homework?                @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource          SectionResource?         @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school            School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt])
+}
+
+model AcademicContentType {
+  id                 String   @id @default(cuid())
+  schoolId           String
+  displayName        String
+  code               String
+  icon               String?
+  supportsSubmission Boolean  @default(false)
+  supportsDueDate    Boolean  @default(false)
+  supportsMarks      Boolean  @default(false)
+  supportsChapter    Boolean  @default(true)
+  canBeSchoolWide    Boolean  @default(false)
+  maximumFileBytes   Int      @default(10485760)
+  allowedMimeTypes   String[] @default([])
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  school             School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active, displayName])
+}
+
+model ResourceCategory {
+  id        String            @id @default(cuid())
+  schoolId  String
+  name      String
+  slug      String
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  homework  Homework[]
+  resources SectionResource[]
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, slug])
+  @@index([schoolId, active, name])
+}
+
+model ResourceTag {
+  id             String                  @id @default(cuid())
+  schoolId       String
+  name           String
+  normalizedName String
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  assignments    ResourceTagAssignment[]
+  school         School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, normalizedName])
+  @@index([schoolId, active, name])
+}
+
+model ResourceTagAssignment {
+  id         String           @id @default(cuid())
+  schoolId   String
+  tagId      String
+  homeworkId String?
+  resourceId String?
+  createdAt  DateTime         @default(now())
+  tag        ResourceTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  homework   Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, homeworkId])
+  @@unique([tagId, resourceId])
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
 }
 
 // Unified communication module. recipientKey/participantKey deliberately support
@@ -3715,6 +3985,209 @@ model FeeAuditLog {
   @@index([schoolId, entityType, entityId])
 }
 
+// Academic analytics configuration and immutable evidence. These models retain
+// scalar references so analytics can evolve without changing the existing
+// academic ownership graph or introducing cascading deletion of historical data.
+model AnalyticsConfiguration {
+  id                       String   @id @default(cuid())
+  schoolId                 String   @unique
+  examWeight               Float    @default(30)
+  chapterQuizWeight        Float    @default(20)
+  attendanceWeight         Float    @default(15)
+  homeworkWeight           Float    @default(15)
+  teacherEvaluationWeight  Float    @default(10)
+  studentFeedbackWeight    Float    @default(5)
+  resourceEngagementWeight Float    @default(5)
+  chapterAssessmentWeight  Float    @default(30)
+  chapterHomeworkWeight    Float    @default(20)
+  chapterTeacherWeight     Float    @default(15)
+  chapterFeedbackWeight    Float    @default(15)
+  chapterAttendanceWeight  Float    @default(10)
+  chapterResourceWeight    Float    @default(10)
+  lowRiskThreshold         Float    @default(70)
+  mediumRiskThreshold      Float    @default(50)
+  minimumAttendanceTarget  Float    @default(75)
+  minimumHomeworkTarget    Float    @default(70)
+  minimumChapterTarget     Float    @default(60)
+  rankingEnabled           Boolean  @default(false)
+  formulaVersion           String   @default("1.0")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  school                   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, updatedAt])
+}
+
+model AnalyticsRiskRule {
+  id            String       @id @default(cuid())
+  schoolId      String
+  code          String
+  title         String
+  description   String?
+  isEnabled     Boolean      @default(true)
+  severity      RiskSeverity
+  threshold     Float?
+  configuration Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, isEnabled])
+}
+
+model LearningOutcome {
+  id          String   @id @default(cuid())
+  schoolId    String
+  chapterId   String
+  title       String
+  description String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  assessmentComponents AssessmentComponent[]
+
+  @@unique([schoolId, chapterId, title])
+  @@index([schoolId, chapterId, isActive])
+}
+
+model AssessmentComponent {
+  id                String               @id @default(cuid())
+  schoolId          String
+  assessmentId      String
+  subjectId         String
+  chapterId         String?
+  learningOutcomeId String?
+  title             String
+  maximumMarks      Float
+  difficulty        AssessmentDifficulty?
+  order             Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  assessment        ChapterAssessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  learningOutcome   LearningOutcome?     @relation(fields: [learningOutcomeId], references: [id], onDelete: SetNull)
+  scores            StudentAssessmentComponentScore[]
+
+  @@unique([schoolId, assessmentId, order])
+  @@index([schoolId, assessmentId])
+  @@index([schoolId, chapterId])
+  @@index([schoolId, learningOutcomeId])
+}
+
+model StudentAssessmentComponentScore {
+  id                    String   @id @default(cuid())
+  schoolId              String
+  studentId             String
+  assessmentComponentId String
+  marksObtained         Float?
+  absent                Boolean  @default(false)
+  remarks               String?
+  recordedAt            DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  assessmentComponent   AssessmentComponent @relation(fields: [assessmentComponentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentComponentId, studentId])
+  @@index([schoolId, studentId, recordedAt])
+  @@index([schoolId, assessmentComponentId])
+}
+
+model ResourceEngagementEvent {
+  id          String                      @id @default(cuid())
+  schoolId    String
+  resourceId  String
+  studentId   String
+  eventType   ResourceEngagementEventType
+  progress    Float?
+  durationSec Int?
+  occurredAt  DateTime                    @default(now())
+  dedupeKey   String?                     @unique
+  resource    SectionResource             @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, studentId, occurredAt])
+  @@index([schoolId, resourceId, studentId])
+}
+
+model AnalyticsRecommendation {
+  id                String                       @id @default(cuid())
+  schoolId          String
+  studentId         String?
+  subjectId         String?
+  chapterId         String?
+  title             String
+  explanation       String
+  recommendedRole   Role
+  priority          AnalyticsRecommendationPriority @default(MEDIUM)
+  status            AnalyticsRecommendationStatus   @default(OPEN)
+  suggestedDeadline DateTime?
+  completionNote    String?
+  sourceCode        String
+  dedupeKey         String?
+  parentVisible     Boolean                      @default(false)
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, studentId, status])
+  @@index([schoolId, recommendedRole, status])
+}
+
+model StudentAnalyticsSnapshot {
+  id                String                @id @default(cuid())
+  schoolId          String
+  studentId         String
+  academicSessionId String
+  snapshotType      AnalyticsSnapshotType
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  score             Float?
+  riskLevel         AnalyticsRiskLevel?
+  dataCoverage      Float?
+  payload           Json
+  formulaVersion    String
+  createdAt         DateTime              @default(now())
+  createdById       String?
+
+  @@index([schoolId, studentId, createdAt])
+  @@index([schoolId, academicSessionId, snapshotType])
+}
+
+model AnalyticsAuditLog {
+  id         String   @id @default(cuid())
+  schoolId   String
+  userId     String?
+  userRole   String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+model AnalyticsStatusOverride {
+  id               String   @id @default(cuid())
+  schoolId         String
+  entityType       String
+  entityId         String
+  calculatedStatus String
+  overriddenStatus String
+  reason           String
+  createdById      String
+  createdAt        DateTime @default(now())
+  revokedAt        DateTime?
+
+  @@index([schoolId, entityType, entityId, createdAt])
+  @@index([schoolId, createdById])
+}
+
 // Enums
 enum Role {
   PLATFORM_OWNER
@@ -3938,6 +4411,33 @@ enum AcademicContentStatus {
   CLOSED
   ARCHIVED
   CANCELLED
+}
+
+enum AcademicAudienceScope {
+  WHOLE_SCHOOL
+  SELECTED_CLASSES
+  ENTIRE_CLASS
+  SELECTED_SECTIONS
+  SUBJECT_BASED
+  CHAPTER_BASED
+  SELECTED_STUDENTS
+}
+
+enum ResourceActivityKind {
+  VIEW
+  DOWNLOAD
+  BOOKMARK
+  ACKNOWLEDGMENT
+  COMPLETION
+  HELPFUL
+  BROKEN_LINK
+}
+
+enum ResourceModerationStatus {
+  PENDING_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
 }
 
 enum HomeworkType {
@@ -4319,6 +4819,62 @@ enum InterventionStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+  NO_RESPONSE
+  FOLLOW_UP_REQUIRED
+}
+
+enum RiskSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnalyticsRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  INSUFFICIENT_DATA
+}
+
+enum AssessmentDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ResourceEngagementEventType {
+  OPENED
+  STARTED
+  PROGRESSED
+  COMPLETED
+  DOWNLOADED
+  LINK_OPENED
+  REOPENED
+}
+
+enum AnalyticsRecommendationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AnalyticsRecommendationStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  DISMISSED
+}
+
+enum AnalyticsSnapshotType {
+  MONTHLY
+  FINAL_EXAM
+  TERM_REPORT
+  SESSION_END
+  COMPILED_CHAPTER
+  MANUAL
 }
 
 enum AttendanceStatus {

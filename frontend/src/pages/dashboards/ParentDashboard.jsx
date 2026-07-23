@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BarChart3, Bell, BookOpenCheck, CalendarCheck, GraduationCap, Image, ShieldCheck, UserRound } from 'lucide-react';
+import { Activity, ArrowRight, BarChart3, Bell, BookOpenCheck, CalendarCheck, GraduationCap, Image, ShieldCheck, UserRound } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { authService } from '../../services/authService';
 import { dashboardService } from '../../services/dashboardService';
@@ -58,6 +58,7 @@ export default function ParentDashboard() {
           <Panel>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Quick access</p><h2 className="mt-2 text-xl font-black">Parent services</h2>
             <div className="mt-5 space-y-3">{[
+              [Activity, 'Academic analytics', 'Strengths, focus areas and recommended next steps', '/analytics/students'],
               [CalendarCheck, 'Attendance details', 'Review daily and monthly attendance', '/dashboard/parent/attendance'],
               [UserRound, 'Parent profile', 'Update permitted contact information', '/dashboard/parent/profile'],
               [Image, 'School gallery', 'See school events and activities', '/dashboard/gallery'],

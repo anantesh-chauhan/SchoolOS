@@ -1,7 +1,7 @@
 import { signCloudinaryParams } from '../utils/cloudinary.util.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import { requireSchoolAdminOrAssignedTeacher, sendAuthorizationError } from '../utils/teacherAuthorization.util.js';
-import { getHomework } from '../modules/homework/homework.service.js';
+import { getHomework, previewAudience } from '../modules/homework/homework.service.js';
 
 const generateTimestamp = () => Math.floor(Date.now() / 1000);
 
@@ -146,6 +146,19 @@ export const getHomeworkUploadSignature = async (req, res) => {
     return res.json({ success: true, data: { cloudName: process.env.CLOUDINARY_CLOUD_NAME, apiKey: process.env.CLOUDINARY_API_KEY, timestamp, folder, signature: signCloudinaryParams(paramsToSign) } });
   } catch (error) {
     return res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Failed to generate homework upload signature', ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}) });
+  }
+};
+
+export const getAcademicContentUploadSignature = async (req, res) => {
+  try {
+    const schoolId = getScopedSchoolId(req.user, req.body.schoolId);
+    await previewAudience(req.user, req.body);
+    const timestamp = generateTimestamp();
+    const folder = `schoolos/${schoolId}/academic-content/${req.user.id}/${timestamp}`;
+    const paramsToSign = { folder, timestamp };
+    return res.json({ success: true, data: { cloudName: process.env.CLOUDINARY_CLOUD_NAME, apiKey: process.env.CLOUDINARY_API_KEY, timestamp, folder, signature: signCloudinaryParams(paramsToSign) } });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Failed to generate academic content upload signature' });
   }
 };
 

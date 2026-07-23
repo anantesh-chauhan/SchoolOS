@@ -34,3 +34,20 @@ test('resource validation accepts multiple safe links and rejects malformed URLs
   assert.match(validateResourceInput({ ...base, resourceType: 'PDF', externalLinks: ['not-a-url'] }).errors.join(' '), /External links/);
 });
 
+test('whole-school and multi-class targets are normalized without duplicating content', () => {
+  const wholeSchool = validateResourceInput({ title: 'Student handbook', resourceType: 'PDF', audienceScope: 'WHOLE_SCHOOL', targets: [{}] });
+  assert.deepEqual(wholeSchool.errors, []);
+  assert.deepEqual(wholeSchool.value.targets, [{ scope: 'WHOLE_SCHOOL', classId: null, sectionId: null, subjectId: null, chapterId: null, studentId: null }]);
+
+  const multiClass = validateResourceInput({ title: 'Career guide', audienceScope: 'SELECTED_CLASSES', targets: [{ classId: 'class-9' }, { classId: 'class-10' }] });
+  assert.deepEqual(multiClass.errors, []);
+  assert.equal(multiClass.value.targets.length, 2);
+  assert.equal(multiClass.value.targets[1].classId, 'class-10');
+});
+
+test('target shape validation rejects incomplete chapter and selected-student audiences', () => {
+  const chapter = validateHomeworkInput({ academicSession: '2026-27', title: 'Electricity', audienceScope: 'CHAPTER_BASED', targets: [{ classId: 'class-10', subjectId: 'science' }] });
+  assert.match(chapter.errors.join(' '), /chapterId/);
+  const student = validateResourceInput({ title: 'Remedial practice', audienceScope: 'SELECTED_STUDENTS', targets: [{ classId: 'class-8' }] });
+  assert.match(student.errors.join(' '), /studentId/);
+});

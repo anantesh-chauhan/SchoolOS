@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 
-import { BarChart3, Calendar, CheckCircle, Loader2, Play, Send, Users, Users2 } from 'lucide-react';
+import { Activity, BarChart3, Calendar, CheckCircle, Loader2, Play, Send, Users, Users2 } from 'lucide-react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { SummaryCard } from '../../components/DashboardCards';
 import { chapterFeedbackService } from '../../services/chapterFeedbackService';
@@ -199,6 +199,16 @@ export default function AdminDashboard() {
             Admin Actions
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Link to="/analytics/school" className="block rounded-lg bg-indigo-50 p-4 text-left transition hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/30">
+              <Activity className="mb-2 text-indigo-700 dark:text-indigo-300" size={20} />
+              <p className="font-semibold text-indigo-900 dark:text-indigo-100">School Analytics</p>
+              <p className="mt-1 text-sm text-indigo-600 dark:text-indigo-300">Academic health, risk, classes and coverage</p>
+            </Link>
+            <Link to="/analytics/students" className="block rounded-lg bg-sky-50 p-4 text-left transition hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/30">
+              <Users className="mb-2 text-sky-700 dark:text-sky-300" size={20} />
+              <p className="font-semibold text-sky-900 dark:text-sky-100">Student Intelligence</p>
+              <p className="mt-1 text-sm text-sky-600 dark:text-sky-300">Review evidence, recommendations and interventions</p>
+            </Link>
             <Link to="/dashboard/admin/classes" className="block p-4 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition text-left">
               <p className="font-semibold text-blue-900 dark:text-blue-100">Class Management</p>
               <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">Add and delete classes</p>
