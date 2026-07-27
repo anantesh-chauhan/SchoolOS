@@ -10,12 +10,15 @@ const clearSession = () => {
   localStorage.removeItem('user');
 };
 
-const subscribeTokenRefresh = (callback) => {
-  pendingRequests.push(callback);
+const subscribeTokenRefresh = (resolve, reject) => {
+  pendingRequests.push({ resolve, reject });
 };
 
-const onRefreshed = (newToken) => {
-  pendingRequests.forEach((callback) => callback(newToken));
+const settlePendingRequests = (error, newToken) => {
+  pendingRequests.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(newToken);
+  });
   pendingRequests = [];
 };
 
@@ -53,11 +56,14 @@ apiClient.interceptors.response.use(
     }
 
     if (isRefreshing) {
-      return new Promise((resolve) => {
-        subscribeTokenRefresh((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(apiClient(originalRequest));
-        });
+      return new Promise((resolve, reject) => {
+        subscribeTokenRefresh(
+          (token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(apiClient(originalRequest));
+          },
+          reject
+        );
       });
     }
 
@@ -86,11 +92,12 @@ apiClient.interceptors.response.use(
       localStorage.setItem('authToken', newToken);
       localStorage.setItem('refreshToken', newRefreshToken);
       localStorage.setItem('user', JSON.stringify(refreshedUser));
-      onRefreshed(newToken);
+      settlePendingRequests(null, newToken);
 
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return apiClient(originalRequest);
     } catch (refreshError) {
+      settlePendingRequests(refreshError);
       clearSession();
       window.location.href = '/login';
       return Promise.reject(refreshError);
@@ -99,5 +106,32 @@ apiClient.interceptors.response.use(
     }
   }
 );
+
+// Collapse identical concurrent reads into a single network request. This is
+// intentionally in-flight only: mutations never risk receiving stale data.
+const inFlightGets = new Map();
+const originalGet = apiClient.get.bind(apiClient);
+
+const stableSerialize = (value) => {
+  if (value === undefined) return '';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  return `{${Object.keys(value).sort().map((key) => (
+    `${JSON.stringify(key)}:${stableSerialize(value[key])}`
+  )).join(',')}}`;
+};
+
+apiClient.get = (url, config = {}) => {
+  if (config.dedupe === false || config.signal) return originalGet(url, config);
+
+  const token = localStorage.getItem('authToken') || '';
+  const key = `${token}|${url}|${stableSerialize(config.params)}`;
+  const existingRequest = inFlightGets.get(key);
+  if (existingRequest) return existingRequest;
+
+  const request = originalGet(url, config).finally(() => inFlightGets.delete(key));
+  inFlightGets.set(key, request);
+  return request;
+};
 
 export default apiClient;

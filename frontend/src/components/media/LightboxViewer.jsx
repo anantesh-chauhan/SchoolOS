@@ -149,6 +149,7 @@ export default function LightboxViewer({
                 shadow-2xl
               "
               loading="lazy"
+              decoding="async"
             />
 
             {/* Caption */}

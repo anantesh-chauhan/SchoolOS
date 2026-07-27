@@ -115,10 +115,15 @@ function Inbox({ user, initialConversationId }) {
   const open = async (row) => { setActive(row.id); setOpening(true); try { const result = await communicationService.conversation(row.id); setDetail(result); await communicationService.readConversation(row.id); await load(); } catch (requestError) { toast.error(requestError.response?.data?.message || 'Could not open conversation'); } finally { setOpening(false); } };
   useEffect(() => {
     load();
-    const timer = setInterval(load, 15000);
-    const refresh = () => load();
-    window.addEventListener('focus', refresh);
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    const timer = setInterval(refreshWhenVisible, 15000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
   useEffect(() => {
     if (!initialConversationId || openedInitial.current || !list) return;

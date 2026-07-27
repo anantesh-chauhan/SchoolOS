@@ -67,6 +67,7 @@ export default function GalleryPage() {
                           alt={group.title}
                           className="h-full w-full object-cover"
                           loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-slate-500">
@@ -132,6 +133,7 @@ export default function GalleryPage() {
                         alt={photo.caption || 'Gallery photo'}
                         className="aspect-[4/3] h-full w-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     </button>
                   ))}

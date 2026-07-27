@@ -9,9 +9,18 @@ import { ThemeProvider } from './contexts/ThemeContext';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        const status = error?.response?.status;
+        return failureCount < 2 && (!status || status === 429 || status >= 500);
+      },
+      retryDelay: (attempt) => Math.min(1000 * (2 ** attempt), 5000),
       refetchOnWindowFocus: false,
-      staleTime: 30 * 1000,
+      refetchOnReconnect: true,
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+    },
+    mutations: {
+      retry: 0,
     },
   },
 });

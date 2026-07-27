@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import prisma from './src/config/prisma.client.js';
 import authRoutes from './src/routes/auth.js';
 import schoolRoutes from './src/routes/schools.js';
@@ -37,16 +38,57 @@ import { processScheduled, processQueuedDeliveries } from './src/modules/communi
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const isProduction = process.env.NODE_ENV === 'production';
+let server;
+let isShuttingDown = false;
+
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || !isProduction || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
+      callback(null, true);
+      return;
+    }
+    const error = new Error('Origin is not allowed by CORS');
+    error.status = 403;
+    callback(error);
+  },
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
 
 // Middleware
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+app.use(cors(corsOptions));
+app.use(compression({
+  threshold: 1024,
+  filter: (req, res) => req.headers['x-no-compression']
+    ? false
+    : compression.filter(req, res),
+}));
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: process.env.FORM_BODY_LIMIT || '1mb',
+  parameterLimit: 1000,
+}));
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use(analyticsInvalidationMiddleware);
 
 // Health Check Endpoint (without database)
 app.get('/health', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
@@ -57,6 +99,7 @@ app.get('/health', (req, res) => {
 
 // Database Health Check
 app.get('/health/db', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({
@@ -135,10 +178,11 @@ app.use((req, res) => {
 // Error Handler
 app.use((err, req, res, next) => {
   console.error('Error:', err.message);
-  res.status(500).json({ 
+  const status = Number(err.status || err.statusCode) || 500;
+  res.status(status).json({
     success: false,
-    message: 'Internal server error', 
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    message: status >= 500 ? 'Internal server error' : err.message,
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
 
@@ -153,7 +197,7 @@ const startServer = async () => {
     console.log('✓ Database connection successful');
 
     // Start Express server
-    app.listen(PORT, '0.0.0.0', () => {
+    server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`\n✅ Server successfully started!`);
       console.log(`   URL: http://localhost:${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -174,9 +218,16 @@ const startServer = async () => {
 startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+process.once('SIGTERM', async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   console.log('\n🛑 Shutting down gracefully...');
   try {
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
     await prisma.$disconnect();
     console.log('✅ Database connection closed');
     process.exit(0);
@@ -186,9 +237,16 @@ process.on('SIGTERM', async () => {
   }
 });
 
-process.on('SIGINT', async () => {
+process.once('SIGINT', async () => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
   console.log('\n🛑 Shutting down gracefully...');
   try {
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
     await prisma.$disconnect();
     console.log('✅ Database connection closed');
     process.exit(0);

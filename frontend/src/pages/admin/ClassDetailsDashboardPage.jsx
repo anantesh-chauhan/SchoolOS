@@ -133,6 +133,8 @@ function StudentDrawer({ open, student, onClose, subjectsForLookup }) {
                   src={student.photo}
                   alt={student.name}
                   className="h-14 w-14 rounded-2xl border border-slate-200 bg-slate-50 object-cover"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="min-w-0">
                   <p className="text-base font-extrabold text-slate-900 truncate">{student.name}</p>
@@ -244,6 +246,8 @@ function StudentCard({ student, onOpen }) {
           src={student.photo}
           alt={student.name}
           className="h-12 w-12 rounded-2xl border border-slate-200 bg-slate-50 object-cover"
+          loading="lazy"
+          decoding="async"
         />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-extrabold text-slate-900 truncate">{student.name}</p>

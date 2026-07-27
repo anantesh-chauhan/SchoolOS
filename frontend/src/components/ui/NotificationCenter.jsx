@@ -35,14 +35,17 @@ export default function NotificationCenter({ enabled = true }) {
   useEffect(() => {
     if (!enabled) { setLoading(false); return undefined; }
     load();
-    const timer = setInterval(load, 60000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    const timer = setInterval(refreshWhenVisible, 60000);
     const refresh = () => load();
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
-    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
       clearInterval(timer);
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
-      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [enabled, load]);
 

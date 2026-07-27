@@ -216,6 +216,7 @@ export default function GalleryManagePhotosPage() {
                           alt={photo.caption || 'Gallery photo'}
                           className="aspect-[4/3] w-full rounded-lg object-cover"
                           loading="lazy"
+                          decoding="async"
                         />
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <p className="line-clamp-1 text-sm text-slate-700">{photo.caption || 'No caption'}</p>
