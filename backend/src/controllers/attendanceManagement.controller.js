@@ -107,8 +107,15 @@ export const saveStudentDailyRegister = async (req, res) => {
     if (state === 'SUBMITTED' && normalized.some((row) => row.status === 'NOT_MARKED')) return fail(res, 400, 'Every enrolled student must be marked before submission');
     const previous = await prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate: date, studentId: { in: ids } } });
     const previousById = new Map(previous.map((row) => [row.studentId, row]));
-    if (isSchoolAdmin(req.user) && previous.some((old) => normalized.find((row) => row.studentId === old.studentId)?.status !== old.status) && !clean(req.body.reason)) return fail(res, 400, 'An override reason is required when an admin changes attendance');
-    const session = await sessionContext(schoolId, req.body.academicSession, date); if (!session) return fail(res, 409, 'Attendance date is outside a configured academic session'); const academicSession = session.name;
+    const changedExistingRecords = previous.filter((old) => {
+      const next = normalized.find((row) => row.studentId === old.studentId);
+      return next && (next.status !== old.status || clean(next.remarks) !== clean(old.remarks));
+    });
+    if (isSchoolAdmin(req.user) && changedExistingRecords.length && !clean(req.body.reason)) {
+      return fail(res, 400, 'Please provide a reason for changing previously saved attendance');
+    }
+    const session = await sessionContext(schoolId, req.body.academicSession, date);
+    const academicSession = session?.name || clean(req.body.academicSession) || sessionNameFor(date);
     await prisma.$transaction(async (tx) => {
       for (const row of normalized) {
         const old = previousById.get(row.studentId);
@@ -120,7 +127,11 @@ export const saveStudentDailyRegister = async (req, res) => {
     const absenceRecipients=[...(rules.studentNotifications?['STUDENT']:[]),...(rules.parentAbsenceNotifications?['PARENT']:[])];
     if(absenceRecipients.length)await Promise.allSettled(normalized.filter((row) => row.status === 'ABSENT').map((row) => publishAttendanceEvent({ schoolId, eventType: 'STUDENT_ABSENT', subjectType: 'STUDENT_ATTENDANCE', subjectId: row.studentId, attendanceDate: date, students: [row.studentId], roles:absenceRecipients, priority: 'HIGH', title: 'Absence recorded', message: `Attendance for ${date.toISOString().slice(0,10)} was marked absent.`, actionUrl: '/student/attendance' })));
     if (state === 'SUBMITTED') await publishAttendanceEvent({ schoolId, eventType: 'ATTENDANCE_SUBMITTED', subjectType: 'SECTION_ATTENDANCE', subjectId: `${classId}:${sectionId}`, attendanceDate: date, roles: ['ADMIN','SCHOOL_OWNER'], title: 'Attendance submitted', message: `${section.class.className} · ${section.sectionName} attendance was submitted.`, actionUrl: '/attendance' }).catch(() => null);
-    return res.json({ success: true, message: state === 'SUBMITTED' ? 'Attendance submitted' : 'Draft attendance saved', data: { state, savedCount: normalized.length } });
+    const savedRegister = await prisma.attendanceDailyRegister.findUnique({
+      where: { schoolId_classId_sectionId_attendanceDate: { schoolId, classId, sectionId, attendanceDate: date } },
+      select: { id: true, state: true, markedCount: true, submittedAt: true, version: true, lockedAt: true },
+    });
+    return res.json({ success: true, message: state === 'SUBMITTED' ? 'Attendance submitted' : 'Draft attendance saved', data: { state, savedCount: normalized.length, register: savedRegister } });
   } catch (error) { if (sendAuthorizationError(res, error)) return; return fail(res, error.statusCode || 400, error.message || 'Failed to save attendance'); }
 };
 

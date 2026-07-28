@@ -13,15 +13,15 @@
     color-scheme: light;
 
     /* Brand Colors */
-    --school-primary: #0f766e;
-    --school-primary-soft: #ccfbf1;
+    --school-primary: #2563eb;
+    --school-primary-soft: #dbeafe;
 
-    --school-secondary: #0f172a;
-    --school-accent: #6366f1;
+    --school-secondary: #0f766e;
+    --school-accent: #3b82f6;
 
     /* Surface Colors */
     --surface-base: #ffffff;
-    --surface-muted: #f8fafc;
+    --surface-muted: #f4f7fb;
 
     /* Text Colors */
     --text-primary: #0f172a;
@@ -30,12 +30,12 @@
     /* Border */
     --border-soft: #e2e8f0;
 
-    --background: #f8fafc;
+    --background: #f4f7fb;
     --foreground: #0f172a;
     --card: #ffffff;
-    --border: #e2e8f0;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
+    --border: #dce5f0;
+    --muted: #edf2f7;
+    --muted-foreground: #5f7088;
     --primary: #2563eb;
     --secondary: #0f766e;
     --danger: #dc2626;
@@ -55,20 +55,31 @@
 
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
   }
 
   .dark {
     color-scheme: dark;
-    --background: #020617;
-    --foreground: #e2e8f0;
-    --card: #0f172a;
-    --border: #1e293b;
-    --muted: #111827;
-    --muted-foreground: #94a3b8;
+    --school-primary: #60a5fa;
+    --school-primary-soft: #18345d;
+    --school-secondary: #5eead4;
+    --school-accent: #93c5fd;
+    --surface-base: #132238;
+    --surface-muted: #0d1728;
+    --text-primary: #f1f6ff;
+    --text-muted: #9fb0c7;
+    --border-soft: #2b405c;
+    --background: #0b1220;
+    --foreground: #f1f6ff;
+    --card: #132238;
+    --border: #2b405c;
+    --muted: #17263a;
+    --muted-foreground: #9fb0c7;
     --primary: #60a5fa;
-    --secondary: #2dd4bf;
-    --danger: #f87171;
-    --success: #34d399;
+    --secondary: #5eead4;
+    --danger: #fb7185;
+    --success: #5eead4;
     --warning: #fbbf24;
   }
 
@@ -77,27 +88,52 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 
-    background: radial-gradient(
-      circle at top left,
-      #dbeafe 0%,
-      #eef2ff 35%,
-      #ecfeff 100%
-    );
+    background:
+      radial-gradient(circle at top left, #e3efff 0%, transparent 33%),
+      radial-gradient(circle at top right, #e5f8f3 0%, transparent 28%),
+      #f4f7fb;
 
     min-height: 100vh;
     color: var(--text-primary);
     transition: background-color 300ms ease, color 300ms ease;
+    overflow-x: hidden;
+    min-width: 320px;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+
+  button,
+  [role='button'],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  @media (max-width: 639px) {
+    input:not([type='checkbox']):not([type='radio']),
+    select,
+    textarea {
+      font-size: 16px;
+    }
+
+    h1 {
+      overflow-wrap: anywhere;
+    }
   }
 
   /* 🌙 DARK MODE */
 
   .dark body {
-    background: radial-gradient(
-      circle at top left,
-      #0f172a 0%,
-      #111827 46%,
-      #020617 100%
-    );
+    background:
+      radial-gradient(circle at top left, #173158 0%, transparent 30%),
+      radial-gradient(circle at top right, #123338 0%, transparent 24%),
+      #0b1220;
 
     color: var(--foreground);
   }
@@ -114,19 +150,29 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #cbd5f5;
+    background: #b9c9dc;
     border-radius: 999px;
   }
 
   .dark ::-webkit-scrollbar-thumb {
-    background: #334155;
+    background: #3a5274;
   }
 
   /* Focus States (Accessibility) */
 
   :focus-visible {
     outline: 2px solid var(--school-accent);
-    outline-offset: 2px;
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: #bfdbfe;
+    color: #10213b;
+  }
+
+  .dark ::selection {
+    background: #28558d;
+    color: #f5f9ff;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -152,11 +198,11 @@
   .glass-panel {
     @apply
       bg-white/70
-      dark:bg-slate-900/70
+      dark:bg-slate-900/80
       backdrop-blur-xl
       border
       border-white/60
-      dark:border-slate-700/70
+      dark:border-slate-700/80
       shadow-xl
       rounded-2xl;
   }
@@ -177,7 +223,7 @@
   }
 
   .card-hover {
-    @apply hover:shadow-md hover:-translate-y-[2px];
+    @apply hover:shadow-md hover:-translate-y-[2px] dark:hover:border-slate-600;
   }
 
   /* Page Titles */
@@ -203,7 +249,29 @@
   /* Section spacing */
 
   .section {
-    @apply space-y-6;
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  /* Mobile-first building blocks for dense legacy screens. */
+  .mobile-stack {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center;
+  }
+
+  .mobile-actions {
+    @apply grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap;
+  }
+
+  .scroll-table {
+    @apply -mx-1 overflow-x-auto overscroll-x-contain px-1;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-card-list {
+    @apply grid gap-3 md:hidden;
+  }
+
+  .desktop-table {
+    @apply hidden md:block;
   }
 
   /* Buttons */
@@ -221,6 +289,7 @@
       hover:shadow-md
       active:scale-[0.98];
     background-color: var(--school-primary);
+    box-shadow: 0 6px 14px rgb(37 99 235 / 0.18);
   }
 
   .btn-secondary {
@@ -330,112 +399,139 @@
       lg:px-8;
   }
 
+  @media (max-width: 639px) {
+    main :where(.overflow-auto, .overflow-x-auto) {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-inline: contain;
+    }
+
+    main :where(table) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    main :where(.fixed.inset-0) {
+      padding: 0.75rem;
+    }
+
+    main :where([class*='max-w-']) {
+      max-width: 100%;
+    }
+  }
+
   /* Dark-mode fallbacks for legacy components that still use light-only utilities. */
   .dark :where(.bg-white) {
-    background-color: rgb(15 23 42);
+    background-color: rgb(19 34 56);
   }
 
   .dark :where(.bg-white\/95) {
-    background-color: rgb(15 23 42 / 0.95);
+    background-color: rgb(19 34 56 / 0.95);
   }
 
   .dark :where(.bg-white\/90) {
-    background-color: rgb(15 23 42 / 0.9);
+    background-color: rgb(19 34 56 / 0.9);
   }
 
   .dark :where(.bg-white\/80) {
-    background-color: rgb(15 23 42 / 0.8);
+    background-color: rgb(19 34 56 / 0.8);
   }
 
   .dark :where(.bg-white\/70) {
-    background-color: rgb(15 23 42 / 0.7);
+    background-color: rgb(19 34 56 / 0.7);
   }
 
   .dark :where(.bg-slate-50) {
-    background-color: rgb(2 6 23);
+    background-color: rgb(13 23 40);
   }
 
   .dark :where(.bg-slate-100) {
-    background-color: rgb(30 41 59);
+    background-color: rgb(23 38 58);
   }
 
   .dark :where(.bg-slate-200) {
-    background-color: rgb(51 65 85);
+    background-color: rgb(37 56 82);
   }
 
   .dark :where(.bg-slate-300) {
-    background-color: rgb(71 85 105);
+    background-color: rgb(55 76 105);
+  }
+
+  .dark :where(.bg-slate-900) {
+    background-color: rgb(19 34 56);
+  }
+
+  .dark :where(.bg-slate-950) {
+    background-color: rgb(11 18 32);
   }
 
   .dark :where(.hover\:bg-white:hover) {
-    background-color: rgb(30 41 59);
+    background-color: rgb(28 47 74);
   }
 
   .dark :where(.hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover) {
-    background-color: rgb(30 41 59);
+    background-color: rgb(28 47 74);
   }
 
   .dark :where(.hover\:bg-slate-200:hover, .hover\:bg-slate-300:hover) {
-    background-color: rgb(51 65 85);
+    background-color: rgb(37 56 82);
   }
 
   .dark :where(.border-slate-100) {
-    border-color: rgb(30 41 59);
+    border-color: rgb(32 51 76);
   }
 
   .dark :where(.border-slate-200) {
-    border-color: rgb(30 41 59);
+    border-color: rgb(43 64 92);
   }
 
   .dark :where(.border-slate-300) {
-    border-color: rgb(51 65 85);
+    border-color: rgb(57 80 111);
   }
 
   .dark :where(.border-gray-100, .border-gray-200) {
-    border-color: rgb(30 41 59);
+    border-color: rgb(43 64 92);
   }
 
   .dark :where(.border-gray-300) {
-    border-color: rgb(51 65 85);
+    border-color: rgb(57 80 111);
   }
 
   .dark :where(.text-black, .text-slate-950, .text-slate-900, .text-gray-950, .text-gray-900) {
-    color: rgb(241 245 249);
+    color: rgb(241 246 255);
   }
 
   .dark :where(.text-slate-800, .text-slate-700, .text-gray-800, .text-gray-700) {
-    color: rgb(226 232 240);
+    color: rgb(218 229 242);
   }
 
   .dark :where(.text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500) {
-    color: rgb(148 163 184);
+    color: rgb(159 176 199);
   }
 
   .dark :where(.text-slate-400, .text-gray-400) {
-    color: rgb(100 116 139);
+    color: rgb(128 150 177);
   }
 
   .dark :where(.placeholder\:text-slate-400::placeholder, .placeholder\:text-gray-400::placeholder) {
-    color: rgb(100 116 139);
+    color: rgb(128 150 177);
   }
 
   .dark :where(input, select, textarea):not([type='checkbox']):not([type='radio']) {
-    background-color: rgb(15 23 42);
-    border-color: rgb(51 65 85);
-    color: rgb(241 245 249);
+    background-color: rgb(14 26 45);
+    border-color: rgb(57 80 111);
+    color: rgb(241 246 255);
   }
 
   .dark :where(input:disabled, select:disabled, textarea:disabled) {
-    background-color: rgb(30 41 59);
-    color: rgb(100 116 139);
+    background-color: rgb(23 38 58);
+    color: rgb(128 150 177);
   }
 
   .dark :where(table) {
-    color: rgb(226 232 240);
+    color: rgb(218 229 242);
   }
 
   .dark :where(thead, tr):where(.bg-slate-100) {
-    background-color: rgb(30 41 59);
-    color: rgb(226 232 240);
+    background-color: rgb(23 38 58);
+    color: rgb(218 229 242);
   }
 }

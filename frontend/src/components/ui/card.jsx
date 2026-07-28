@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { cn } from "../../lib/utils";
 
 /* =====================================================
@@ -18,10 +19,10 @@ export function Card({
     <div
       className={cn(
 
-        "rounded-2xl",
+        "rounded-xl sm:rounded-2xl",
         "border border-slate-200",
         "bg-white",
-        "shadow-sm",
+        "shadow-sm shadow-slate-200/70",
 
         "transition-all duration-300",
 
@@ -29,7 +30,7 @@ export function Card({
 
         "dark:bg-slate-900",
         "dark:border-slate-800",
-        "dark:shadow-slate-950/20",
+        "dark:shadow-[0_10px_30px_rgba(3,10,24,0.25)]",
 
         className
 
@@ -63,7 +64,7 @@ export function CardHeader({
 
         "border-b border-slate-200",
 
-        "px-6 py-4",
+        "px-4 py-3 sm:px-6 sm:py-4",
 
         "dark:border-slate-800",
 
@@ -167,7 +168,7 @@ export function CardContent({
     <div
       className={cn(
 
-        "px-6 py-5",
+        "px-4 py-4 sm:px-6 sm:py-5",
 
         className
 
@@ -203,7 +204,7 @@ export function CardFooter({
 
         "border-t border-slate-200",
 
-        "px-6 py-4",
+        "px-4 py-3 sm:px-6 sm:py-4",
 
         "dark:border-slate-800",
 
@@ -218,3 +219,11 @@ export function CardFooter({
   );
 
 }
+
+const sharedPropTypes = { className: PropTypes.string, children: PropTypes.node };
+Card.propTypes = { ...sharedPropTypes, hover: PropTypes.bool };
+CardHeader.propTypes = sharedPropTypes;
+CardTitle.propTypes = sharedPropTypes;
+CardDescription.propTypes = sharedPropTypes;
+CardContent.propTypes = sharedPropTypes;
+CardFooter.propTypes = sharedPropTypes;

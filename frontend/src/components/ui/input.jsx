@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PropTypes from "prop-types";
 import { cn } from "../../lib/utils";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -8,11 +9,11 @@ import { Eye, EyeOff } from "lucide-react";
 
 const sizes = {
 
-  sm: "h-8 text-xs px-2.5",
+  sm: "h-10 text-base px-2.5 sm:h-8 sm:text-xs",
 
-  md: "h-10 text-sm px-3",
+  md: "h-11 text-base px-3 sm:h-10 sm:text-sm",
 
-  lg: "h-11 text-base px-3.5",
+  lg: "h-12 text-base px-3.5 sm:h-11",
 
 };
 
@@ -197,3 +198,15 @@ export function Input({
   );
 
 }
+
+Input.propTypes = {
+  className: PropTypes.string,
+  label: PropTypes.string,
+  error: PropTypes.node,
+  helperText: PropTypes.node,
+  leftIcon: PropTypes.elementType,
+  rightIcon: PropTypes.elementType,
+  type: PropTypes.string,
+  size: PropTypes.oneOf(Object.keys(sizes)),
+  disabled: PropTypes.bool,
+};

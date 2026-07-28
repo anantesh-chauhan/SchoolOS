@@ -1,5 +1,6 @@
 import { Dialog, Transition } from "@headlessui/react";
 import React, { Fragment } from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -74,7 +75,7 @@ export function Modal({
 
         <div className="fixed inset-0 overflow-y-auto">
 
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
 
             <Transition.Child
               as={Fragment}
@@ -95,7 +96,7 @@ export function Modal({
 
                   "overflow-hidden",
 
-                  "rounded-2xl",
+                  "max-h-[92dvh] rounded-t-2xl sm:max-h-none sm:rounded-2xl",
 
                   "border border-slate-200",
 
@@ -117,7 +118,7 @@ export function Modal({
 
                   {/* Header */}
 
-                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4 dark:border-slate-700">
 
                     <div className="flex items-center gap-2">
 
@@ -141,7 +142,7 @@ export function Modal({
 
                       <button
                         onClick={onClose}
-                        className="rounded-md p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-9 sm:w-9 dark:hover:bg-slate-800"
                       >
 
                         <X className="h-5 w-5" />
@@ -154,7 +155,7 @@ export function Modal({
 
                   {/* Content */}
 
-                  <div className="px-6 py-5 max-h-[70vh] overflow-y-auto">
+                  <div className="max-h-[70dvh] overflow-y-auto px-4 py-4 sm:max-h-[70vh] sm:px-6 sm:py-5">
 
                     {children}
 
@@ -164,7 +165,7 @@ export function Modal({
 
                   {footer && (
 
-                    <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-slate-700">
+                    <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3 sm:flex sm:items-center sm:justify-end sm:px-6 sm:py-4 dark:border-slate-700">
 
                       {footer}
 
@@ -189,3 +190,14 @@ export function Modal({
   );
 
 }
+
+Modal.propTypes = {
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.node,
+  children: PropTypes.node,
+  footer: PropTypes.node,
+  size: PropTypes.oneOf(Object.keys(sizes)),
+  showClose: PropTypes.bool,
+  icon: PropTypes.elementType,
+};

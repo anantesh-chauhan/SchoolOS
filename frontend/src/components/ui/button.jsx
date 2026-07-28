@@ -1,4 +1,5 @@
 import React from "react";
+import PropTypes from "prop-types";
 import { cn } from "../../lib/utils";
 import { Loader2 } from "lucide-react";
 
@@ -9,19 +10,19 @@ import { Loader2 } from "lucide-react";
 const variants = {
 
   default:
-    "bg-slate-900 text-white hover:bg-slate-800 shadow-sm dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white",
+    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm dark:bg-blue-500 dark:text-slate-950 dark:hover:bg-blue-400",
 
   secondary:
     "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700",
 
   primary:
-    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm",
+    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm dark:bg-blue-500 dark:text-slate-950 dark:hover:bg-blue-400",
 
   success:
-    "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm",
+    "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300",
 
   warning:
-    "bg-amber-500 text-white hover:bg-amber-600 shadow-sm",
+    "bg-amber-500 text-white hover:bg-amber-600 shadow-sm dark:bg-amber-400 dark:text-slate-950 dark:hover:bg-amber-300",
 
   danger:
     "bg-red-600 text-white hover:bg-red-700 shadow-sm",
@@ -44,16 +45,16 @@ const variants = {
 const sizes = {
 
   sm:
-    "h-8 px-3 text-xs rounded-md",
+    "h-10 px-3 text-xs rounded-lg sm:h-8 sm:rounded-md",
 
   md:
-    "h-10 px-4 text-sm rounded-md",
+    "h-11 px-4 text-sm rounded-lg sm:h-10 sm:rounded-md",
 
   lg:
-    "h-11 px-6 text-base rounded-lg",
+    "h-12 px-5 text-base rounded-xl sm:h-11 sm:px-6 sm:rounded-lg",
 
   icon:
-    "h-10 w-10 rounded-md p-0",
+    "h-11 w-11 rounded-lg p-0 sm:h-10 sm:w-10 sm:rounded-md",
 
 };
 
@@ -161,3 +162,16 @@ export function Button({
   );
 
 }
+
+Button.propTypes = {
+  className: PropTypes.string,
+  variant: PropTypes.oneOf(Object.keys(variants)),
+  size: PropTypes.oneOf(Object.keys(sizes)),
+  type: PropTypes.oneOf(["button", "submit", "reset"]),
+  loading: PropTypes.bool,
+  fullWidth: PropTypes.bool,
+  leftIcon: PropTypes.elementType,
+  rightIcon: PropTypes.elementType,
+  children: PropTypes.node,
+  disabled: PropTypes.bool,
+};

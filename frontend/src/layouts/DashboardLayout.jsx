@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   BookOpen,
   BookOpenCheck,
@@ -7,7 +8,6 @@ import {
   ChevronDown,
   Home,
   Layers,
-  LogOut,
   LayoutGrid,
   Menu,
   Monitor,
@@ -21,7 +21,6 @@ import {
   UserRound,
   Users,
   UsersRound,
-  X,
   MessageSquare,
   KeyRound,
   BadgeIndianRupee,
@@ -133,44 +132,46 @@ const DashboardLayout = ({ children, role }) => {
       { group:'Support & Quality', icon:MessageSquare, items:[{label:'Issue Reports',icon:MessageSquare,href:'/platform/issues'},{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] },
     ],
     SCHOOL_OWNER: [
-      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
-      {
-        group: 'Academic Setup',
-        icon: BookOpen,
-        items: [
-          { label: 'Dashboard', icon: Home, href: '/dashboard/school' },
-          { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
-          { label: 'Sections', icon: Shapes, href: '/dashboard/admin/sections' },
-          { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
-          { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
-          { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
-          { label: 'Class Teachers', icon: ClipboardCheck, href: '/dashboard/admin/class-teachers' },
-          { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
-          { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
-          { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
-          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
-          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
-          { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
-          { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
-        ],
-      },
-      {
-        group: 'School Management',
-        icon: Users,
-        items: [
-          { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
-          { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
-          { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
-          { label: 'User Accounts', icon: Users, href: '/dashboard/school/users' },
-          { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
-          { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
-          { label: 'Attendance Dashboard', icon: ClipboardCheck, href: '/attendance' },
-          { label: 'Attendance Rules', icon: Settings, href: '/attendance/settings' },
-          { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
-          { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
-          { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
-        ],
-      },
+      { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/school' }] },
+      { group: 'People & Access', icon: Users, items: [
+        { label: 'Students', icon: Users, href: '/dashboard/admin/students/add' },
+        { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
+        { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
+        { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
+        { label: 'User Accounts', icon: Users, href: '/dashboard/school/users' },
+        { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
+      ] },
+      { group: 'Classes & Timetable', icon: School, items: [
+        { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
+        { label: 'Sections', icon: Shapes, href: '/dashboard/admin/sections' },
+        { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
+        { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
+        { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
+        { label: 'Class Teachers', icon: ClipboardCheck, href: '/dashboard/admin/class-teachers' },
+        { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
+        { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
+        { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
+      ] },
+      { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [
+        { label: 'Attendance Dashboard', icon: ClipboardCheck, href: '/attendance' },
+        { label: 'Student Attendance', icon: Users, href: '/dashboard/admin/attendance/students' },
+        { label: 'Teacher Attendance', icon: UsersRound, href: '/dashboard/admin/attendance/teachers' },
+        { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/admin/attendance/calendar' },
+        { label: 'Attendance Rules', icon: Settings, href: '/attendance/settings' },
+      ] },
+      { group: 'Learning & Resources', icon: BookOpen, items: [
+        { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+        { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
+        { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
+        { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
+      ] },
+      { group: 'Fees & Finance', icon: BadgeIndianRupee, items: [
+        { label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' },
+        { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' },
+        { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' },
+        { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' },
+        { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' },
+      ] },
       {
         group: 'System',
         icon: Settings,
@@ -184,47 +185,49 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     ADMIN: [
-      { group: 'Fee Management', icon: BadgeIndianRupee, items: [{ label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' }, { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' }, { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' }, { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' }, { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' }] },
       { group: 'Overview', icon: Home, items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
         ],
       },
-      {
-        group: 'Academic Setup',
-        icon: BookOpen,
-        items: [
-          { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
-          { label: 'Sections', icon: Shapes, href: '/dashboard/admin/sections' },
-          { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
-          { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
-          { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
-          { label: 'Class Teachers', icon: ClipboardCheck, href: '/dashboard/admin/class-teachers' },
-          { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
-          { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
-          { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
-          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
-          { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
-          { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
-          { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
-        ],
-      },
-      {
-        group: 'School Management',
-        icon: Users,
-        items: [
-          { label: 'Add Student', icon: Users, href: '/dashboard/admin/students/add' },
-          { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
-          { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
-          { label: 'User Accounts', icon: Users, href: '/dashboard/admin/users' },
-          { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
-          { label: 'Student Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/students' },
-          { label: 'Attendance Dashboard', icon: ClipboardCheck, href: '/attendance' },
-          { label: 'Attendance Rules', icon: Settings, href: '/attendance/settings' },
-          { label: 'Teacher Attendance', icon: ClipboardCheck, href: '/dashboard/admin/attendance/teachers' },
-          { label: 'Academic Calendar', icon: ClipboardCheck, href: '/dashboard/admin/attendance/calendar' },
-          { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
-        ],
-      },
+      { group: 'People & Access', icon: Users, items: [
+        { label: 'Students', icon: Users, href: '/dashboard/admin/students/add' },
+        { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
+        { label: 'Teachers', icon: UsersRound, href: '/dashboard/admin/teachers' },
+        { label: 'Teacher Summary', icon: BookOpenCheck, href: '/dashboard/admin/teacher-assignment-summary' },
+        { label: 'User Accounts', icon: Users, href: '/dashboard/admin/users' },
+        { label: 'Login Credentials', icon: KeyRound, href: '/dashboard/admin/credentials' },
+      ] },
+      { group: 'Classes & Timetable', icon: School, items: [
+        { label: 'Classes', icon: Layers, href: '/dashboard/admin/classes' },
+        { label: 'Sections', icon: Shapes, href: '/dashboard/admin/sections' },
+        { label: 'Subjects', icon: BookOpen, href: '/dashboard/admin/subjects' },
+        { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
+        { label: 'Teacher Assignment', icon: UsersRound, href: '/dashboard/admin/teacher-assignment' },
+        { label: 'Class Teachers', icon: ClipboardCheck, href: '/dashboard/admin/class-teachers' },
+        { label: 'Weekly Slots', icon: BookOpenCheck, href: '/dashboard/admin/weekly-slots' },
+        { label: 'Timetable Builder', icon: School, href: '/dashboard/admin/timetable-builder' },
+        { label: 'Timetable Audit', icon: BookOpenCheck, href: '/dashboard/admin/timetable-reconciliation' },
+      ] },
+      { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [
+        { label: 'Attendance Dashboard', icon: ClipboardCheck, href: '/attendance' },
+        { label: 'Student Attendance', icon: Users, href: '/dashboard/admin/attendance/students' },
+        { label: 'Teacher Attendance', icon: UsersRound, href: '/dashboard/admin/attendance/teachers' },
+        { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/admin/attendance/calendar' },
+        { label: 'Attendance Rules', icon: Settings, href: '/attendance/settings' },
+      ] },
+      { group: 'Learning & Resources', icon: BookOpen, items: [
+        { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+        { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
+        { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
+        { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
+      ] },
+      { group: 'Fees & Finance', icon: BadgeIndianRupee, items: [
+        { label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' },
+        { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' },
+        { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' },
+        { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' },
+        { label: 'Reports & Operations', icon: ClipboardCheck, href: '/dashboard/fees/operations' },
+      ] },
       {
         group: 'System',
         icon: Settings,
@@ -277,7 +280,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Dashboard', icon: Home, href: '/teacher/dashboard' },
         ],
       },
-      { group: 'Teaching', icon: BookOpen, items: [
+      { group: 'Teaching & Resources', icon: BookOpen, items: [
           { label: 'My Classes & Subjects', icon: School, href: '/teacher/assignments' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
           { label: 'Poll Management', icon: MessageSquare, href: '/teacher/polls' },
@@ -287,6 +290,9 @@ const DashboardLayout = ({ children, role }) => {
       },
       { group: 'Class Management', icon: Users, items: [
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
+        ],
+      },
+      { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [
           { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
           { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
           { label: 'Request Correction', icon: ClipboardCheck, href: '/attendance/request-correction' },
@@ -302,16 +308,19 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     PARENT: [
-      {
-        group: 'My Child',
-        icon: Users,
-        items: [
-          { label: 'Dashboard', icon: Home, href: '/dashboard/parent' },
+      { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/parent' }] },
+      { group: 'Learning & Resources', icon: BookOpen, items: [
+          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
+          { label: 'Academic Progress', icon: Activity, href: '/analytics/students' },
+        ],
+      },
+      { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [
           { label: 'Attendance', icon: ClipboardCheck, href: '/dashboard/parent/attendance' },
           { label: 'Request Correction', icon: ClipboardCheck, href: '/attendance/request-correction' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
-          { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
-          { label: 'Academic Progress', icon: Activity, href: '/analytics/students' },
+        ],
+      },
+      { group: 'Fees & Finance', icon: BadgeIndianRupee, items: [
           { label: 'Children Fees', icon: BadgeIndianRupee, href: '/parent/fees' },
           { label: 'Family Fee Summary', icon: BadgeIndianRupee, href: '/parent/fees/family' },
         ],
@@ -362,15 +371,15 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     STAFF: [
-      {
-        group: 'System',
-        icon: Settings,
-        items: [
+      { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/staff' }] },
+      { group: 'Work & Attendance', icon: ClipboardCheck, items: [
           { label: 'My HR & Payslips', icon: WalletCards, href: '/my/hr' },
           { label: 'Attendance Correction', icon: ClipboardCheck, href: '/attendance/request-correction' },
-          { label: 'My Profile', icon: UserRound, href: '/dashboard/staff/profile' },
-          { label: 'Dashboard', icon: Home, href: '/dashboard/staff' },
           { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
+        ],
+      },
+      { group: 'Account', icon: Settings, items: [
+          { label: 'My Profile', icon: UserRound, href: '/dashboard/staff/profile' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
         ],
@@ -378,7 +387,7 @@ const DashboardLayout = ({ children, role }) => {
     ],
   };
 
-  const groupedItems = roleMenuConfig[role] || [];
+  const groupedItems = (roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] }));
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
   const profileRouteByRole = {
@@ -430,7 +439,7 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-950 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex h-screen min-h-[100dvh] bg-slate-50 text-slate-950 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
       <DateTimeTopBar />
 
       {sidebarOpen && (
@@ -441,7 +450,7 @@ const DashboardLayout = ({ children, role }) => {
             onClick={() => setSidebarOpen(false)}
             aria-label="Close sidebar"
           />
-              <div className="absolute left-0 top-0 h-full w-72 shadow-xl transition-transform duration-300">
+              <div className="absolute left-0 top-0 h-full w-[min(18rem,88vw)] shadow-xl transition-transform duration-300">
                 <Sidebar
                   groupedItems={groupedItems}
                   desktopCollapsed={desktopCollapsed}
@@ -467,7 +476,7 @@ const DashboardLayout = ({ children, role }) => {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 pt-6">
-        <header className="h-16 border-b border-slate-200/70 bg-white/75 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/65 sm:px-6 flex items-center justify-between transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75 dark:supports-[backdrop-filter]:bg-slate-950/65">
+        <header className="h-14 shrink-0 border-b border-slate-200/70 bg-white/75 px-3 shadow-[0_1px_0_rgb(15_23_42_/_0.03)] backdrop-blur supports-[backdrop-filter]:bg-white/65 sm:h-16 sm:px-6 flex items-center justify-between transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75 dark:shadow-[0_1px_0_rgb(148_163_184_/_0.08)] dark:supports-[backdrop-filter]:bg-slate-950/65">
 
 
 
@@ -500,7 +509,7 @@ const DashboardLayout = ({ children, role }) => {
 
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3">
             <ThemeToggle />
 
             <NotificationCenter enabled={role !== 'PLATFORM_OWNER'} />
@@ -553,10 +562,10 @@ const DashboardLayout = ({ children, role }) => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto p-4 sm:p-6">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto p-3 pb-20 sm:p-6 sm:pb-6">
           <div className="mx-auto w-full max-w-7xl">
 
-            <div className="mb-4 sm:hidden">
+            <div className="mb-3 sm:hidden">
               <p className="text-xs text-slate-500 dark:text-slate-400">{breadcrumb.join(' / ')}</p>
               <div className="mt-2 relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -574,7 +583,7 @@ const DashboardLayout = ({ children, role }) => {
 
         </main>
 
-        <footer className="border-t border-slate-200/70 bg-white/60 px-4 py-2 text-center text-[11px] text-slate-500 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-400">
+        <footer className="hidden border-t border-slate-200/70 bg-white/60 px-4 py-2 text-center text-[11px] text-slate-500 backdrop-blur sm:block dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-400">
           © {new Date().getFullYear()} SchoolOS
         </footer>
         <ReportIssueButton />
@@ -582,6 +591,11 @@ const DashboardLayout = ({ children, role }) => {
     </div>
 
   );
+};
+
+DashboardLayout.propTypes = {
+  children: PropTypes.node.isRequired,
+  role: PropTypes.string,
 };
 
 export default DashboardLayout;

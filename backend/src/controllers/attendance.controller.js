@@ -77,12 +77,16 @@ export const getStudentAttendanceRoster = async (req, res) => {
     const section = await getSectionOr404({ schoolId, classId, sectionId });
     const access = await requireSchoolAdminOrAssignedTeacherForSection(req.user, { schoolId, classId, sectionId });
 
-    const [students, attendanceRows, classTeacher] = await Promise.all([
+    const [students, attendanceRows, classTeacher, register] = await Promise.all([
       getSectionStudents(section, attendanceDate),
       prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate } }),
       prisma.teacherAssignment.findFirst({
         where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER', 'BOTH'] } },
         include: { teacher: { select: { id: true, teacherName: true, employeeId: true } } },
+      }),
+      prisma.attendanceDailyRegister.findUnique({
+        where: { schoolId_classId_sectionId_attendanceDate: { schoolId, classId, sectionId, attendanceDate } },
+        select: { id: true, state: true, markedCount: true, submittedAt: true, version: true, lockedAt: true },
       }),
     ]);
 
@@ -96,6 +100,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
         class: section.class,
         section: { id: section.id, sectionName: section.sectionName, sectionOrder: section.sectionOrder },
         classTeacher: classTeacher?.teacher || null,
+        register,
         students: students.map((student) => {
           const attendance = attendanceByStudentId.get(student.id);
           return {
