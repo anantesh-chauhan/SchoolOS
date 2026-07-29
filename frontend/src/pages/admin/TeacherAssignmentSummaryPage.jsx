@@ -7,6 +7,7 @@ import { useAcademicStructure } from '../../hooks/useAcademicStructure';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { authService } from '../../services/authService';
+import { API_BASE_URL } from '../../services/api';
 
 export default function TeacherAssignmentSummaryPage() {
   const [classId, setClassId] = useState('');
@@ -32,9 +33,7 @@ export default function TeacherAssignmentSummaryPage() {
     if (sectionId) params.append('sectionId', sectionId);
     if (teacherId) params.append('teacherId', teacherId);
     params.append('exportFormat', 'csv');
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
-      || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
-    return `${apiBaseUrl}/teachers/assignments/summary?${params.toString()}`;
+    return `${API_BASE_URL}/teachers/assignments/summary?${params.toString()}`;
   }, [classId, sectionId, teacherId]);
 
   const exportCsv = async () => {

@@ -13,6 +13,7 @@ Express server serves both the application and `/api`.
 - Health Check Path: `/health`
 - `NODE_VERSION`: `20`
 - `VITE_API_BASE_URL`: `/api`
+- `ENABLE_INSTANT_LOGIN`: `true` for this demo deployment
 
 Leaving Root Directory empty is required. Render excludes sibling directories
 when Root Directory is set to `backend`, so the backend build would not be able
@@ -36,6 +37,10 @@ Save that complete value as `DATABASE_URL` in Render and set
 `DB_CONNECTION_MODE=pooler`. Then deploy again with **Clear build cache &
 deploy**. The Session pooler is IPv4-compatible and is appropriate for this
 persistent Express service.
+
+Instant login bypasses passwords and must only be enabled for a demo database
+containing disposable accounts. Set `ENABLE_INSTANT_LOGIN=false` before using
+this configuration for a real production school.
 
 For the current Supabase project, the verified Session Pooler host is
 `aws-1-ap-south-1.pooler.supabase.com`. The Render start script also detects

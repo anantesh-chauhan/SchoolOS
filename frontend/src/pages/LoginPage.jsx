@@ -37,6 +37,7 @@ export default function LoginPage() {
     }
   });
   const [demoAccountsLoading, setDemoAccountsLoading] = useState(true);
+  const [demoAccountsError, setDemoAccountsError] = useState('');
   const [demoSearch, setDemoSearch] = useState('');
   const [instantFilters, setInstantFilters] = useState({ role: '', school: '', className: '', section: '' });
 
@@ -99,12 +100,28 @@ export default function LoginPage() {
     const loadAccounts = async (retry = false) => {
       try {
         const groups = await authService.getDemoAccounts();
-        if (!mounted || !Array.isArray(groups) || groups.length === 0) return;
+        if (!mounted) return;
+        if (!Array.isArray(groups)) {
+          throw new Error('Instant-login accounts returned an invalid response.');
+        }
         setDemoAccounts(groups);
+        setDemoAccountsError(groups.some((group) => group.users?.length)
+          ? ''
+          : 'No active demo accounts were found in the database.');
         sessionStorage.setItem('schoolosInstantAccounts', JSON.stringify(groups));
-      } catch {
+      } catch (error) {
+        if (!mounted) return;
+        const status = error?.response?.status;
+        const message = error?.response?.data?.message || error?.message;
+        setDemoAccountsError(status === 404
+          ? 'Instant login is disabled on the server. Enable it for this demo deployment.'
+          : message || 'Demo accounts could not be loaded. The server may still be starting.');
+        if (status === 404) {
+          setDemoAccounts([]);
+          sessionStorage.removeItem('schoolosInstantAccounts');
+        }
         // Keep the most recent successful list visible while the API reconnects.
-        if (mounted && retry) retryTimer = window.setTimeout(() => loadAccounts(true), 5000);
+        if (retry && status !== 404) retryTimer = window.setTimeout(() => loadAccounts(true), 5000);
       } finally {
         if (mounted) setDemoAccountsLoading(false);
       }
@@ -455,7 +472,7 @@ export default function LoginPage() {
                     <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Instant Login</p>
                     <p className="mt-1 text-[11px] text-slate-500">Search by school, class, section, name, or email.</p>
                   </div>
-                  <p className="w-fit text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700 font-medium uppercase">Development only</p>
+                  <p className="w-fit text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700 font-medium uppercase">Demo access</p>
                 </div>
                 <input
                   value={demoSearch}
@@ -472,6 +489,17 @@ export default function LoginPage() {
                 </div>
                 <div className="mb-3 flex items-center justify-between text-[11px] text-slate-500"><span>{filteredDemoAccounts.reduce((sum, group) => sum + group.matchedUsers, 0)} database users shown</span><button type="button" className="font-semibold text-blue-600" onClick={() => { setDemoSearch(''); setInstantFilters({ role: '', school: '', className: '', section: '' }); }}>Clear filters</button></div>
                 <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-2 space-y-3 custom-scrollbar">
+                  {demoAccountsLoading && demoAccounts.length === 0 && (
+                    <div className="flex items-center justify-center gap-2 rounded-xl bg-white p-5 text-xs font-medium text-slate-500">
+                      <Loader size={15} className="animate-spin" />
+                      Loading demo users...
+                    </div>
+                  )}
+                  {demoAccountsError && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-800">
+                      {demoAccountsError}
+                    </div>
+                  )}
                   {filteredDemoAccounts.map((group) => (
                     <div key={group.role} className="p-1">
                       <div className="mb-2 flex items-center justify-between gap-2">

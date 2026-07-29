@@ -1,7 +1,16 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-  || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+const browserIsLocal = typeof window !== 'undefined'
+  && ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+const configuredApiIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i
+  .test(configuredApiBaseUrl);
+
+// Never let a stale Render environment variable send a deployed browser back
+// to the visitor's own computer. The combined service always exposes /api.
+export const API_BASE_URL = configuredApiBaseUrl && (!configuredApiIsLocal || browserIsLocal)
+  ? configuredApiBaseUrl
+  : (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 let isRefreshing = false;
 let pendingRequests = [];
 

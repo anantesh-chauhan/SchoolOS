@@ -82,6 +82,14 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://api.cloudinary.com'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      mediaSrc: ["'self'", 'blob:', 'https:'],
+    },
+  },
 }));
 app.use(cors(corsOptions));
 app.use(compression({

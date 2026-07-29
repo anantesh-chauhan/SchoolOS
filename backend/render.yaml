@@ -25,6 +25,6 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: ENABLE_INSTANT_LOGIN
-        value: "false"
+        value: "true"
       - key: COMMUNICATION_JOBS_ENABLED
         value: "false"

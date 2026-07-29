@@ -39,7 +39,7 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     if (decoded.sessionVersion !== undefined) {
-      const account = ['STUDENT', 'PARENT'].includes(decoded.role)
+      const account = ['STUDENT', 'PARENT'].includes(decoded.role) && decoded.studentId
         ? await prisma.student.findFirst({ where: { id: decoded.studentId, schoolId: decoded.schoolId, isActive: true }, select: { sessionVersion: true } })
         : await prisma.user.findFirst({ where: { id: decoded.id, isActive: true }, select: { sessionVersion: true } });
       if (!account || account.sessionVersion !== decoded.sessionVersion) {

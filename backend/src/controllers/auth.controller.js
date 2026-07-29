@@ -285,7 +285,7 @@ export const login = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    if (['STUDENT', 'PARENT'].includes(req.user.role)) {
+    if (['STUDENT', 'PARENT'].includes(req.user.role) && req.user.studentId) {
       const portalStudent = await findPortalStudent({
         role: req.user.role,
         email: req.user.email,
@@ -647,7 +647,7 @@ export const refreshSession = async (req, res) => {
     }
 
     const decoded = verifyRefreshToken(incomingToken);
-    if (['STUDENT', 'PARENT'].includes(decoded.role)) {
+    if (['STUDENT', 'PARENT'].includes(decoded.role) && decoded.studentId) {
       const portalStudent = await findPortalStudent({
         role: decoded.role,
         email: decoded.email,
@@ -750,7 +750,7 @@ export const getDemoAccounts = async (req, res) => {
     const [users, portalStudents] = await Promise.all([prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'TEACHER', 'STUDENT', 'PARENT', 'STAFF'] },
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'TEACHER', 'STAFF'] },
       },
       select: {
         id: true,
@@ -834,10 +834,8 @@ export const getDemoAccounts = async (req, res) => {
     const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Human Resources', 'Teachers', 'Staff', 'Students', 'Parents']
       .map((role) => ({ role, users: [] }));
     const groupByLabel = new Map(groups.map((group) => [group.role, group]));
-    const portalLoginIds = new Set(portalStudents.flatMap((student) => [student.studentUserId, student.parentUserId]).filter(Boolean).map(normalizeLoginId));
-
     users.forEach((user) => {
-      if (['STUDENT', 'PARENT'].includes(user.role) && portalLoginIds.has(normalizeLoginId(user.email))) return;
+      if (['STUDENT', 'PARENT'].includes(user.role)) return;
       const label = labelByRole[user.role];
       if (!label || !groupByLabel.has(label)) return;
       const teacher = user.role === 'TEACHER'

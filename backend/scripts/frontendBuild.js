@@ -16,11 +16,22 @@ if (!npmCli || !existsSync(npmCli)) {
   throw new Error('Unable to locate npm. Run this script with npm run frontend:build.');
 }
 
+const configuredApiBaseUrl = String(process.env.VITE_API_BASE_URL || '').trim();
+const configuredApiIsLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:\/|$)/i
+  .test(configuredApiBaseUrl);
+const apiBaseUrl = process.env.RENDER === 'true' || configuredApiIsLocal
+  ? '/api'
+  : configuredApiBaseUrl || '/api';
+
+if (configuredApiIsLocal) {
+  console.warn('Ignoring localhost VITE_API_BASE_URL for the production build; using /api.');
+}
+
 const result = spawnSync(process.execPath, [npmCli, 'run', 'build'], {
   cwd: frontendDirectory,
   env: {
     ...process.env,
-    VITE_API_BASE_URL: process.env.VITE_API_BASE_URL || '/api',
+    VITE_API_BASE_URL: apiBaseUrl,
   },
   stdio: 'inherit',
 });
