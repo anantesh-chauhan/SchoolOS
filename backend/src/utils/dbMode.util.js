@@ -65,12 +65,11 @@ export const getModeConfig = (scope = 'master', dbConfig = null) => {
   }
 
   const host = dbConfig?.db_host || process.env.MASTER_DB_HOST || parsedDbUrl?.hostname;
-  const defaultPort = mode === 'pooler' ? 6543 : 5432;
+  // Supavisor session mode is the correct default for a persistent Node
+  // service. Transaction mode remains available by explicitly setting 6543.
+  const defaultPort = 5432;
   const rawPort = dbConfig?.db_port || process.env.MASTER_DB_PORT || parsedDbUrl?.port || defaultPort;
-  let port = toInt(rawPort, defaultPort);
-  if (mode === 'pooler' && port === 5432) {
-    port = 6543;
-  }
+  const port = toInt(rawPort, defaultPort);
   const database =
     dbConfig?.db_name ||
     process.env.MASTER_DB_NAME ||

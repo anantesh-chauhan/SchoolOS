@@ -18,5 +18,24 @@ Leaving Root Directory empty is required. Render excludes sibling directories
 when Root Directory is set to `backend`, so the backend build would not be able
 to access `frontend`.
 
-Set `DATABASE_URL` and other production secrets in the Render dashboard. The
-equivalent single-service Blueprint is in `backend/render.yaml`.
+## Supabase database connection
+
+Render cannot reach Supabase's direct `db.<project-ref>.supabase.co:5432`
+hostname unless the Supabase IPv4 add-on is enabled. Do not use the Direct
+Connection string as `DATABASE_URL`.
+
+In Supabase, open **Connect**, select **Session pooler**, and copy its complete
+connection string. Replace the password placeholder with the database password,
+URL-encoding any special characters. It should have this shape:
+
+```text
+postgresql://postgres.<project-ref>:<url-encoded-password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+Save that complete value as `DATABASE_URL` in Render and set
+`DB_CONNECTION_MODE=pooler`. Then deploy again with **Clear build cache &
+deploy**. The Session pooler is IPv4-compatible and is appropriate for this
+persistent Express service.
+
+Set other production secrets in the Render dashboard. The equivalent
+single-service Blueprint is in `backend/render.yaml`.

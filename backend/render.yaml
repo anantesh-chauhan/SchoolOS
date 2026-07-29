@@ -16,6 +16,8 @@ services:
         value: /api
       - key: DATABASE_URL
         sync: false
+      - key: DB_CONNECTION_MODE
+        value: pooler
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
