@@ -14,6 +14,7 @@
     "frontend:copy": "node scripts/build.js",
     "build": "npm run frontend:install && npm run frontend:build && npm run frontend:copy",
     "start": "node server.js",
+    "start:render": "node scripts/renderStart.js",
     "dev": "nodemon server.js",
     "test": "node --test test/*.test.js",
     "prisma:migrate": "prisma migrate dev",

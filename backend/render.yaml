@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: cd backend && npm ci && npm run build
-    startCommand: cd backend && npx prisma migrate deploy && npm start
+    startCommand: cd backend && npm run start:render
     healthCheckPath: /health
     maxShutdownDelaySeconds: 30
     envVars:
@@ -18,6 +18,8 @@ services:
         sync: false
       - key: DB_CONNECTION_MODE
         value: pooler
+      - key: SUPABASE_POOLER_HOST
+        value: aws-1-ap-south-1.pooler.supabase.com
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS

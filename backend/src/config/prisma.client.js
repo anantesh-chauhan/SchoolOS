@@ -1,6 +1,9 @@
 import { PrismaClient } from '../generated/prisma/index.js';
+import { normalizeDatabaseUrlForRender } from './databaseUrl.js';
 
 const globalForPrisma = globalThis;
+
+normalizeDatabaseUrlForRender();
 
 export const prisma = globalForPrisma.schoolOsPrisma || new PrismaClient();
 

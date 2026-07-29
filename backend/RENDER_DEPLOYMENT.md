@@ -9,7 +9,7 @@ Express server serves both the application and `/api`.
 - Root Directory: leave empty
 - Runtime: `Node`
 - Build Command: `cd backend && npm ci && npm run build`
-- Start Command: `cd backend && npx prisma migrate deploy && npm start`
+- Start Command: `cd backend && npm run start:render`
 - Health Check Path: `/health`
 - `NODE_VERSION`: `20`
 - `VITE_API_BASE_URL`: `/api`
@@ -36,6 +36,11 @@ Save that complete value as `DATABASE_URL` in Render and set
 `DB_CONNECTION_MODE=pooler`. Then deploy again with **Clear build cache &
 deploy**. The Session pooler is IPv4-compatible and is appropriate for this
 persistent Express service.
+
+For the current Supabase project, the verified Session Pooler host is
+`aws-1-ap-south-1.pooler.supabase.com`. The Render start script also detects
+the project's old direct URL and safely switches it to this pooler before
+running migrations and starting Express.
 
 Set other production secrets in the Render dashboard. The equivalent
 single-service Blueprint is in `backend/render.yaml`.
