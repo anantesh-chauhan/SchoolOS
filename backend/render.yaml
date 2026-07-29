@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: schoolos-api
+    name: schoolos
     runtime: node
-    rootDir: backend
     plan: free
-    buildCommand: npm ci
-    startCommand: npx prisma migrate deploy && npm start
+    buildCommand: cd backend && npm ci && npm run build
+    startCommand: cd backend && npx prisma migrate deploy && npm start
     healthCheckPath: /health
     maxShutdownDelaySeconds: 30
     envVars:
@@ -13,6 +12,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: 20
+      - key: VITE_API_BASE_URL
+        value: /api
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -23,32 +24,3 @@ services:
         value: "false"
       - key: COMMUNICATION_JOBS_ENABLED
         value: "false"
-
-  - type: web
-    name: schoolos-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: ./dist
-    envVars:
-      - key: NODE_VERSION
-        value: 20
-      - key: VITE_API_BASE_URL
-        sync: false
-    headers:
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable
-      - path: /index.html
-        name: Cache-Control
-        value: no-cache
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html

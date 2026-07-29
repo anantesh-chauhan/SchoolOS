@@ -32,7 +32,9 @@ export default function TeacherAssignmentSummaryPage() {
     if (sectionId) params.append('sectionId', sectionId);
     if (teacherId) params.append('teacherId', teacherId);
     params.append('exportFormat', 'csv');
-    return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'}/teachers/assignments/summary?${params.toString()}`;
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL
+      || (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
+    return `${apiBaseUrl}/teachers/assignments/summary?${params.toString()}`;
   }, [classId, sectionId, teacherId]);
 
   const exportCsv = async () => {

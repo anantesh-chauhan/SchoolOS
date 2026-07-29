@@ -41,6 +41,7 @@ temp/
 dist/
 build/
 out/
+public/
 
 # OS
 .DS_Store

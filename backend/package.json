@@ -4,6 +4,9 @@
   "description": "Multi-tenant SaaS backend for SchoolOS",
   "main": "server.js",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "postinstall": "prisma generate",
     "frontend:install": "node scripts/frontendInstall.js",

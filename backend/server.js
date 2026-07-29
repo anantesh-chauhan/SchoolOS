@@ -3,6 +3,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import prisma from './src/config/prisma.client.js';
 import authRoutes from './src/routes/auth.js';
 import schoolRoutes from './src/routes/schools.js';
@@ -39,6 +42,9 @@ import { processScheduled, processQueuedDeliveries } from './src/modules/communi
 const app = express();
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const frontendDirectory = path.join(currentDirectory, 'public');
+const frontendIndex = path.join(frontendDirectory, 'index.html');
 let server;
 let isShuttingDown = false;
 
@@ -47,18 +53,28 @@ const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 
   .map((origin) => origin.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin || !isProduction || allowedOrigins.includes(origin.replace(/\/$/, ''))) {
-      callback(null, true);
-      return;
-    }
-    const error = new Error('Origin is not allowed by CORS');
-    error.status = 403;
-    callback(error);
-  },
-  credentials: true,
-  optionsSuccessStatus: 204,
+const corsOptions = (req, callback) => {
+  const origin = req.get('Origin');
+  const requestOrigin = `${req.protocol}://${req.get('host')}`.replace(/\/$/, '');
+  const normalizedOrigin = origin?.replace(/\/$/, '');
+
+  if (
+    !origin
+    || !isProduction
+    || normalizedOrigin === requestOrigin
+    || allowedOrigins.includes(normalizedOrigin)
+  ) {
+    callback(null, {
+      origin: true,
+      credentials: true,
+      optionsSuccessStatus: 204,
+    });
+    return;
+  }
+
+  const error = new Error('Origin is not allowed by CORS');
+  error.status = 403;
+  callback(error);
 };
 
 // Middleware
@@ -166,6 +182,32 @@ app.use('/api', communicationRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
+// Serve the compiled Vite application in the single-service deployment.
+if (existsSync(frontendIndex)) {
+  app.use(express.static(frontendDirectory, {
+    index: false,
+    maxAge: isProduction ? '1y' : 0,
+    setHeaders(res, filePath) {
+      if (path.basename(filePath) === 'index.html') {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
+
+  app.get('*', (req, res, next) => {
+    if (
+      req.path === '/api'
+      || req.path.startsWith('/api/')
+      || path.extname(req.path)
+    ) {
+      next();
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(frontendIndex);
+  });
+}
 
 // 404 Handler
 app.use((req, res) => {
