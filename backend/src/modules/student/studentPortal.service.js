@@ -109,7 +109,9 @@ export const getAttendanceCalendar = async (ctx, year, month) => {
 };
 
 const editableState = (poll) => {
-  if (poll.status !== 'ACTIVE') return { editable: false, reason: 'This poll is closed or has been archived.' };
+  const response = poll.votes?.[0];
+  if (response && ['SUBMITTED', 'LOCKED', 'COMPILED'].includes(response.state)) return { editable: false, reason: 'Submitted feedback is read-only.' };
+  if (!['ACTIVE', 'OPEN'].includes(poll.status)) return { editable: false, reason: 'This poll is closed or has been archived.' };
   if (poll.compiledAt || poll.summary) return { editable: false, reason: 'This poll can no longer be edited because its responses have been compiled into the chapter analysis.' };
   if (poll.endAt && poll.endAt <= today()) return { editable: false, reason: 'This poll is closed because the submission deadline has passed.' };
   return { editable: true, reason: null };
@@ -117,7 +119,10 @@ const editableState = (poll) => {
 
 export const getPolls = async (ctx, mode) => {
   const polls = await prisma.chapterPoll.findMany({ where: { schoolId: ctx.schoolId, classId: ctx.classId, sectionId: ctx.sectionId }, include: { subject: { select: { id: true, subjectName: true } }, chapter: { select: { id: true, chapterName: true, chapterNumber: true } }, teacher: { select: { teacherName: true } }, votes: { where: { studentId: ctx.student.id } }, summary: { select: { id: true, isPublished: true } } }, orderBy: { updatedAt: 'desc' } });
-  return polls.filter((poll) => mode === 'pending' ? !poll.votes.length && editableState(poll).editable : poll.votes.length).map((poll) => ({ id: poll.id, submissionId: poll.votes[0]?.id || null, title: poll.title, description: poll.description, status: poll.status, startAt: poll.startAt, endAt: poll.endAt, subject: poll.subject, chapter: poll.chapter, teacher: poll.teacher, submission: poll.votes[0] || null, ...editableState(poll), summaryAvailable: Boolean(poll.summary?.isPublished) }));
+  return polls.filter((poll) => {
+    const locked = ['SUBMITTED', 'LOCKED', 'COMPILED'].includes(poll.votes[0]?.state);
+    return mode === 'pending' ? !locked && editableState(poll).editable : locked;
+  }).map((poll) => ({ id: poll.id, submissionId: poll.votes[0]?.id || null, title: poll.title, description: poll.description, instructions: poll.instructions, status: poll.status, startAt: poll.startAt, endAt: poll.endAt, subject: poll.subject, chapter: poll.chapter, teacher: poll.teacher, submission: poll.votes[0] || null, ...editableState(poll), summaryAvailable: Boolean(poll.summary?.isPublished) }));
 };
 
 export const getPoll = async (ctx, pollId) => {
@@ -131,12 +136,12 @@ export const saveVote = async (ctx, pollId, body, editing = false) => {
   const poll = await prisma.chapterPoll.findFirst({ where: { id: pollId, schoolId: ctx.schoolId, classId: ctx.classId, sectionId: ctx.sectionId }, include: { summary: true, votes: { where: { studentId: ctx.student.id } } } });
   if (!poll) throw Object.assign(new Error('Poll not found'), { statusCode: 404 });
   const state = editableState(poll); if (!state.editable) throw Object.assign(new Error(state.reason), { statusCode: 409 });
-  const fields = ['understandingRating','difficultyRating','confidenceRating','teachingRating','paceRating','clarityRating']; const data = {};
+  if (editing) throw Object.assign(new Error('Submitted feedback is read-only and cannot be edited'), { statusCode: 409 });
+  if (poll.votes.length && ['SUBMITTED','LOCKED','COMPILED'].includes(poll.votes[0].state)) throw Object.assign(new Error('You have already submitted this poll'), { statusCode: 409 });
+  const fields = ['understandingRating','teachingRating','paceRating','examplesRating','practiceRating','resourcesRating','confidenceRating','interestRating','doubtResolutionRating','testReadinessRating']; const data = {};
   for (const field of fields) { const value = Number(body[field]); if (!Number.isInteger(value) || value < 1 || value > 5) throw Object.assign(new Error(`${field} must be an integer from 1 to 5`), { statusCode: 400 }); data[field] = value; }
-  data.comment = body.comment ? String(body.comment).trim().slice(0, 2000) : null;
-  if (poll.votes.length && !editing) throw Object.assign(new Error('You have already submitted this poll'), { statusCode: 409 });
-  if (!poll.votes.length && editing) throw Object.assign(new Error('Submission not found'), { statusCode: 404 });
-  return poll.votes.length ? prisma.studentChapterVote.update({ where: { id: poll.votes[0].id }, data: { ...data, submittedAt: today() } }) : prisma.studentChapterVote.create({ data: { ...data, pollId: poll.id, schoolId: ctx.schoolId, classId: ctx.classId, sectionId: ctx.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId, studentId: ctx.student.id } });
+  const now=today(); data.clarityRating=data.teachingRating; data.comment=body.suggestion?String(body.suggestion).trim().slice(0,2000):null; data.suggestion=data.comment; data.difficultArea=body.difficultArea||null; data.helpfulMethod=body.helpfulMethod||null; data.supportNeeded=Array.isArray(body.supportNeeded)?body.supportNeeded:[]; data.state='SUBMITTED'; data.submittedAt=now; data.submittedById=ctx.user?.id||null; data.lockedAt=now; data.lastSavedAt=now; data.version=(poll.votes[0]?.version||0)+1; data.snapshot=JSON.parse(JSON.stringify({...data,pollId:poll.id,studentId:ctx.student.id}));
+  return poll.votes.length ? prisma.studentChapterVote.update({ where: { id: poll.votes[0].id }, data }) : prisma.studentChapterVote.create({ data: { ...data, pollId: poll.id, schoolId: ctx.schoolId, classId: ctx.classId, sectionId: ctx.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId, studentId: ctx.student.id } });
 };
 
 export const getDashboard = async (ctx) => {

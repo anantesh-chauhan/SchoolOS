@@ -14,12 +14,15 @@ import {
   sendAuthorizationError,
 } from '../utils/teacherAuthorization.util.js';
 
-const VALID_POLL_STATUSES = new Set(['DRAFT', 'ACTIVE', 'CLOSED', 'COMPILED', 'PUBLISHED']);
-const ACTIVE_SUBMIT_STATUSES = new Set(['ACTIVE']);
+const VALID_POLL_STATUSES = new Set(['DRAFT', 'SCHEDULED', 'ACTIVE', 'OPEN', 'CLOSED', 'COMPILED', 'PUBLISHED', 'ARCHIVED', 'CANCELLED']);
+const ACTIVE_SUBMIT_STATUSES = new Set(['ACTIVE', 'OPEN']);
+const MANAGER_ROLES = new Set(['ADMIN', 'SCHOOL_OWNER', 'CURRICULUM_MANAGER']);
+const TEACHER_DIMENSIONS = ['understandingRating', 'participationRating', 'practiceRating', 'applicationRating', 'confidenceRating', 'improvementRating', 'independenceRating', 'consistencyRating'];
+const STUDENT_DIMENSIONS = ['understandingRating', 'teachingRating', 'paceRating', 'examplesRating', 'practiceRating', 'resourcesRating', 'confidenceRating', 'interestRating', 'doubtResolutionRating', 'testReadinessRating'];
 
 const assertAdmin = (user) => {
-  if (!isSchoolAdmin(user)) {
-    const error = new Error('Only school admins can manage chapter analysis.');
+  if (!MANAGER_ROLES.has(user?.role)) {
+    const error = new Error('Only school administrators or curriculum managers can manage chapter feedback.');
     error.statusCode = 403;
     throw error;
   }
@@ -28,6 +31,40 @@ const assertAdmin = (user) => {
 const rating = (value) => {
   const number = Number(value);
   return Number.isInteger(number) && number >= 1 && number <= 5 ? number : null;
+};
+
+const clean = (value, max = 2000) => value == null ? null : String(value).trim().slice(0, max) || null;
+const responseIsLocked = (row) => ['SUBMITTED', 'LOCKED', 'COMPILED'].includes(row?.state);
+const pollAcceptsResponses = (poll) => ACTIVE_SUBMIT_STATUSES.has(poll.status)
+  && !poll.compiledAt
+  && (!poll.startAt || poll.startAt <= new Date())
+  && (!poll.endAt || poll.endAt > new Date());
+const responseSnapshot = (data) => JSON.parse(JSON.stringify(data));
+const feedbackAuditData = (req, action, entityType, entityId, { pollId = null, previous = null, current = null, reason = null } = {}) => ({
+  schoolId: req.user.schoolId,
+  pollId,
+  // Student and parent portal principals live in Student, while actorId references User.
+  actorId: ['STUDENT', 'PARENT'].includes(req.user.role) ? null : req.user.id,
+  actorRole: req.user.role,
+  action,
+  entityType,
+  entityId,
+  previous: previous ? responseSnapshot(previous) : undefined,
+  current: current ? responseSnapshot(current) : undefined,
+  reason: clean(reason, 500),
+  ipAddress: req.ip,
+  userAgent: clean(req.get('user-agent'), 500),
+});
+const auditFeedback = (db, req, action, entityType, entityId, context = {}) =>
+  db.feedbackAuditLog.create({ data: feedbackAuditData(req, action, entityType, entityId, context) });
+const saveFeedbackAudits = async (rows) => {
+  if (!rows.length) return;
+  try {
+    await prisma.feedbackAuditLog.createMany({ data: rows });
+  } catch (error) {
+    // An audit transport failure must never roll back an already persisted response.
+    console.error('Feedback audit write failed:', error.message);
+  }
 };
 
 const getStudentForUser = async (user) => {
@@ -95,14 +132,24 @@ const notifyPollAudience = async (poll, { notifyStudents = false, notifyTeacher 
 const summarizePoll = async (poll, user = null) => {
   const [studentCount, voteCount, evaluationCount] = await Promise.all([
     getSectionStudents(poll).then((students) => students.length),
-    prisma.studentChapterVote.count({ where: { pollId: poll.id, schoolId: poll.schoolId } }),
-    prisma.teacherStudentEvaluation.count({ where: { pollId: poll.id, schoolId: poll.schoolId } }),
+    prisma.studentChapterVote.count({ where: { pollId: poll.id, schoolId: poll.schoolId, state: { in: ['SUBMITTED', 'LOCKED', 'COMPILED'] } } }),
+    prisma.teacherStudentEvaluation.count({ where: { pollId: poll.id, schoolId: poll.schoolId, state: { in: ['SUBMITTED', 'LOCKED', 'COMPILED'] } } }),
   ]);
 
   return {
     id: poll.id,
     title: poll.title,
     description: poll.description,
+    pollType: poll.pollType,
+    instructions: poll.instructions,
+    respondentTypes: poll.respondentTypes,
+    anonymousToTeacher: poll.anonymousToTeacher,
+    teacherVisibleToStudents: poll.teacherVisibleToStudents,
+    allowClassTeacher: poll.allowClassTeacher,
+    commentsRequired: poll.commentsRequired,
+    minimumResponsePercentage: poll.minimumResponsePercentage,
+    enabledTeacherDimensions: poll.enabledTeacherDimensions,
+    enabledStudentDimensions: poll.enabledStudentDimensions,
     status: poll.status,
     startAt: poll.startAt,
     endAt: poll.endAt,
@@ -114,13 +161,13 @@ const summarizePoll = async (poll, user = null) => {
     chapter: poll.chapter,
     teacher: poll.teacher,
     summaryPublished: Boolean(poll.summary?.isPublished),
-    counts: isSchoolAdmin(user) ? { totalStudents: studentCount, studentVotesSubmitted: voteCount, teacherEvaluationsSubmitted: evaluationCount } : undefined,
+    counts: MANAGER_ROLES.has(user?.role) ? { totalStudents: studentCount, studentVotesSubmitted: voteCount, teacherEvaluationsSubmitted: evaluationCount } : undefined,
   };
 };
 
 const allowedSummaryFor = async (summary, user) => {
   if (!summary) return null;
-  if (isSchoolAdmin(user)) return summary;
+  if (MANAGER_ROLES.has(user?.role)) return summary;
 
   const base = {
     id: summary.id,
@@ -232,7 +279,7 @@ export const getTeacherPolls = async (req, res) => {
 
     const polls = await prisma.chapterPoll.findMany({
       where: { schoolId: req.user.schoolId, teacherId: teacher.id },
-      include: { ...pollInclude, evaluations: { where: { teacherId: teacher.id }, select: { studentId: true } } },
+      include: { ...pollInclude, evaluations: { where: { teacherId: teacher.id } } },
       orderBy: { updatedAt: 'desc' },
     });
 
@@ -245,11 +292,31 @@ export const getTeacherPolls = async (req, res) => {
           id: student.id,
           name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '),
           rollNumber: student.rollNumber,
+          admissionNumber: student.admissionNo,
+          photo: student.profilePicture || null,
+          evaluation: (() => {
+            const row = poll.evaluations.find((item) => item.studentId === student.id);
+            if (!row) return null;
+            const legacy = row.understandingRating == null && row.applicationRating == null;
+            const value = (current, fallback) => current ?? (legacy && fallback != null ? fallback * 2 : fallback);
+            return {
+              ...row,
+              understandingRating: value(row.understandingRating, row.conceptClarityRating),
+              participationRating: legacy && row.participationRating != null ? row.participationRating * 2 : row.participationRating,
+              practiceRating: value(row.practiceRating, row.homeworkRating),
+              applicationRating: value(row.applicationRating, row.conceptClarityRating),
+              confidenceRating: value(row.confidenceRating, row.conceptClarityRating),
+              improvementRating: row.improvementRating ?? (row.improvementNeedRating == null ? null : (6 - row.improvementNeedRating) * (legacy ? 2 : 1)),
+              independenceRating: value(row.independenceRating, row.attentionRating),
+              consistencyRating: value(row.consistencyRating, row.homeworkRating),
+            };
+          })(),
         })),
         teacherEvaluation: {
-          submitted: poll.evaluations.length,
+          submitted: poll.evaluations.filter((row) => responseIsLocked(row)).length,
+          drafted: poll.evaluations.filter((row) => !responseIsLocked(row)).length,
           total: students.length,
-          isPending: poll.status !== 'DRAFT' && poll.evaluations.length < students.length,
+          isPending: poll.status !== 'DRAFT' && poll.evaluations.filter((row) => responseIsLocked(row)).length < students.length,
         },
       };
     }));
@@ -260,7 +327,7 @@ export const getTeacherPolls = async (req, res) => {
   }
 };
 
-export const submitTeacherStudentEvaluations = async (req, res) => {
+const saveTeacherEvaluations = async (req, res, submitFinal) => {
   try {
     const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
@@ -268,59 +335,118 @@ export const submitTeacherStudentEvaluations = async (req, res) => {
     if (poll.teacherId && poll.teacherId !== teacher.id) {
       return res.status(403).json({ success: false, message: 'This poll belongs to another assigned teacher.' });
     }
-    if (!['ACTIVE', 'CLOSED'].includes(poll.status)) {
-      return res.status(400).json({ success: false, message: 'Teacher evaluations are allowed only while poll is active or closed.' });
-    }
+    if (!pollAcceptsResponses(poll)) return res.status(409).json({ success: false, message: 'This poll is not currently accepting responses.' });
 
     const evaluations = Array.isArray(req.body.evaluations) ? req.body.evaluations : [];
     if (!evaluations.length) return res.status(400).json({ success: false, message: 'evaluations array is required' });
     const students = await getSectionStudents(poll);
     const allowedStudentIds = new Set(students.map((student) => student.id));
+    const enabled = Array.isArray(poll.enabledTeacherDimensions) ? poll.enabledTeacherDimensions : TEACHER_DIMENSIONS;
+    if (enabled.length < 4) return res.status(409).json({ success: false, message: 'A valid poll must enable at least four teacher rating dimensions.' });
 
-    const tx = evaluations.map((item) => {
-      if (!allowedStudentIds.has(item.studentId)) throw new Error('One or more students do not belong to this section.');
-      const data = {
-        pollId: poll.id,
-        schoolId: poll.schoolId,
-        classId: poll.classId,
-        sectionId: poll.sectionId,
-        subjectId: poll.subjectId,
-        chapterId: poll.chapterId,
-        teacherId: teacher.id,
-        studentId: item.studentId,
-        attentionRating: rating(item.attentionRating),
-        participationRating: rating(item.participationRating),
-        homeworkRating: rating(item.homeworkRating),
-        conceptClarityRating: rating(item.conceptClarityRating),
-        improvementNeedRating: rating(item.improvementNeedRating),
-        strengths: item.strengths?.trim() || null,
-        weaknesses: item.weaknesses?.trim() || null,
-        recommendation: item.recommendation?.trim() || null,
-        submittedAt: new Date(),
-      };
-      if (Object.entries(data).some(([key, value]) => key.endsWith('Rating') && !value)) {
-        throw new Error('All ratings must be integers from 1 to 5.');
+    const submittedStudentIds = evaluations.map((item) => item.studentId);
+    if (new Set(submittedStudentIds).size !== submittedStudentIds.length) {
+      return res.status(400).json({ success: false, message: 'Each student may appear only once in an evaluation save.' });
+    }
+    if (submittedStudentIds.some((studentId) => !allowedStudentIds.has(studentId))) {
+      return res.status(400).json({ success: false, message: 'One or more students do not belong to this section.' });
+    }
+
+    const existingRows = await prisma.teacherStudentEvaluation.findMany({
+      where: { pollId: poll.id, teacherId: teacher.id, studentId: { in: submittedStudentIds } },
+    });
+    const existingByStudent = new Map(existingRows.map((row) => [row.studentId, row]));
+    const now = new Date();
+    const prepared = evaluations.map((item) => {
+      const existing = existingByStudent.get(item.studentId) || null;
+      if (responseIsLocked(existing)) {
+        if (submitFinal) return { item, existing, payload: null };
+        throw new Error('Submitted teacher feedback is read-only.');
       }
-      return prisma.teacherStudentEvaluation.upsert({
-        where: { pollId_teacherId_studentId: { pollId: poll.id, teacherId: teacher.id, studentId: item.studentId } },
-        create: data,
-        update: data,
-      });
+      const dimensions = Object.fromEntries(TEACHER_DIMENSIONS.map((key) => [key, item[key] == null || item[key] === '' ? null : rating(item[key])]));
+      if (Object.entries(dimensions).some(([key, value]) => item[key] != null && item[key] !== '' && value == null)) throw new Error('Ratings must be whole numbers from 1 to 5.');
+      if (submitFinal && enabled.some((key) => !dimensions[key])) throw new Error('Complete every enabled rating before final submission.');
+      const values = enabled.map((key) => dimensions[key]).filter(Boolean);
+      const payload = {
+        ...dimensions,
+        // Populate legacy evidence columns for existing analytics during transition.
+        attentionRating: dimensions.participationRating,
+        homeworkRating: dimensions.practiceRating,
+        conceptClarityRating: dimensions.understandingRating,
+        improvementNeedRating: dimensions.improvementRating ? 6 - dimensions.improvementRating : null,
+        overallScore: values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null,
+        remark: clean(item.remark, 500),
+        strengths: clean(item.strengths, 500),
+        weaknesses: clean(item.weaknesses, 500),
+        recommendation: clean(item.recommendation, 500),
+        state: submitFinal ? 'SUBMITTED' : 'DRAFT_SAVED',
+        lastSavedAt: now,
+        submittedAt: submitFinal ? now : null,
+        submittedById: submitFinal ? req.user.id : null,
+        lockedAt: submitFinal ? now : null,
+        version: (existing?.version || 0) + 1,
+      };
+      if (submitFinal) payload.snapshot = responseSnapshot({ ...payload, pollId: poll.id, teacherId: teacher.id, studentId: item.studentId });
+      return { item, existing, payload };
     });
 
-    const saved = await prisma.$transaction(tx);
-    return res.status(201).json({ success: true, data: { submitted: saved.length } });
+    const writes = prepared.filter((row) => row.payload).map(({ item, existing, payload }) => existing
+      ? prisma.teacherStudentEvaluation.updateMany({
+          where: { id: existing.id, state: { notIn: ['SUBMITTED', 'LOCKED', 'COMPILED'] } },
+          data: payload,
+        })
+      : prisma.teacherStudentEvaluation.create({
+          data: { ...payload, pollId: poll.id, schoolId: poll.schoolId, classId: poll.classId, sectionId: poll.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId, teacherId: teacher.id, studentId: item.studentId },
+        }));
+    // Batch transactions do not depend on a long-lived interactive transaction ID.
+    if (writes.length) await prisma.$transaction(writes);
+
+    const saved = await prisma.teacherStudentEvaluation.findMany({
+      where: { pollId: poll.id, teacherId: teacher.id, studentId: { in: submittedStudentIds } },
+    });
+    const savedByStudent = new Map(saved.map((row) => [row.studentId, row]));
+    await saveFeedbackAudits(prepared.filter((row) => row.payload).map(({ item, existing }) => {
+      const row = savedByStudent.get(item.studentId);
+      return feedbackAuditData(req, submitFinal ? 'TEACHER_RESPONSE_SUBMITTED' : 'TEACHER_DRAFT_SAVED', 'TeacherStudentEvaluation', row?.id, {
+        pollId: poll.id,
+        previous: existing,
+        current: { state: row?.state, version: row?.version },
+      });
+    }));
+    return res.status(submitFinal ? 201 : 200).json({
+      success: true,
+      data: {
+        saved: saved.length,
+        state: submitFinal ? 'SUBMITTED' : 'DRAFT_SAVED',
+        lastSavedAt: saved[0]?.lastSavedAt,
+        responses: saved.map((row) => ({
+          id: row.id,
+          studentId: row.studentId,
+          state: row.state,
+          version: row.version,
+          lastSavedAt: row.lastSavedAt,
+          submittedAt: row.submittedAt,
+        })),
+      },
+    });
   } catch (error) {
     if (sendAuthorizationError(res, error)) return;
-    return res.status(400).json({ success: false, message: error.message || 'Failed to submit evaluations' });
+    return res.status(error.statusCode || 400).json({
+      success: false,
+      message: error.message || 'Failed to save evaluations',
+      ...(error.currentVersion != null ? { data: { currentVersion: error.currentVersion, studentId: error.studentId } } : {}),
+    });
   }
 };
+
+export const saveTeacherEvaluationDraft = (req, res) => saveTeacherEvaluations(req, res, false);
+export const submitTeacherStudentEvaluations = (req, res) => saveTeacherEvaluations(req, res, true);
 
 export const getStudentNotifications = async (req, res) => {
   try {
     const student = await getStudentForUser(req.user);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
-    const polls = await getStudentPollRows(student, true);
+    const polls = (await getStudentPollRows(student, true)).filter(pollAcceptsResponses);
     return res.json({
       success: true,
       data: polls.map((poll) => ({
@@ -348,9 +474,9 @@ const getStudentPollRows = async (student, activeOnly = false) => {
       schoolId: student.schoolId,
       classId: classRow.id,
       sectionId: section.id,
-      ...(activeOnly ? { status: 'ACTIVE' } : { status: { in: ['ACTIVE', 'COMPILED', 'PUBLISHED'] } }),
+      ...(activeOnly ? { status: { in: ['ACTIVE', 'OPEN'] } } : { status: { in: ['ACTIVE', 'OPEN', 'CLOSED', 'COMPILED', 'PUBLISHED', 'ARCHIVED', 'CANCELLED'] } }),
     },
-    include: { ...pollInclude, votes: { where: { studentId: student.id }, select: { id: true, submittedAt: true } } },
+    include: { ...pollInclude, votes: { where: { studentId: student.id } } },
     orderBy: { updatedAt: 'desc' },
   });
 };
@@ -362,7 +488,9 @@ export const getStudentPolls = async (req, res) => {
     const polls = await getStudentPollRows(student);
     const data = await Promise.all(polls.map(async (poll) => ({
       ...(await summarizePoll(poll, req.user)),
-      submitted: poll.votes.length > 0,
+      response: poll.votes[0] || null,
+      submitted: responseIsLocked(poll.votes[0]),
+      editable: pollAcceptsResponses(poll) && !responseIsLocked(poll.votes[0]),
     })));
     return res.json({ success: true, data });
   } catch (error) {
@@ -370,46 +498,74 @@ export const getStudentPolls = async (req, res) => {
   }
 };
 
-export const submitStudentVote = async (req, res) => {
+const saveStudentResponse = async (req, res, submitFinal) => {
   try {
     const student = await getStudentForUser(req.user);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
     const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: student.schoolId } });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
-    if (!ACTIVE_SUBMIT_STATUSES.has(poll.status)) return res.status(400).json({ success: false, message: 'Poll is not active.' });
+    if (!pollAcceptsResponses(poll)) return res.status(409).json({ success: false, message: 'This poll is not currently accepting responses.' });
 
     const students = await getSectionStudents(poll);
     if (!students.some((item) => item.id === student.id)) {
       return res.status(403).json({ success: false, message: 'This poll is not for your class-section.' });
     }
 
-    const data = {
-      pollId: poll.id,
-      schoolId: poll.schoolId,
-      classId: poll.classId,
-      sectionId: poll.sectionId,
-      subjectId: poll.subjectId,
-      chapterId: poll.chapterId,
-      studentId: student.id,
-      understandingRating: rating(req.body.understandingRating),
-      difficultyRating: rating(req.body.difficultyRating),
-      confidenceRating: rating(req.body.confidenceRating),
-      teachingRating: rating(req.body.teachingRating),
-      paceRating: rating(req.body.paceRating),
-      clarityRating: rating(req.body.clarityRating),
-      comment: req.body.comment?.trim() || null,
+    const existing = await prisma.studentChapterVote.findUnique({ where: { pollId_studentId: { pollId: poll.id, studentId: student.id } } });
+    if (responseIsLocked(existing)) return res.status(409).json({ success: false, message: 'Submitted feedback is read-only.' });
+    const enabled = Array.isArray(poll.enabledStudentDimensions) ? poll.enabledStudentDimensions : STUDENT_DIMENSIONS;
+    const dimensions = Object.fromEntries(STUDENT_DIMENSIONS.map((key) => [key, req.body[key] == null || req.body[key] === '' ? null : rating(req.body[key])]));
+    if (Object.entries(dimensions).some(([key, value]) => req.body[key] != null && req.body[key] !== '' && value == null)) return res.status(400).json({ success: false, message: 'Ratings must be whole numbers from 1 to 5.' });
+    if (submitFinal && enabled.some((key) => !dimensions[key])) return res.status(400).json({ success: false, message: 'Complete every required rating before final submission.' });
+    if (submitFinal && poll.commentsRequired && !clean(req.body.suggestion || req.body.comment)) return res.status(400).json({ success: false, message: 'A comment is required for this poll.' });
+    const now = new Date();
+    const payload = {
+      ...dimensions,
+      // Keep legacy fields populated for existing reports.
+      difficultyRating: req.body.difficultyRating == null ? null : rating(req.body.difficultyRating),
+      clarityRating: dimensions.teachingRating,
+      difficultArea: clean(req.body.difficultArea, 100),
+      helpfulMethod: clean(req.body.helpfulMethod, 100),
+      supportNeeded: Array.isArray(req.body.supportNeeded) ? req.body.supportNeeded.map((item) => clean(item, 100)).filter(Boolean).slice(0, 10) : [],
+      difficultTopic: clean(req.body.difficultTopic, 500),
+      helpfulExplanation: clean(req.body.helpfulExplanation, 500),
+      explainAgain: clean(req.body.explainAgain, 500),
+      suggestion: clean(req.body.suggestion, 1000),
+      comment: clean(req.body.comment || req.body.suggestion, 1000),
+      state: submitFinal ? 'SUBMITTED' : 'DRAFT_SAVED',
+      version: (existing?.version || 0) + 1,
+      lastSavedAt: now,
+      submittedAt: submitFinal ? now : null,
+      submittedById: submitFinal ? req.user.id : null,
+      lockedAt: submitFinal ? now : null,
     };
-    if (Object.entries(data).some(([key, value]) => key.endsWith('Rating') && !value)) {
-      return res.status(400).json({ success: false, message: 'All ratings must be integers from 1 to 5.' });
+    if (submitFinal) payload.snapshot = responseSnapshot({ ...payload, pollId: poll.id, studentId: student.id });
+    let vote;
+    if (existing) {
+      const updated = await prisma.studentChapterVote.updateMany({
+        where: { id: existing.id, state: { notIn: ['SUBMITTED', 'LOCKED', 'COMPILED'] } },
+        data: payload,
+      });
+      if (!updated.count) throw Object.assign(new Error('Submitted feedback is read-only.'), { statusCode: 409 });
+      vote = await prisma.studentChapterVote.findUnique({ where: { id: existing.id } });
+    } else {
+      vote = await prisma.studentChapterVote.create({ data: { ...payload, pollId: poll.id, schoolId: poll.schoolId, classId: poll.classId, sectionId: poll.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId, studentId: student.id } });
     }
-
-    const vote = await prisma.studentChapterVote.create({ data });
-    return res.status(201).json({ success: true, data: { id: vote.id, submittedAt: vote.submittedAt } });
+    await saveFeedbackAudits([
+      feedbackAuditData(req, submitFinal ? 'STUDENT_RESPONSE_SUBMITTED' : 'STUDENT_DRAFT_SAVED', 'StudentChapterVote', vote.id, {
+        pollId: poll.id,
+        previous: existing,
+        current: { state: vote.state, version: vote.version },
+      }),
+    ]);
+    return res.status(submitFinal ? 201 : 200).json({ success: true, data: { id: vote.id, state: vote.state, version: vote.version, lastSavedAt: vote.lastSavedAt, submittedAt: vote.submittedAt } });
   } catch (error) {
-    if (error.code === 'P2002') return res.status(409).json({ success: false, message: 'You have already submitted this poll.' });
-    return res.status(500).json({ success: false, message: 'Failed to submit vote' });
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to save feedback' });
   }
 };
+
+export const saveStudentVoteDraft = (req, res) => saveStudentResponse(req, res, false);
+export const submitStudentVote = (req, res) => saveStudentResponse(req, res, true);
 
 export const getAdminChapterCompletions = async (req, res) => {
   try {
@@ -459,9 +615,26 @@ export const createAdminChapterPoll = async (req, res) => {
       orderBy: { updatedAt: 'desc' },
     });
 
-    const poll = await prisma.chapterPoll.create({
-      data: {
+    const template = req.body.templateId ? await prisma.feedbackTemplate.findFirst({ where: { id: req.body.templateId, schoolId: req.user.schoolId, isActive: true } }) : null;
+    if (req.body.templateId && !template) return res.status(404).json({ success: false, message: 'Feedback template not found' });
+    const teacherSource = req.body.enabledTeacherDimensions ?? template?.teacherDimensions;
+    const studentSource = req.body.enabledStudentDimensions ?? template?.studentDimensions;
+    const teacherDimensions = Array.isArray(teacherSource) ? teacherSource.filter((key) => TEACHER_DIMENSIONS.includes(key)) : TEACHER_DIMENSIONS;
+    const studentDimensions = Array.isArray(studentSource) ? studentSource.filter((key) => STUDENT_DIMENSIONS.includes(key)) : STUDENT_DIMENSIONS;
+    if (teacherDimensions.length < 4) return res.status(400).json({ success: false, message: 'At least four teacher rating dimensions are required.' });
+    const minimumResponsePercentage = Number(req.body.minimumResponsePercentage ?? template?.minimumResponsePercentage ?? 60);
+    if (!Number.isInteger(minimumResponsePercentage) || minimumResponsePercentage < 0 || minimumResponsePercentage > 100) {
+      return res.status(400).json({ success: false, message: 'Minimum response percentage must be from 0 to 100.' });
+    }
+    const requestedStatus = String(req.body.status || 'DRAFT').toUpperCase();
+    const startAt = req.body.startAt ? new Date(req.body.startAt) : null;
+    const status = requestedStatus === 'OPEN' || requestedStatus === 'ACTIVE'
+      ? 'OPEN'
+      : requestedStatus === 'SCHEDULED' || (startAt && startAt > new Date()) ? 'SCHEDULED' : 'DRAFT';
+    const poll = await prisma.$transaction(async (tx) => {
+      const created = await tx.chapterPoll.create({ data: {
         schoolId: req.user.schoolId,
+        academicSessionId: req.body.academicSessionId || progress.academicSessionId || null,
         classId,
         sectionId,
         subjectId,
@@ -470,14 +643,25 @@ export const createAdminChapterPoll = async (req, res) => {
         createdByAdminId: req.user.id,
         title: req.body.title?.trim() || `${progress.subject.subjectName} - ${progress.chapter.chapterName} feedback`,
         description: req.body.description?.trim() || null,
-        status: req.body.status === 'ACTIVE' ? 'ACTIVE' : 'DRAFT',
-        startAt: req.body.startAt ? new Date(req.body.startAt) : (req.body.status === 'ACTIVE' ? new Date() : null),
+        pollType: req.body.pollType || template?.pollType || 'CHAPTER_COMPLETION',
+        respondentTypes: Array.isArray(req.body.respondentTypes) ? req.body.respondentTypes : template?.respondentTypes || ['SUBJECT_TEACHER', 'STUDENT'],
+        instructions: clean(req.body.instructions ?? template?.instructions),
+        anonymousToTeacher: req.body.anonymousToTeacher ?? template?.anonymousToTeacher ?? true,
+        teacherVisibleToStudents: req.body.teacherVisibleToStudents ?? template?.teacherVisibleToStudents ?? false,
+        allowClassTeacher: Boolean(req.body.allowClassTeacher),
+        commentsRequired: req.body.commentsRequired ?? template?.commentsRequired ?? false,
+        minimumResponsePercentage,
+        enabledTeacherDimensions: teacherDimensions,
+        enabledStudentDimensions: studentDimensions,
+        status,
+        startAt: startAt || (status === 'OPEN' ? new Date() : null),
         endAt: req.body.endAt ? new Date(req.body.endAt) : null,
-      },
-      include: pollInclude,
+      }, include: pollInclude });
+      await auditFeedback(tx, req, 'POLL_CREATED', 'ChapterPoll', created.id, { pollId: created.id, current: { title: created.title, status: created.status } });
+      return created;
     });
 
-    await notifyPollAudience(poll, { notifyStudents: poll.status === 'ACTIVE', notifyTeacher: true });
+    await notifyPollAudience(poll, { notifyStudents: ACTIVE_SUBMIT_STATUSES.has(poll.status), notifyTeacher: true });
 
     return res.status(201).json({ success: true, data: await summarizePoll(poll, req.user) });
   } catch (error) {
@@ -501,6 +685,76 @@ export const getAdminChapterPolls = async (req, res) => {
   }
 };
 
+export const duplicateAdminChapterPoll = async (req, res) => {
+  try {
+    assertAdmin(req.user);
+    const source = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
+    if (!source) return res.status(404).json({ success: false, message: 'Source poll not found' });
+    const copy = await prisma.$transaction(async (tx) => {
+      const row = await tx.chapterPoll.create({
+        data: {
+          schoolId: source.schoolId, academicSessionId: req.body.academicSessionId || source.academicSessionId,
+          classId: req.body.classId || source.classId, sectionId: req.body.sectionId || source.sectionId,
+          subjectId: req.body.subjectId || source.subjectId, chapterId: req.body.chapterId || source.chapterId,
+          teacherId: req.body.teacherId || source.teacherId, createdByAdminId: req.user.id,
+          title: clean(req.body.title, 300) || `Copy of ${source.title}`, description: source.description,
+          pollType: source.pollType, respondentTypes: source.respondentTypes, instructions: source.instructions,
+          anonymousToTeacher: source.anonymousToTeacher, teacherVisibleToStudents: source.teacherVisibleToStudents,
+          allowClassTeacher: source.allowClassTeacher, commentsRequired: source.commentsRequired,
+          minimumResponsePercentage: source.minimumResponsePercentage,
+          enabledTeacherDimensions: source.enabledTeacherDimensions, enabledStudentDimensions: source.enabledStudentDimensions,
+          status: 'DRAFT',
+        },
+        include: pollInclude,
+      });
+      await auditFeedback(tx, req, 'POLL_DUPLICATED', 'ChapterPoll', row.id, { pollId: row.id, current: { sourcePollId: source.id, title: row.title } });
+      return row;
+    });
+    return res.status(201).json({ success: true, data: await summarizePoll(copy, req.user) });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to duplicate poll' });
+  }
+};
+
+export const getFeedbackTemplates = async (req, res) => {
+  try {
+    assertAdmin(req.user);
+    const rows = await prisma.feedbackTemplate.findMany({ where: { schoolId: req.user.schoolId, ...(req.query.includeInactive === 'true' ? {} : { isActive: true }) }, orderBy: { name: 'asc' } });
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load templates' });
+  }
+};
+
+export const saveFeedbackTemplate = async (req, res) => {
+  try {
+    assertAdmin(req.user);
+    const teacherDimensions = Array.isArray(req.body.teacherDimensions) ? req.body.teacherDimensions.filter((key) => TEACHER_DIMENSIONS.includes(key)) : [];
+    if (teacherDimensions.length < 4) return res.status(400).json({ success: false, message: 'Templates require at least four teacher dimensions.' });
+    const studentDimensions = Array.isArray(req.body.studentDimensions) ? req.body.studentDimensions.filter((key) => STUDENT_DIMENSIONS.includes(key)) : STUDENT_DIMENSIONS;
+    const minimum = Number(req.body.minimumResponsePercentage ?? 60);
+    if (!clean(req.body.name, 150) || !Number.isInteger(minimum) || minimum < 0 || minimum > 100) return res.status(400).json({ success: false, message: 'Valid name and response threshold are required.' });
+    const row = await prisma.feedbackTemplate.upsert({
+      where: { schoolId_name: { schoolId: req.user.schoolId, name: clean(req.body.name, 150) } },
+      create: { schoolId: req.user.schoolId, createdById: req.user.id, name: clean(req.body.name, 150), pollType: req.body.pollType || 'CHAPTER_COMPLETION', instructions: clean(req.body.instructions), respondentTypes: req.body.respondentTypes || ['SUBJECT_TEACHER', 'STUDENT'], teacherDimensions, studentDimensions, anonymousToTeacher: req.body.anonymousToTeacher !== false, teacherVisibleToStudents: Boolean(req.body.teacherVisibleToStudents), commentsRequired: Boolean(req.body.commentsRequired), minimumResponsePercentage: minimum },
+      update: { pollType: req.body.pollType || 'CHAPTER_COMPLETION', instructions: clean(req.body.instructions), respondentTypes: req.body.respondentTypes || ['SUBJECT_TEACHER', 'STUDENT'], teacherDimensions, studentDimensions, anonymousToTeacher: req.body.anonymousToTeacher !== false, teacherVisibleToStudents: Boolean(req.body.teacherVisibleToStudents), commentsRequired: Boolean(req.body.commentsRequired), minimumResponsePercentage: minimum, isActive: req.body.isActive !== false },
+    });
+    return res.status(201).json({ success: true, data: row });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Failed to save template' });
+  }
+};
+
+export const getFeedbackAuditLog = async (req, res) => {
+  try {
+    assertAdmin(req.user);
+    const rows = await prisma.feedbackAuditLog.findMany({ where: { schoolId: req.user.schoolId, ...(req.query.pollId ? { pollId: req.query.pollId } : {}) }, orderBy: { createdAt: 'desc' }, take: Math.min(500, Number(req.query.limit) || 100) });
+    return res.json({ success: true, data: rows });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ success: false, message: error.message || 'Failed to load feedback audit log' });
+  }
+};
+
 export const updateAdminChapterPollStatus = async (req, res) => {
   try {
     assertAdmin(req.user);
@@ -508,17 +762,20 @@ export const updateAdminChapterPollStatus = async (req, res) => {
     if (!VALID_POLL_STATUSES.has(status)) return res.status(400).json({ success: false, message: 'Invalid poll status' });
     const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
+    if (poll.compiledAt || poll.status === 'COMPILED') return res.status(409).json({ success: false, message: 'Compiled polls are immutable and cannot be reopened or changed.' });
+    if (['COMPILED', 'PUBLISHED'].includes(status)) return res.status(400).json({ success: false, message: 'Use the compile workflow to finalize a poll.' });
     const data = {
       status,
-      ...(status === 'ACTIVE' && !poll.startAt ? { startAt: new Date() } : {}),
-      ...(status === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
+      ...(ACTIVE_SUBMIT_STATUSES.has(status) && !poll.startAt ? { startAt: new Date() } : {}),
+      ...(req.body.endAt ? { endAt: new Date(req.body.endAt) } : {}),
     };
-    const updated = await prisma.chapterPoll.update({ where: { id: poll.id }, data, include: pollInclude });
-    if (status === 'ACTIVE') {
+    const updated = await prisma.$transaction(async (tx) => {
+      const saved = await tx.chapterPoll.update({ where: { id: poll.id }, data, include: pollInclude });
+      await auditFeedback(tx, req, status === 'OPEN' || status === 'ACTIVE' ? 'POLL_OPENED' : `POLL_${status}`, 'ChapterPoll', poll.id, { pollId: poll.id, previous: { status: poll.status, endAt: poll.endAt }, current: { status: saved.status, endAt: saved.endAt }, reason: req.body.reason });
+      return saved;
+    });
+    if (ACTIVE_SUBMIT_STATUSES.has(status)) {
       await notifyPollAudience(updated, { notifyStudents: true, notifyTeacher: poll.status !== 'ACTIVE' });
-    }
-    if (status === 'PUBLISHED') {
-      await prisma.chapterAnalysisSummary.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, data: { isPublished: true } });
     }
     return res.json({ success: true, data: await summarizePoll(updated, req.user) });
   } catch (error) {
@@ -533,16 +790,24 @@ export const getAdminRawStatus = async (req, res) => {
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
     const students = await getSectionStudents(poll);
     const [votes, evaluations] = await Promise.all([
-      prisma.studentChapterVote.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, select: { studentId: true } }),
-      prisma.teacherStudentEvaluation.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, select: { studentId: true } }),
+      prisma.studentChapterVote.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, select: { studentId: true, state: true } }),
+      prisma.teacherStudentEvaluation.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId }, select: { studentId: true, state: true } }),
     ]);
-    const voted = new Set(votes.map((vote) => vote.studentId));
+    const submittedVotes = votes.filter(responseIsLocked);
+    const submittedEvaluations = evaluations.filter(responseIsLocked);
+    const voted = new Set(submittedVotes.map((vote) => vote.studentId));
+    const responsePercentage = students.length ? Math.round((submittedVotes.length / students.length) * 1000) / 10 : 0;
     return res.json({
       success: true,
       data: {
         totalStudents: students.length,
-        studentVotesSubmitted: votes.length,
-        teacherEvaluationsSubmitted: evaluations.length,
+        studentVotesSubmitted: submittedVotes.length,
+        teacherEvaluationsSubmitted: submittedEvaluations.length,
+        responsePercentage,
+        minimumResponsePercentage: poll.minimumResponsePercentage,
+        thresholdMet: responsePercentage >= poll.minimumResponsePercentage,
+        incompleteDrafts: votes.filter((row) => !responseIsLocked(row)).length + evaluations.filter((row) => !responseIsLocked(row)).length,
+        deadlinePassed: Boolean(poll.endAt && poll.endAt <= new Date()),
         pendingStudents: students.filter((student) => !voted.has(student.id)).map((student) => ({
           id: student.id,
           name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '),
@@ -561,30 +826,36 @@ export const compileAdminChapterPoll = async (req, res) => {
     const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
     const existing = await prisma.chapterAnalysisSummary.findUnique({ where: { pollId: poll.id } });
-    if (existing && !req.body.recompile) {
-      return res.status(409).json({ success: false, message: 'Summary already exists. Pass recompile: true to update it.' });
-    }
+    if (existing || poll.compiledAt || poll.status === 'COMPILED') return res.status(409).json({ success: false, message: 'This poll has already been compiled and is permanently locked.' });
 
-    const [students, votes, evaluations] = await Promise.all([
+    const [students, votes, evaluations, assessmentResults] = await Promise.all([
       getSectionStudents(poll),
-      prisma.studentChapterVote.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId } }),
-      prisma.teacherStudentEvaluation.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId } }),
+      prisma.studentChapterVote.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['SUBMITTED', 'LOCKED'] } } }),
+      prisma.teacherStudentEvaluation.findMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['SUBMITTED', 'LOCKED'] } } }),
+      prisma.chapterAssessmentResult.findMany({ where: { schoolId: req.user.schoolId, classId: poll.classId, sectionId: poll.sectionId, subjectId: poll.subjectId, chapterId: poll.chapterId } }),
     ]);
+    const responsePercentage = students.length ? (votes.length / students.length) * 100 : 0;
     const summaryData = buildChapterAnalysisSummary({
       poll,
       students,
       votes,
       evaluations,
+      assessmentResults,
       adminId: req.user.id,
       adminNotes: req.body.adminNotes?.trim() || existing?.adminNotes || null,
     });
 
-    const summary = await prisma.chapterAnalysisSummary.upsert({
-      where: { pollId: poll.id },
-      create: summaryData,
-      update: { ...summaryData, compiledAt: new Date() },
+    const summary = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const created = await tx.chapterAnalysisSummary.create({ data: summaryData });
+      await tx.studentChapterVote.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['SUBMITTED', 'LOCKED'] } }, data: { state: 'COMPILED', lockedAt: now } });
+      await tx.studentChapterVote.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['IN_PROGRESS', 'DRAFT_SAVED'] } }, data: { state: 'LOCKED', lockedAt: now } });
+      await tx.teacherStudentEvaluation.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['SUBMITTED', 'LOCKED'] } }, data: { state: 'COMPILED', lockedAt: now } });
+      await tx.teacherStudentEvaluation.updateMany({ where: { pollId: poll.id, schoolId: req.user.schoolId, state: { in: ['IN_PROGRESS', 'DRAFT_SAVED'] } }, data: { state: 'LOCKED', lockedAt: now } });
+      await tx.chapterPoll.update({ where: { id: poll.id }, data: { status: 'COMPILED', compiledAt: now } });
+      await auditFeedback(tx, req, 'POLL_COMPILED', 'ChapterPoll', poll.id, { pollId: poll.id, previous: { status: poll.status }, current: { status: 'COMPILED', responsePercentage, thresholdMet: responsePercentage >= poll.minimumResponsePercentage }, reason: req.body.adminNotes });
+      return created;
     });
-    await prisma.chapterPoll.update({ where: { id: poll.id }, data: { status: 'COMPILED', compiledAt: new Date() } });
     await recalculateMasteryForPoll(poll);
 
     return res.json({ success: true, data: summary });
@@ -621,7 +892,7 @@ export const recalculatePollMastery = async (req, res) => {
   try {
     const poll = await prisma.chapterPoll.findFirst({ where: { id: req.params.pollId, schoolId: req.user.schoolId } });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
-    await requireSchoolAdminOrAssignedTeacher(req.user, poll);
+    if (!MANAGER_ROLES.has(req.user.role)) await requireSchoolAdminOrAssignedTeacher(req.user, poll);
     const rows = await recalculateMasteryForPoll(poll);
     return res.json({ success: true, data: { calculated: rows.length } });
   } catch (error) {
@@ -642,7 +913,7 @@ export const getPollMasteryMatrix = async (req, res) => {
       },
     });
     if (!poll) return res.status(404).json({ success: false, message: 'Poll not found' });
-    await requireSchoolAdminOrAssignedTeacher(req.user, poll);
+    if (!MANAGER_ROLES.has(req.user.role)) await requireSchoolAdminOrAssignedTeacher(req.user, poll);
 
     const students = await getSectionStudentsForContext(poll);
     const masteries = await prisma.studentChapterMastery.findMany({
@@ -726,7 +997,7 @@ export const createIntervention = async (req, res) => {
       where: { id: req.body.masteryId, schoolId: req.user.schoolId },
     });
     if (!mastery) return res.status(404).json({ success: false, message: 'Mastery row not found' });
-    const permission = await requireSchoolAdminOrAssignedTeacher(req.user, mastery);
+    const permission = MANAGER_ROLES.has(req.user.role) ? { isAdmin: true, teacher: null } : await requireSchoolAdminOrAssignedTeacher(req.user, mastery);
 
     const intervention = await prisma.learningIntervention.create({
       data: {
@@ -799,7 +1070,7 @@ export const getChapterAnalysis = async (req, res) => {
     });
     if (!summary) return res.status(404).json({ success: false, message: 'Published analysis not found' });
     if (req.user.role === 'TEACHER') {
-      await requireSchoolAdminOrAssignedTeacher(req.user, summary);
+      if (!MANAGER_ROLES.has(req.user.role)) await requireSchoolAdminOrAssignedTeacher(req.user, summary);
     }
     if (req.user.role === 'STUDENT') {
       const student = await getStudentForUser(req.user);

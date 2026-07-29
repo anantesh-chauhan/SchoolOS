@@ -14,8 +14,8 @@ const TeacherAssignmentDetailPage = lazy(() => import('./pages/teacher/TeacherPo
 const TeacherChapterPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherChapterPage})));
 const TeacherAssignmentStudentsPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.AssignmentStudentsPage})));
 const TeacherStudentPerformancePage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherStudentPage})));
-const TeacherPollsPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPollsPage})));
-const TeacherPollPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPollPage})));
+const TeacherPollsPage = lazy(() => import('./pages/teacher/TeacherPollListPage'));
+const TeacherPollPage = lazy(() => import('./pages/teacher/TeacherWholeClassRatingPage'));
 const TeacherPerformancePage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.TeacherPerformancePage})));
 const TeacherMyClassPage = lazy(() => import('./pages/teacher/TeacherPortalPages').then(m=>({default:m.MyClassPage})));
 const ParentDashboard = lazy(() => import('./pages/dashboards/ParentDashboard'));
@@ -27,8 +27,8 @@ const StudentAttendanceSummaryPage = lazy(() => import('./pages/student/StudentP
 const StudentAttendanceMonthPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.AttendanceMonthPage })));
 const StudentPendingPollsPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollsPage /> })));
 const StudentSubmittedPollsPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollsPage submitted /> })));
-const StudentPollPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollPage /> })));
-const StudentSubmittedPollPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: () => <m.PollPage submitted /> })));
+const StudentPollPage = lazy(() => import('./pages/student/StudentChapterFeedbackPage'));
+const StudentSubmittedPollPage = lazy(() => import('./pages/student/StudentChapterFeedbackPage'));
 const StudentResourcesPage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.ResourcesPage })));
 const StudentPerformancePage = lazy(() => import('./pages/student/StudentPortalPages').then(m => ({ default: m.PerformancePage })));
 const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard'));

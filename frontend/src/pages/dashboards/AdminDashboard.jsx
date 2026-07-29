@@ -74,7 +74,10 @@ export default function AdminDashboard() {
         sectionId: row.sectionId,
         subjectId: row.subjectId,
         chapterId: row.chapterId,
-        status: activate ? 'ACTIVE' : 'DRAFT',
+        status: activate ? 'OPEN' : 'DRAFT',
+        minimumResponsePercentage: 60,
+        anonymousToTeacher: true,
+        respondentTypes: ['SUBJECT_TEACHER', 'STUDENT'],
       });
       toast.success(activate ? 'Poll created and activated' : 'Poll created as draft');
       await loadFeedback();
@@ -103,7 +106,7 @@ export default function AdminDashboard() {
     if (!window.confirm('Compile and save the final chapter analysis?')) return;
     setBusyId(poll.id);
     try {
-      await chapterFeedbackService.compilePoll(poll.id, { recompile: poll.status === 'COMPILED' || poll.status === 'PUBLISHED' });
+      await chapterFeedbackService.compilePoll(poll.id);
       toast.success('Analysis compiled');
       await loadFeedback();
     } catch (error) {
@@ -236,7 +239,7 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
+        <motion.div id="chapter-feedback" variants={itemVariants} className="scroll-mt-6 bg-white dark:bg-gray-800 rounded-xl p-6 shadow">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -288,7 +291,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div>
+              <div id="poll-management" className="scroll-mt-6">
                 <h4 className="font-black text-gray-900 dark:text-white">Poll Management</h4>
                 <div className="mt-3 space-y-3">
                   {polls.length === 0 && (
@@ -320,10 +323,9 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {poll.status === 'DRAFT' && <button type="button" onClick={() => setPollStatus(poll, 'ACTIVE')} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">Activate</button>}
-                          {poll.status === 'ACTIVE' && <button type="button" onClick={() => setPollStatus(poll, 'CLOSED')} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">Close</button>}
-                          {['CLOSED', 'COMPILED', 'PUBLISHED'].includes(poll.status) && <button type="button" onClick={() => compilePoll(poll)} disabled={busyId === poll.id} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">Compile</button>}
-                          {poll.status === 'COMPILED' && <button type="button" onClick={() => setPollStatus(poll, 'PUBLISHED')} className="rounded-lg bg-cyan-600 px-3 py-2 text-xs font-bold text-white">Publish</button>}
+                          {poll.status === 'DRAFT' && <button type="button" onClick={() => setPollStatus(poll, 'OPEN')} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white">Open</button>}
+                          {['ACTIVE','OPEN'].includes(poll.status) && <button type="button" onClick={() => setPollStatus(poll, 'CLOSED')} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white">Close</button>}
+                          {poll.status === 'CLOSED' && <button type="button" onClick={() => compilePoll(poll)} disabled={busyId === poll.id} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-60">Compile permanently</button>}
                         </div>
                       </div>
                     );

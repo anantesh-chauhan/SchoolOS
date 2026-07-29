@@ -165,6 +165,12 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
         { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
       ] },
+      { group: 'Polls & Feedback', icon: MessageSquare, items: [
+        { label: 'Feedback Dashboard', icon: MessageSquare, href: '/dashboard/admin#chapter-feedback' },
+        { label: 'Poll Management', icon: ClipboardCheck, href: '/dashboard/admin#poll-management' },
+        { label: 'Student Insights', icon: Users, href: '/analytics/students' },
+        { label: 'School Feedback Analytics', icon: Activity, href: '/analytics/school' },
+      ] },
       { group: 'Fees & Finance', icon: BadgeIndianRupee, items: [
         { label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' },
         { label: 'Fee Masters & Records', icon: Layers, href: '/dashboard/fees/administration' },
@@ -220,6 +226,12 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
         { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
         { label: 'Analytics Settings', icon: Settings, href: '/analytics/configuration' },
+      ] },
+      { group: 'Polls & Feedback', icon: MessageSquare, items: [
+        { label: 'Feedback Dashboard', icon: MessageSquare, href: '/dashboard/admin#chapter-feedback' },
+        { label: 'Poll Management', icon: ClipboardCheck, href: '/dashboard/admin#poll-management' },
+        { label: 'Student Insights', icon: Users, href: '/analytics/students' },
+        { label: 'School Feedback Analytics', icon: Activity, href: '/analytics/school' },
       ] },
       { group: 'Fees & Finance', icon: BadgeIndianRupee, items: [
         { label: 'Fee Dashboard', icon: BadgeIndianRupee, href: '/dashboard/fees' },
@@ -283,13 +295,18 @@ const DashboardLayout = ({ children, role }) => {
       { group: 'Teaching & Resources', icon: BookOpen, items: [
           { label: 'My Classes & Subjects', icon: School, href: '/teacher/assignments' },
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
-          { label: 'Poll Management', icon: MessageSquare, href: '/teacher/polls' },
           { label: 'Student Performance', icon: Users, href: '/teacher/performance' },
           { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
         ],
       },
       { group: 'Class Management', icon: Users, items: [
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
+        ],
+      },
+      { group: 'Polls & Feedback', icon: MessageSquare, items: [
+          { label: 'Assigned Polls', icon: MessageSquare, href: '/teacher/polls?view=assigned' },
+          { label: 'Pending & Drafts', icon: ClipboardCheck, href: '/teacher/polls?view=pending' },
+          { label: 'Submitted Feedback', icon: BookOpenCheck, href: '/teacher/polls?view=submitted' },
         ],
       },
       { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [

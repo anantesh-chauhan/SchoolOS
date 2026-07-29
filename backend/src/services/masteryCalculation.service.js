@@ -8,7 +8,19 @@ const avg = (values) => {
   return Number((nums.reduce((sum, value) => sum + value, 0) / nums.length).toFixed(2));
 };
 
-const ratingToScore = (value) => (Number.isFinite(Number(value)) ? clamp((Number(value) / 5) * 100) : null);
+const ratingToScore = (value) => {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return clamp((number / (number > 5 ? 10 : 5)) * 100);
+};
+const inverseRatingToScore = (value) => {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  const onFive = number > 5 ? number / 2 : number;
+  return ratingToScore(6 - onFive);
+};
 
 export const masteryLevelForScore = (score) => {
   if (!Number.isFinite(Number(score))) return null;
@@ -50,7 +62,11 @@ export const calculateStudentMastery = ({ student, vote, evaluation, assessmentR
         6 - evaluation.improvementNeedRating,
       ].map(ratingToScore))
     : null;
-  const selfScore = vote ? avg([vote.understandingRating, vote.confidenceRating, 6 - vote.difficultyRating].map(ratingToScore)) : null;
+  const selfScore = vote ? avg([
+    ratingToScore(vote.understandingRating),
+    ratingToScore(vote.confidenceRating),
+    inverseRatingToScore(vote.difficultyRating),
+  ]) : null;
   const assignmentScore = evaluation ? ratingToScore(evaluation.homeworkRating) : null;
 
   const components = [

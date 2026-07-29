@@ -41,6 +41,10 @@ export const chapterFeedbackService = {
     const response = await apiClient.post(`/teacher/polls/${pollId}/student-evaluations`, { evaluations });
     return response.data.data;
   },
+  saveTeacherDraft: async (pollId, evaluations) => {
+    const response = await apiClient.put(`/teacher/polls/${pollId}/student-evaluations/draft`, { evaluations });
+    return response.data.data;
+  },
   createTeacherAssessment: async (pollId, payload) => {
     const response = await apiClient.post(`/teacher/polls/${pollId}/assessments`, payload);
     return response.data.data;
@@ -67,6 +71,10 @@ export const chapterFeedbackService = {
   },
   submitStudentVote: async (pollId, payload) => {
     const response = await apiClient.post(`/student/polls/${pollId}/vote`, payload);
+    return response.data.data;
+  },
+  saveStudentDraft: async (pollId, payload) => {
+    const response = await apiClient.put(`/student/polls/${pollId}/draft`, payload);
     return response.data.data;
   },
   getChapterAnalysis: async (chapterId) => {

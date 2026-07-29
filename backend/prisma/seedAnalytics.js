@@ -85,24 +85,27 @@ async function seedVariedProfiles(school) {
       const assignment = await prisma.teacherAssignment.findFirst({
         where: { schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, isActive: true },
       });
-      const poll = await prisma.chapterPoll.upsert({
-        where: { schoolId_classId_sectionId_subjectId_chapterId: { schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, chapterId: chapter.id } },
-        update: {},
-        create: {
+      let poll = await prisma.chapterPoll.findFirst({ where: { schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, chapterId: chapter.id, title: `[Analytics demo] ${chapter.chapterName} reflection` } });
+      if (!poll) poll = await prisma.chapterPoll.create({
+        data: {
           schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, chapterId: chapter.id,
-          teacherId: assignment?.teacherId || null, title: `[Analytics demo] ${chapter.chapterName} reflection`, status: 'ACTIVE',
+          academicSessionId: session.id, teacherId: assignment?.teacherId || null, title: `[Analytics demo] ${chapter.chapterName} reflection`, status: 'OPEN',
           description: 'Student-friendly chapter understanding reflection.',
+          minimumResponsePercentage: 60,
         },
       });
       const finalScore = profile.scores.at(-1);
       const rating = Math.max(1, Math.min(5, Math.round(finalScore / 20)));
+      const submittedAt = addDays(session.startDate, 95);
       await prisma.studentChapterVote.upsert({
         where: { pollId_studentId: { pollId: poll.id, studentId: student.id } },
         update: {},
         create: {
           pollId: poll.id, schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, chapterId: chapter.id, studentId: student.id,
           understandingRating: rating, difficultyRating: 6 - rating, confidenceRating: rating, teachingRating: 4, paceRating: 4, clarityRating: 4,
-          comment: profile.name,
+          examplesRating: 4, practiceRating: rating, resourcesRating: 4, interestRating: 4, doubtResolutionRating: 4, testReadinessRating: rating,
+          helpfulMethod: 'Teacher Explanation', supportNeeded: finalScore < 60 ? ['Extra Practice', 'Revision Class'] : ['No Additional Support'],
+          comment: profile.name, state: 'SUBMITTED', submittedAt, lockedAt: submittedAt, lastSavedAt: submittedAt, snapshot: { seed: 'analytics-v2', profile: profile.name },
         },
       });
       if (assignment?.teacherId) {
@@ -113,12 +116,16 @@ async function seedVariedProfiles(school) {
             pollId: poll.id, schoolId: school.id, classId: classRow.id, sectionId: section.id, subjectId: chapter.subjectId, chapterId: chapter.id,
             teacherId: assignment.teacherId, studentId: student.id,
             attentionRating: profile.lowParticipation ? 2 : rating,
-            participationRating: profile.lowParticipation ? 1 : rating,
+            participationRating: profile.lowParticipation ? 2 : rating,
             homeworkRating: profile.homework === null ? 3 : Math.max(1, Math.round(profile.homework * 5)),
             conceptClarityRating: rating, improvementNeedRating: finalScore < 60 ? 4 : 2,
+            understandingRating: rating, practiceRating: profile.homework === null ? 3 : Math.max(1, Math.round(profile.homework * 5)),
+            applicationRating: rating, confidenceRating: rating, improvementRating: finalScore < 60 ? 2 : 4,
+            independenceRating: rating, consistencyRating: rating, overallScore: rating,
             strengths: finalScore >= 75 ? 'Demonstrates secure understanding in recorded assessments.' : 'Responds to guided practice.',
             weaknesses: profile.lowParticipation ? 'Participation is currently limited despite strong recorded marks.' : finalScore < 60 ? 'Some concepts require targeted revision.' : null,
             recommendation: profile.lowParticipation ? 'Use low-pressure participation prompts and monitor confidence.' : 'Continue focused practice and review progress.',
+            state: 'SUBMITTED', submittedAt, lockedAt: submittedAt, lastSavedAt: submittedAt, snapshot: { seed: 'analytics-v2', profile: profile.name },
           },
         });
       }
