@@ -67,7 +67,7 @@ export default function ImageCropperModal({
           animate={{ opacity: 1 }}
           className="
             relative
-            h-[340px]
+            h-[min(340px,42dvh)]
             w-full
             overflow-hidden
             rounded-2xl
@@ -149,8 +149,12 @@ export default function ImageCropperModal({
         <div
           className="
             flex
-            items-center
+            flex-col
+            items-stretch
             justify-between
+            gap-3
+            sm:flex-row
+            sm:items-center
             pt-4
             border-t
             border-slate-200
@@ -166,7 +170,7 @@ export default function ImageCropperModal({
             Adjust the crop area before applying changes
           </p>
 
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
 
             <Button
               variant="secondary"

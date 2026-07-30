@@ -16,19 +16,19 @@ export default function AttendanceCalendar({ month, days = [], personalRecords =
   return (
     <div className="overflow-x-auto pb-1">
       <div className="min-w-[700px]">
-        <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <div key={day} className="py-2">{day}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-2">
-          {Array.from({ length: leading }).map((_, index) => <div key={`empty-${index}`} className="min-h-28 rounded-2xl bg-slate-50/50 dark:bg-slate-950/30" />)}
+          {Array.from({ length: leading }).map((_, index) => <div key={`empty-${index}`} className="min-h-28 rounded-2xl bg-[var(--surface-muted)] opacity-60" />)}
         {days.map((day) => {
           const record = records.get(day.date);
           const label = record?.status || day.dayType;
           const eventStyle = getCalendarEventStyle(day.eventType || day.dayType);
           const isToday = day.date === today;
           return (
-            <button key={day.date} type="button" onClick={() => onSelectDay?.(day)} className={`group min-h-28 rounded-2xl border p-2.5 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${eventStyle.cell} ${isToday ? 'ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900' : ''}`}>
-              <div className="flex items-start justify-between gap-1"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-black ${isToday ? 'bg-indigo-600 text-white' : 'text-slate-800 dark:text-slate-100'}`}>{Number(day.date.slice(-2))}</span><span className={`max-w-[78px] truncate rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${tones[label] || eventStyle.badge}`}>{label.replace(/_/g, ' ')}</span></div>
+            <button key={day.date} type="button" onClick={() => onSelectDay?.(day)} className={`group min-h-28 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] p-2.5 text-left transition-all hover:-translate-y-0.5 hover:bg-[var(--surface-elevated)] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--school-primary)] ${eventStyle.cell} ${isToday ? 'ring-2 ring-[var(--school-primary)] ring-offset-2 ring-offset-[var(--background)]' : ''}`}>
+              <div className="flex items-start justify-between gap-1"><span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-black ${isToday ? 'bg-[var(--school-primary)] text-[var(--on-primary)]' : 'text-[var(--text-primary)]'}`}>{Number(day.date.slice(-2))}</span><span className={`max-w-[78px] truncate rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-wide ${tones[label] || eventStyle.badge}`}>{label.replace(/_/g, ' ')}</span></div>
               {record ? <p className="mt-3 text-xs text-slate-500">{record.remarks || 'Attendance recorded'}</p> : day.counts ? <div className="mt-3 space-y-0.5 text-[11px]"><p className="font-semibold text-emerald-700">P {day.counts.PRESENT}</p><p className="font-semibold text-rose-700">A {day.counts.ABSENT}</p><p className="text-slate-500">Marked {day.counts.marked}/{day.counts.total}</p></div> : null}
               {day.title && <p className="mt-3 line-clamp-2 text-[11px] font-semibold leading-4 text-slate-700 dark:text-slate-200">{day.title}</p>}
             </button>

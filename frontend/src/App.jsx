@@ -37,7 +37,6 @@ const StudentPerformancePage = lazy(() => import('./pages/student/StudentPortalP
 const StaffDashboard = lazy(() => import('./pages/dashboards/StaffDashboard'));
 const SchoolManagementPage = lazy(() => import('./pages/platform/SchoolManagementPage'));
 const SchoolSettingsPage = lazy(() => import('./pages/platform/SchoolSettingsPage'));
-const SchoolProfilePage = lazy(() => import('./pages/school/SchoolProfilePage'));
 const ClassManagementPage = lazy(() => import('./pages/admin/ClassManagementPage'));
 const ClassDetailsDashboardPage = lazy(() => import('./pages/admin/ClassDetailsDashboardPage'));
 const SubjectDetailsDashboardPage = lazy(() => import('./pages/admin/SubjectDetailsDashboardPage'));
@@ -106,6 +105,7 @@ const AnalyticsConfigurationPage = lazy(() => import('./features/analytics/pages
 const SchoolAnalyticsPage = lazy(() => import('./features/analytics/pages/SchoolAnalyticsPage'));
 const ClassAnalyticsPage = lazy(() => import('./features/analytics/pages/ClassAnalyticsPage'));
 const OfflinePage = lazy(() => import('./pages/OfflinePage'));
+const PermissionDeniedPage = lazy(() => import('./pages/PermissionDeniedPage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -130,6 +130,7 @@ export default function App() {
       />
       <Suspense fallback={<AppFallback />}>
         <Routes>
+          <Route path="/permission-denied" element={<PermissionDeniedPage />} />
           {/* Login Route */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/student-login" element={<StudentLoginPage />} />
@@ -210,6 +211,15 @@ export default function App() {
           path="/dashboard/platform/school-settings"
           element={
             <ProtectedRoute allowedRoles={['PLATFORM_OWNER']}>
+              <SchoolSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/dashboard/school/settings"
+          element={
+            <ProtectedRoute allowedRoles={['SCHOOL_OWNER']}>
               <SchoolSettingsPage />
             </ProtectedRoute>
           }
@@ -411,8 +421,6 @@ export default function App() {
           <Route path="/student/fees" element={<ProtectedRoute allowedRoles={['STUDENT']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/parent/fees" element={<ProtectedRoute allowedRoles={['PARENT']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/dashboard/calendar" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><AcademicCalendarPage /></ProtectedRoute>} />
-          <Route path="/dashboard/school/settings" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER']}><SchoolProfilePage /></ProtectedRoute>} />
-
           <Route
             path="/dashboard/admin/class-teachers"
             element={

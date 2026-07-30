@@ -190,11 +190,11 @@ const StudentForm = ({ onSave = null }) => {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-5xl">
-      <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 px-6 py-5 text-white sm:px-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-300">Admissions</p>
+      <div className="overflow-hidden rounded-3xl border border-[var(--border-soft)] bg-[var(--surface-base)] shadow-sm">
+        <div className="border-b border-[var(--border-soft)] bg-primaryGradient px-6 py-5 text-white sm:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/75">Admissions</p>
           <h2 className="mt-2 text-2xl font-semibold">Add Student</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300">
+          <p className="mt-2 max-w-2xl text-sm text-white/80">
             Create a student record, assign a class, and generate one-click credentials after the admission is saved.
           </p>
         </div>
@@ -249,7 +249,7 @@ const StudentForm = ({ onSave = null }) => {
                   name="gender"
                   value={values.gender}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--school-primary)] focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
                 >
                   <option value="">Select gender</option>
                   {genderOptions.map((option) => (
@@ -270,7 +270,7 @@ const StudentForm = ({ onSave = null }) => {
                   value={values.currentClass}
                   onChange={handleChange}
                   disabled={classesQuery.isLoading}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition disabled:cursor-not-allowed disabled:bg-slate-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 py-2.5 text-sm outline-none transition disabled:cursor-not-allowed disabled:bg-[var(--surface-muted)] focus:border-[var(--school-primary)] focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
                 >
                   <option value="">
                     {classesQuery.isLoading ? 'Loading classes...' : 'Select class'}
@@ -361,7 +361,7 @@ const StudentForm = ({ onSave = null }) => {
                   name="session"
                   value={values.session}
                   onChange={handleChange}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--school-primary)] focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
                 >
                   {sessionOptions.map((option) => (
                     <option key={option} value={option}>
@@ -377,7 +377,7 @@ const StudentForm = ({ onSave = null }) => {
             <button
               type="submit"
               disabled={submitting || classesQuery.isLoading}
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+              className="inline-flex items-center justify-center rounded-xl bg-[var(--school-primary)] px-6 py-2.5 text-sm font-semibold text-[var(--on-primary)] shadow-sm transition hover:bg-[var(--school-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? (
                 <>

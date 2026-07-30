@@ -14,7 +14,7 @@ export default function PerformanceTrendChart({ trend, attendance }) {
           <>
             <div className="h-48" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}><XAxis dataKey="month" tick={{ fontSize: 11 }} /><YAxis domain={[0, 100]} tick={{ fontSize: 11 }} /><Tooltip /><Line type="monotone" dataKey="value" name="Attendance %" stroke="#4f46e5" strokeWidth={3} dot={{ r: 3 }} /></LineChart>
+                <LineChart data={data}><XAxis dataKey="month" tick={{ fontSize: 11 }} /><YAxis domain={[0, 100]} tick={{ fontSize: 11 }} /><Tooltip /><Line type="monotone" dataKey="value" name="Attendance %" stroke="var(--school-primary)" strokeWidth={3} dot={{ r: 3 }} /></LineChart>
               </ResponsiveContainer>
             </div>
             <table className="sr-only"><caption>Monthly attendance values</caption><tbody>{data.map((row) => <tr key={row.month}><th>{row.month}</th><td>{row.value}%</td></tr>)}</tbody></table>

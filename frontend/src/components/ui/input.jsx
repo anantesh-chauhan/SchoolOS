@@ -57,13 +57,13 @@ export function Input({
 
   return (
 
-    <div className="w-full space-y-1.5">
+    <div className="min-w-0 w-full space-y-1.5">
 
       {/* Label */}
 
       {label && (
 
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <label className="text-sm font-medium text-[var(--text-primary)]">
 
           {label}
 
@@ -95,21 +95,16 @@ export function Input({
 
             "w-full rounded-lg border",
 
-            "bg-white text-slate-900",
+            "bg-[var(--surface-elevated)] text-[var(--text-primary)]",
 
             "placeholder:text-slate-400",
 
             "outline-none transition-all",
 
-            "focus:ring-2 focus:ring-indigo-200",
-
-            "focus:border-indigo-500",
+            "focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]",
+            "focus:border-[var(--school-primary)]",
 
             "disabled:opacity-50",
-
-            "dark:bg-slate-900",
-            "dark:text-white",
-            "dark:border-slate-700",
 
             sizes[size],
 
@@ -119,7 +114,7 @@ export function Input({
 
             error
               ? "border-red-500 focus:ring-red-200 focus:border-red-500"
-              : "border-slate-300",
+              : "border-[var(--border-soft)]",
 
             className
 
@@ -173,7 +168,7 @@ export function Input({
 
       {helperText && !error && (
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-[var(--text-muted)]">
 
           {helperText}
 

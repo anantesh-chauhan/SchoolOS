@@ -10,13 +10,13 @@ import { Loader2 } from "lucide-react";
 const variants = {
 
   default:
-    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm dark:bg-blue-500 dark:text-slate-950 dark:hover:bg-blue-400",
+    "bg-[var(--school-primary)] text-[var(--on-primary)] hover:bg-[var(--school-primary-hover)] shadow-[0_5px_16px_rgb(var(--school-focus-rgb)/0.18)]",
 
   secondary:
-    "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700",
+    "border border-[var(--border-soft)] bg-[var(--surface-muted)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]",
 
   primary:
-    "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm dark:bg-blue-500 dark:text-slate-950 dark:hover:bg-blue-400",
+    "bg-[var(--school-primary)] text-[var(--on-primary)] hover:bg-[var(--school-primary-hover)] shadow-[0_5px_16px_rgb(var(--school-focus-rgb)/0.18)]",
 
   success:
     "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm dark:bg-teal-400 dark:text-slate-950 dark:hover:bg-teal-300",
@@ -28,13 +28,13 @@ const variants = {
     "bg-red-600 text-white hover:bg-red-700 shadow-sm",
 
   outline:
-    "border border-slate-300 text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800",
+    "border border-[var(--border-soft)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]",
 
   ghost:
-    "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
+    "text-[var(--text-primary)] hover:bg-[var(--surface-hover)]",
 
   link:
-    "text-indigo-600 hover:underline underline-offset-4 px-0 py-0 h-auto dark:text-indigo-300",
+    "text-[var(--school-primary)] hover:underline underline-offset-4 px-0 py-0 h-auto",
 
 };
 
@@ -99,16 +99,16 @@ export function Button({
 
       className={cn(
 
-        "inline-flex items-center justify-center gap-2",
+        "inline-flex max-w-full items-center justify-center gap-2",
 
         "font-medium whitespace-nowrap",
 
         "transition-all duration-200",
-        "hover:scale-[1.02]",
+        "hover:-translate-y-px",
 
         "focus-visible:outline-none",
         "focus-visible:ring-2",
-        "focus-visible:ring-indigo-500",
+        "focus-visible:ring-[rgb(var(--school-focus-rgb)/0.42)]",
 
         "disabled:opacity-50",
         "disabled:pointer-events-none",

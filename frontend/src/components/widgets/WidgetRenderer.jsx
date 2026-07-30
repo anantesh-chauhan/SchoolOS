@@ -86,21 +86,16 @@ const renderListRow = (item, index) => {
           rounded-xl
           rounded-2xl
           border
-          border-slate-200
-          border-slate-100
-          dark:border-slate-700
-          bg-slate-50
-          dark:bg-slate-800/40
+          border-[var(--border-soft)]
+          bg-[var(--surface-muted)]
           px-4
           py-3
-          bg-white
-          dark:bg-slate-800/20
+          bg-[var(--surface-base)]
           p-5
           transition-all
           hover:shadow-md
-          hover:border-sky-200
-          hover:border-sky-100
-          hover:bg-sky-50/20
+          hover:border-[var(--school-primary)]
+          hover:bg-[var(--surface-elevated)]
         "
       >
         <div className="flex items-start justify-between gap-3">
@@ -418,14 +413,11 @@ const renderStats = (data) => {
               rounded-xl
             rounded-2xl
               border
-              border-slate-200
-            border-slate-100
-              dark:border-slate-700
-              bg-white
-              dark:bg-slate-800
+              border-[var(--border-soft)]
+              bg-[var(--surface-base)]
               px-4
               py-3
-            bg-white/50
+            bg-[var(--surface-base)]
             p-5
               shadow-sm
             "

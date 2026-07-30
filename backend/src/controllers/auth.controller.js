@@ -1,6 +1,7 @@
 import bcryptjs from 'bcryptjs';
 import prisma from '../config/prisma.client.js';
 import { generateRefreshToken, generateToken, verifyRefreshToken } from '../utils/jwt.util.js';
+import { permissionsForRole } from '../config/permissions.js';
 
 const normalizeLoginId = (value) => String(value ?? '').trim().toLowerCase();
 const instantLoginEnabled = () => process.env.NODE_ENV !== 'production' || process.env.ENABLE_INSTANT_LOGIN === 'true';
@@ -295,7 +296,13 @@ export const getMe = async (req, res) => {
       if (!portalStudent) {
         return res.status(404).json({ success: false, message: 'Portal account not found or inactive', code: 'NOT_FOUND' });
       }
-      return res.json({ success: true, data: buildPortalSession(portalStudent, req.user.role).user });
+      return res.json({
+        success: true,
+        data: {
+          ...buildPortalSession(portalStudent, req.user.role).user,
+          permissions: permissionsForRole(req.user.role),
+        },
+      });
     }
 
     // user is already attached by authMiddleware
@@ -383,6 +390,7 @@ export const getMe = async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        permissions: permissionsForRole(user.role),
         schoolId: user.schoolId,
         studentId: linkedStudent?.id || null,
         linkedStudent,

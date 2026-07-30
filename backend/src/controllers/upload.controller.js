@@ -48,7 +48,7 @@ export const getGalleryUploadSignature = async (req, res) => {
 
 export const getSchoolLogoUploadSignature = async (req, res) => {
   try {
-    const schoolId = req.body.schoolId || req.query.schoolId;
+    const schoolId = getScopedSchoolId(req.user, req.body.schoolId || req.query.schoolId);
 
     if (!schoolId) {
       return res.status(400).json({

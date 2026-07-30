@@ -214,6 +214,22 @@ export const updateSchoolSettingsBySchoolId = async (req, res) => {
   }
 };
 
+export const getMySchoolSettings = async (req, res) => {
+  if (!req.user?.schoolId) {
+    return res.status(400).json({ success: false, message: 'No school is linked to this account' });
+  }
+  req.params.schoolId = req.user.schoolId;
+  return getSchoolSettingsBySchoolId(req, res);
+};
+
+export const updateMySchoolSettings = async (req, res) => {
+  if (!req.user?.schoolId) {
+    return res.status(400).json({ success: false, message: 'No school is linked to this account' });
+  }
+  req.params.schoolId = req.user.schoolId;
+  return updateSchoolSettingsBySchoolId(req, res);
+};
+
 export const getCurrentSchoolBranding = async (req, res) => {
   try {
     const schoolId = req.user?.schoolId;

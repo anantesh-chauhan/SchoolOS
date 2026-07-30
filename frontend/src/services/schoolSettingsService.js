@@ -13,6 +13,14 @@ export const schoolSettingsService = {
     const response = await apiClient.patch(`/school-settings/${schoolId}`, payload);
     return response.data;
   },
+  getMine: async () => {
+    const response = await apiClient.get('/school-settings/mine');
+    return response.data;
+  },
+  updateMine: async (payload) => {
+    const response = await apiClient.patch('/school-settings/mine', payload);
+    return response.data;
+  },
   getCurrentBranding: async () => {
     const response = await apiClient.get('/school-settings/branding/current');
     return response.data;

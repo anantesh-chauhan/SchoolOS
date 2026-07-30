@@ -38,13 +38,20 @@ export const authMiddleware = async (req, res, next) => {
       });
     }
 
-    if (decoded.sessionVersion !== undefined) {
-      const account = ['STUDENT', 'PARENT'].includes(decoded.role) && decoded.studentId
-        ? await prisma.student.findFirst({ where: { id: decoded.studentId, schoolId: decoded.schoolId, isActive: true }, select: { sessionVersion: true } })
-        : await prisma.user.findFirst({ where: { id: decoded.id, isActive: true }, select: { sessionVersion: true } });
-      if (!account || account.sessionVersion !== decoded.sessionVersion) {
-        return res.status(401).json({ success: false, message: 'Session is no longer valid', code: 'SESSION_REVOKED' });
-      }
+    const account = ['STUDENT', 'PARENT'].includes(decoded.role) && decoded.studentId
+      ? await prisma.student.findFirst({
+          where: { id: decoded.studentId, schoolId: decoded.schoolId, isActive: true },
+          select: { sessionVersion: true, school: { select: { status: true } } },
+        })
+      : await prisma.user.findFirst({
+          where: { id: decoded.id, isActive: true },
+          select: { sessionVersion: true, school: { select: { status: true } } },
+        });
+    if (!account || (decoded.sessionVersion !== undefined && account.sessionVersion !== decoded.sessionVersion)) {
+      return res.status(401).json({ success: false, message: 'Session is no longer valid', code: 'SESSION_REVOKED' });
+    }
+    if (decoded.role !== 'PLATFORM_OWNER' && account.school?.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'School access is inactive', code: 'SCHOOL_INACTIVE' });
     }
     
     req.user = decoded;

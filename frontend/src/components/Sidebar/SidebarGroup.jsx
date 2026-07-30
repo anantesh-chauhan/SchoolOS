@@ -9,7 +9,7 @@ const variants = {
   open: { height: 'auto', opacity: 1 },
 };
 
-const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed }) => {
+const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed, onNavigate }) => {
   const location = useLocation();
   const path = location.pathname;
 
@@ -24,7 +24,7 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed }) => {
         onClick={onToggle}
         className={`flex items-center justify-between w-full px-3 py-2 rounded-xl transition-all duration-200 active:scale-[0.98] ${
           desktopCollapsed ? 'justify-center' : 'justify-between'
-        } ${isActiveGroup ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'}`}
+        } ${isActiveGroup ? 'bg-[var(--school-primary-soft)] text-[var(--school-primary-soft-text)]' : 'text-[var(--text-primary)] hover:bg-[var(--surface-hover)]'}`}
       >
         <div className="flex items-center gap-3">
           {group.icon ? <group.icon size={18} /> : null}
@@ -32,7 +32,7 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed }) => {
         </div>
 
         {!desktopCollapsed && (
-          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} className="text-slate-500 dark:text-slate-400">
+          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} className="text-[var(--text-muted)]">
             <ChevronDown size={16} />
           </motion.span>
         )}
@@ -50,7 +50,7 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed }) => {
           >
             <div className="space-y-1">
               {group.items.map((item) => (
-                <SidebarItem key={item.href + item.label} item={item} desktopCollapsed={desktopCollapsed} />
+                <SidebarItem key={item.href + item.label} item={item} desktopCollapsed={desktopCollapsed} onNavigate={onNavigate} />
               ))}
             </div>
           </motion.div>

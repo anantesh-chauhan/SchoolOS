@@ -2,10 +2,12 @@ import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { authService } from "../services/authService";
+import { canAll } from "../security/permissions";
 
 const ProtectedRoute = ({
   children,
   allowedRoles = null,
+  requiredPermissions = [],
 }) => {
   const [loading, setLoading] =
     useState(true);
@@ -15,6 +17,7 @@ const ProtectedRoute = ({
 
   const [redirectPath, setRedirectPath] =
     useState(null);
+  const permissionKey = requiredPermissions.join('|');
 
   useEffect(() => {
 
@@ -66,6 +69,12 @@ const ProtectedRoute = ({
 
         }
 
+        if (requiredPermissions.length && !canAll(user, requiredPermissions)) {
+          setIsAuthorized(false);
+          setRedirectPath('/permission-denied');
+          return;
+        }
+
         setIsAuthorized(true);
 
         setRedirectPath(null);
@@ -100,7 +109,7 @@ const ProtectedRoute = ({
 
     };
 
-  }, [allowedRoles]);
+  }, [allowedRoles, permissionKey]);
 
   /* ======================================
      Premium Loading Screen
@@ -117,13 +126,7 @@ const ProtectedRoute = ({
           flex
           items-center
           justify-center
-          bg-gradient-to-br
-          from-slate-50
-          via-blue-50
-          to-indigo-100
-          dark:from-slate-900
-          dark:via-slate-900
-          dark:to-slate-800
+          bg-[var(--background)]
         "
 
         initial={{ opacity: 0 }}
@@ -152,12 +155,10 @@ const ProtectedRoute = ({
             px-8
             py-8
             rounded-2xl
-            bg-white/80
-            dark:bg-slate-900/70
+          bg-[var(--surface-elevated)]
             backdrop-blur-xl
             border
-            border-slate-200
-            dark:border-slate-700
+          border-[var(--border-soft)]
             shadow-xl
           "
 
@@ -172,9 +173,8 @@ const ProtectedRoute = ({
                 w-14
                 h-14
                 border-4
-                border-blue-200
-                dark:border-blue-900
-                border-t-blue-600
+                border-[var(--school-primary-soft)]
+                border-t-[var(--school-primary)]
                 rounded-full
                 animate-spin
               "
@@ -189,7 +189,7 @@ const ProtectedRoute = ({
                 rounded-full
                 blur-md
                 opacity-40
-                bg-blue-400
+                bg-[var(--school-primary)]
               "
             />
 
@@ -201,8 +201,7 @@ const ProtectedRoute = ({
 
             <p
               className="
-                text-slate-700
-                dark:text-slate-200
+                text-[var(--text-primary)]
                 font-semibold
                 text-base
               "
@@ -215,8 +214,7 @@ const ProtectedRoute = ({
             <p
               className="
                 text-sm
-                text-slate-500
-                dark:text-slate-400
+                text-[var(--text-muted)]
                 mt-1
               "
             >

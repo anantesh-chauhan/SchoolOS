@@ -19,6 +19,9 @@ import {
   promoteStudentController,
 } from '../controllers/student.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
+import { requirePermission } from '../middleware/permission.middleware.js';
+import { requireStudentAccess } from '../middleware/scope.middleware.js';
+import { PERMISSIONS } from '../config/permissions.js';
 
 const router = express.Router();
 
@@ -30,10 +33,10 @@ router.use(authMiddleware);
  * Create a new student
  * Required: studentFirstName, dob, gender, className, fatherName, parentMobile, session
  */
-router.post('/', createStudent);
+router.post('/', requirePermission(PERMISSIONS.STUDENTS_CREATE), createStudent);
 
-router.get('/allocation/roster', getStudentAllocationRoster);
-router.put('/:id/allocation', allocateStudent);
+router.get('/allocation/roster', requirePermission(PERMISSIONS.STUDENTS_ALLOCATE), getStudentAllocationRoster);
+router.put('/:id/allocation', requirePermission(PERMISSIONS.STUDENTS_ALLOCATE), allocateStudent);
 
 /**
  * POST /api/students/generate-serial
@@ -41,7 +44,7 @@ router.put('/:id/allocation', allocateStudent);
  * Required: studentId
  * Serial number is unique per className + session
  */
-router.post('/generate-serial', generateStudentSerial);
+router.post('/generate-serial', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generateStudentSerial);
 
 /**
  * POST /api/students/generate-student-id
@@ -50,7 +53,7 @@ router.post('/generate-serial', generateStudentSerial);
  * studentId must have serialNo generated first
  * Format: firstname.C{class}.S{serial}.{sessionYear}@{schoolCode}.schoolos.edu
  */
-router.post('/generate-student-id', generateStudentUserIdController);
+router.post('/generate-student-id', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generateStudentUserIdController);
 
 /**
  * POST /api/students/generate-parent-id
@@ -59,7 +62,7 @@ router.post('/generate-student-id', generateStudentUserIdController);
  * studentId must have serialNo generated first
  * Format: father.student.c{class}.{serial}.{sessionYear}@{schoolCode}.schoolos.edu
  */
-router.post('/generate-parent-id', generateParentUserIdController);
+router.post('/generate-parent-id', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generateParentUserIdController);
 
 /**
  * POST /api/students/generate-passwords
@@ -69,7 +72,7 @@ router.post('/generate-parent-id', generateParentUserIdController);
  * Format: Student: firstname@serial@YY (e.g., rahul@112@24)
  * Format: Parent: fathername#serial#dobDay (e.g., mohan#112#15)
  */
-router.post('/generate-passwords', generatePasswordsController);
+router.post('/generate-passwords', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generatePasswordsController);
 
 /**
  * POST /api/students/generate-passwords/bulk
@@ -77,7 +80,7 @@ router.post('/generate-passwords', generatePasswordsController);
  * Required: studentIds (array)
  * Returns array of generation results
  */
-router.post('/generate-passwords/bulk', bulkGeneratePasswordsController);
+router.post('/generate-passwords/bulk', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), bulkGeneratePasswordsController);
 
 /**
  * POST /api/students/generate-all
@@ -87,51 +90,56 @@ router.post('/generate-passwords/bulk', bulkGeneratePasswordsController);
  * If serial exists: skips serial generation
  * Returns: serialNo, studentUserId, parentUserId, studentPassword, parentPassword, pdfUrl
  */
-router.post('/generate-all', generateAllCredentialsController);
+router.post('/generate-all', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generateAllCredentialsController);
 
 /**
  * POST /api/students/:id/credentials
  * Generate or fetch admission credentials
  */
-router.post('/:id/credentials', generateStudentCredentialsController);
+router.post('/:id/credentials', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), generateStudentCredentialsController);
 
 /**
  * GET /api/students/:id/pdf
  * Download the admission slip PDF
  */
-router.get('/:id/pdf', downloadStudentPdfController);
+router.get('/:id/pdf', requirePermission(PERMISSIONS.STUDENTS_CREDENTIALS_MANAGE), downloadStudentPdfController);
 
 /**
  * POST /api/students/:id/promote
  * Promote a student and archive current academic state
  */
-router.post('/:id/promote', promoteStudentController);
+router.post('/:id/promote', requirePermission(PERMISSIONS.STUDENTS_PROMOTE), promoteStudentController);
 
-router.get('/me/academics', getMyStudentAcademics);
+router.get('/me/academics', requirePermission(PERMISSIONS.STUDENTS_VIEW), getMyStudentAcademics);
 
 /**
  * GET /api/students
  * Get all students (paginated)
  * Query params: page, limit, session
  */
-router.get('/', getStudents);
+router.get('/', requirePermission(PERMISSIONS.STUDENTS_DIRECTORY_VIEW), getStudents);
 
 /**
  * GET /api/students/:id
  * Get a specific student by ID
  */
-router.get('/:id', getStudentById);
+router.get(
+  '/:id',
+  requirePermission(PERMISSIONS.STUDENTS_VIEW),
+  requireStudentAccess(PERMISSIONS.STUDENTS_VIEW),
+  getStudentById,
+);
 
 /**
  * PUT /api/students/:id
  * Update a student
  */
-router.put('/:id', updateStudent);
+router.put('/:id', requirePermission(PERMISSIONS.STUDENTS_UPDATE), updateStudent);
 
 /**
  * DELETE /api/students/:id
  * Delete a student
  */
-router.delete('/:id', deleteStudent);
+router.delete('/:id', requirePermission(PERMISSIONS.STUDENTS_ARCHIVE), deleteStudent);
 
 export default router;

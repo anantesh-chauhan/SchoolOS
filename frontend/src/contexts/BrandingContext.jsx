@@ -9,10 +9,16 @@ import { useQuery } from "@tanstack/react-query";
 
 import { authService } from "../services/authService";
 import { schoolSettingsService } from "../services/schoolSettingsService";
+import {
+  applySchoolPalette,
+  DEFAULT_SCHOOL_PALETTE,
+  findSchoolPalette,
+  SCHOOL_PALETTES,
+} from "../theme/schoolPalettes";
 
 const DEFAULT_BRANDING = {
-  primaryColor: "#0f766e",
-  secondaryColor: "#0f172a",
+  primaryColor: DEFAULT_SCHOOL_PALETTE.primary,
+  secondaryColor: DEFAULT_SCHOOL_PALETTE.secondary,
   schoolName: "SchoolOS an Analytic Platform of your School",
 };
 
@@ -37,7 +43,9 @@ export function BrandingProvider({ children }) {
 
     enabled: Boolean(user?.schoolId),
 
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60,
+    refetchOnWindowFocus: true,
 
     retry: 1,
 
@@ -47,7 +55,10 @@ export function BrandingProvider({ children }) {
     brandingQuery.data?.data ||
     DEFAULT_BRANDING;
 
-  // Apply CSS variables
+  const palette = useMemo(
+    () => findSchoolPalette(branding.primaryColor, branding.secondaryColor),
+    [branding.primaryColor, branding.secondaryColor]
+  );
 
   useEffect(() => {
 
@@ -56,17 +67,7 @@ export function BrandingProvider({ children }) {
     const root =
       document.documentElement;
 
-    root.style.setProperty(
-      "--school-primary",
-      branding.primaryColor ||
-        DEFAULT_BRANDING.primaryColor
-    );
-
-    root.style.setProperty(
-      "--school-secondary",
-      branding.secondaryColor ||
-        DEFAULT_BRANDING.secondaryColor
-    );
+    applySchoolPalette(palette);
 
     document.title = branding.schoolName || DEFAULT_BRANDING.schoolName;
     if (branding.logoUrl) {
@@ -79,11 +80,13 @@ export function BrandingProvider({ children }) {
       favicon.href = branding.logoUrl;
     }
 
-  }, [branding]);
+  }, [branding, palette]);
 
   const value = useMemo(
     () => ({
       branding,
+      palette,
+      palettes: SCHOOL_PALETTES,
       isLoading:
         brandingQuery.isLoading,
       isError:
@@ -93,6 +96,7 @@ export function BrandingProvider({ children }) {
     }),
     [
       branding,
+      palette,
       brandingQuery.isLoading,
       brandingQuery.isError,
       brandingQuery.refetch,

@@ -63,13 +63,7 @@ class ErrorBoundary extends React.Component {
             flex
             items-center
             justify-center
-            bg-gradient-to-br
-            from-slate-50
-            via-red-50
-            to-orange-100
-            dark:from-slate-900
-            dark:via-slate-900
-            dark:to-slate-800
+            bg-[var(--background)]
             px-4
           "
 
@@ -87,11 +81,9 @@ class ErrorBoundary extends React.Component {
             className="
               max-w-lg
               w-full
-              bg-white
-              dark:bg-slate-900
+              bg-[var(--surface-elevated)]
               border
-              border-slate-200
-              dark:border-slate-700
+              border-[var(--border-soft)]
               rounded-2xl
               shadow-xl
               p-8
@@ -129,8 +121,7 @@ class ErrorBoundary extends React.Component {
             <h2 className="
               text-2xl
               font-bold
-              text-slate-900
-              dark:text-white
+              text-[var(--text-primary)]
               mb-2
             ">
 
@@ -141,8 +132,7 @@ class ErrorBoundary extends React.Component {
             {/* Message */}
 
             <p className="
-              text-slate-600
-              dark:text-slate-400
+              text-[var(--text-muted)]
               mb-6
             ">
 
@@ -174,10 +164,10 @@ class ErrorBoundary extends React.Component {
                   px-4
                   py-2
                   rounded-lg
-                  bg-indigo-600
-                  text-white
+                  bg-[var(--school-primary)]
+                  text-[var(--on-primary)]
                   font-medium
-                  hover:bg-indigo-700
+                  hover:bg-[var(--school-primary-hover)]
                   transition
                 "
               >
@@ -202,11 +192,9 @@ class ErrorBoundary extends React.Component {
                   py-2
                   rounded-lg
                   border
-                  border-slate-300
-                  text-slate-700
-                  dark:text-slate-200
-                  hover:bg-slate-100
-                  dark:hover:bg-slate-800
+                  border-[var(--border-soft)]
+                  text-[var(--text-primary)]
+                  hover:bg-[var(--surface-hover)]
                   transition
                 "
               >

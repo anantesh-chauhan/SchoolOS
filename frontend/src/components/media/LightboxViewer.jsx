@@ -77,8 +77,8 @@ export default function LightboxViewer({
             type="button"
             className="
               absolute
-              top-4
-              right-4
+              top-[max(1rem,env(safe-area-inset-top))]
+              right-[max(1rem,env(safe-area-inset-right))]
               rounded-full
               bg-white/10
               p-2
@@ -97,7 +97,9 @@ export default function LightboxViewer({
             type="button"
             className="
               absolute
-              left-4
+              bottom-[max(1rem,env(safe-area-inset-bottom))]
+              left-[max(1rem,env(safe-area-inset-left))]
+              sm:bottom-auto
               rounded-full
               bg-white/10
               p-3
@@ -126,8 +128,8 @@ export default function LightboxViewer({
               duration: 0.2,
             }}
             className="
-              max-h-[88vh]
-              max-w-[92vw]
+              max-h-[82dvh]
+              max-w-[94vw]
               text-center
             "
           >
@@ -142,8 +144,8 @@ export default function LightboxViewer({
                 "Gallery image"
               }
               className="
-                max-h-[80vh]
-                max-w-[92vw]
+                max-h-[72dvh]
+                max-w-[94vw]
                 rounded-2xl
                 object-contain
                 shadow-2xl
@@ -203,7 +205,9 @@ export default function LightboxViewer({
             type="button"
             className="
               absolute
-              right-4
+              bottom-[max(1rem,env(safe-area-inset-bottom))]
+              right-[max(1rem,env(safe-area-inset-right))]
+              sm:bottom-auto
               rounded-full
               bg-white/10
               p-3

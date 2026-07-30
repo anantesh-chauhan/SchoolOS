@@ -10,7 +10,7 @@ export default function AcademicHealthCard({ health }) {
     <Card className="overflow-hidden">
       <CardContent className="p-0">
         <div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
-          <div className="relative grid h-28 w-28 shrink-0 place-items-center rounded-full bg-slate-100 dark:bg-slate-800" style={{ background: score === null ? undefined : `conic-gradient(#4f46e5 ${score * 3.6}deg, rgb(226 232 240) 0deg)` }}>
+          <div className="relative grid h-28 w-28 shrink-0 place-items-center rounded-full bg-slate-100 dark:bg-slate-800" style={{ background: score === null ? undefined : `conic-gradient(var(--school-primary) ${score * 3.6}deg, rgb(226 232 240) 0deg)` }}>
             <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center dark:bg-slate-900">
               <div><p className="text-3xl font-bold">{score === null ? '—' : Math.round(score)}</p><p className="text-[10px] uppercase tracking-wider text-slate-500">out of 100</p></div>
             </div>

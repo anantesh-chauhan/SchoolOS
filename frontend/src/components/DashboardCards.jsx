@@ -16,7 +16,7 @@ export const SummaryCard = ({
   const reduceMotion = useReducedMotion();
   const colors = {
     blue:
-      "bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10 border-blue-200 dark:border-blue-800",
+      "bg-[var(--surface-base)] border-[var(--border-soft)]",
 
     green:
       "bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-800/10 border-green-200 dark:border-green-800",
@@ -30,7 +30,7 @@ export const SummaryCard = ({
 
   const iconColors = {
     blue:
-      "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-800",
+      "text-[var(--school-primary-soft-text)] bg-[var(--school-primary-soft)]",
 
     green:
       "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-800",
@@ -63,7 +63,7 @@ export const SummaryCard = ({
         cursor-pointer
         transition-all
         shadow-sm
-        hover:shadow-xl
+        hover:shadow-[0_12px_28px_rgb(var(--school-focus-rgb)/0.12)]
         ${colors[color]}
       `}
     >
@@ -76,11 +76,11 @@ export const SummaryCard = ({
         {/* Text Section */}
 
         <div>
-          <p className="text-slate-600 dark:text-slate-400 text-sm font-medium mb-2 tracking-wide">
+          <p className="mb-2 text-sm font-medium tracking-wide text-[var(--text-muted)]">
             {label}
           </p>
 
-          <h3 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white tracking-tight">
+          <h3 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] md:text-4xl">
             {value}
           </h3>
 
@@ -103,7 +103,7 @@ export const SummaryCard = ({
 
               {Math.abs(trend)}%
 
-              <span className="text-slate-500 dark:text-slate-400 ml-1">
+              <span className="ml-1 text-[var(--text-muted)]">
                 vs last month
               </span>
             </div>
@@ -173,10 +173,7 @@ export const WelcomeCard = ({
         mb-6
         text-white
         shadow-xl
-        bg-gradient-to-r
-        from-indigo-600
-        via-blue-600
-        to-cyan-600
+        bg-primaryGradient
       "
     >
 
@@ -209,7 +206,7 @@ export const WelcomeCard = ({
         </h2>
 
         <p className="
-          text-blue-100
+          text-white/80
           text-sm
           md:text-base
           font-medium

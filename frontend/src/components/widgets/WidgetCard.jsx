@@ -29,16 +29,14 @@ export default function WidgetCard({
           overflow-hidden
           rounded-[2rem]
           border
-          border-slate-200/60
-          bg-white/80
+          border-[var(--border-soft)]
+          bg-[var(--surface-base)]
           backdrop-blur-xl
           shadow-[0_8px_30px_rgb(0,0,0,0.04)]
           transition-all
           duration-500
           hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)]
-          hover:border-sky-200/50
-          dark:bg-slate-900/80
-          dark:border-slate-700
+          hover:border-[var(--school-primary)]
         "
       >
 
@@ -68,12 +66,10 @@ export default function WidgetCard({
                 className="
                   p-3
                   rounded-xl
-                  bg-slate-50
-                  border border-slate-100
-                  dark:bg-slate-800/50
-                  text-slate-500
-                  dark:text-slate-300
-                  group-hover/card:bg-sky-500 group-hover/card:text-white group-hover/card:border-sky-500 transition-all duration-300"
+                  bg-[var(--school-primary-soft)]
+                  border border-[var(--border-soft)]
+                  text-[var(--school-primary-soft-text)]
+                  group-hover/card:bg-[var(--school-primary)] group-hover/card:text-[var(--on-primary)] group-hover/card:border-[var(--school-primary)] transition-all duration-300"
               >
 
                 <Icon className="h-5 w-5" />
@@ -88,8 +84,7 @@ export default function WidgetCard({
                 className="
                   text-lg
                   font-bold
-                  text-slate-900
-                  dark:text-white
+                  text-[var(--text-primary)]
                   tracking-tight
                 "
               >
@@ -104,8 +99,7 @@ export default function WidgetCard({
                   className="
                     mt-1
                     text-sm
-                    text-slate-500
-                    dark:text-slate-400
+                    text-[var(--text-muted)]
                   "
                 >
 
@@ -144,7 +138,7 @@ export default function WidgetCard({
 
         {/* Divider */}
 
-        <div className="mx-8 border-t border-slate-100/80 dark:border-slate-800" />
+        <div className="mx-8 border-t border-[var(--border-soft)]" />
 
         {/* Content */}
 

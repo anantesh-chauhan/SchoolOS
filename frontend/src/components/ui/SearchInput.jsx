@@ -23,7 +23,7 @@ const SearchInput = ({
         onChange={onChange}
         placeholder={placeholder}
         aria-label={ariaLabel}
-        className={`h-11 w-full rounded-xl border border-slate-200 bg-white/80 px-3 ${paddingLeftClass} pr-3 text-base text-slate-900 placeholder:text-slate-400 shadow-sm backdrop-blur focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-colors sm:h-10 sm:text-sm`}
+        className={`h-11 w-full rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-3 ${paddingLeftClass} pr-3 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-sm focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)] transition-colors sm:h-10 sm:text-sm`}
       />
     </div>
   );

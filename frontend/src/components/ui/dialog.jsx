@@ -67,7 +67,7 @@ export function Modal({
           leaveTo="opacity-0"
         >
 
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" />
+          <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-[3px]" />
 
         </Transition.Child>
 
@@ -75,7 +75,7 @@ export function Modal({
 
         <div className="fixed inset-0 overflow-y-auto">
 
-          <div className="flex min-h-full items-end justify-center p-0 sm:items-center sm:p-4">
+          <div className="flex min-h-full items-end justify-center pt-[env(safe-area-inset-top)] sm:items-center sm:p-4">
 
             <Transition.Child
               as={Fragment}
@@ -96,16 +96,11 @@ export function Modal({
 
                   "overflow-hidden",
 
-                  "max-h-[92dvh] rounded-t-2xl sm:max-h-none sm:rounded-2xl",
+                  "max-h-[calc(100dvh-env(safe-area-inset-top))] rounded-t-2xl pb-[env(safe-area-inset-bottom)] sm:max-h-[92dvh] sm:rounded-2xl sm:pb-0",
 
-                  "border border-slate-200",
-
-                  "bg-white",
-
-                  "shadow-2xl",
-
-                  "dark:bg-slate-900",
-                  "dark:border-slate-700"
+                  "border border-[var(--border-soft)]",
+                  "bg-[var(--surface-elevated)] text-[var(--text-primary)]",
+                  "shadow-[0_24px_70px_rgba(8,25,28,0.28)]"
 
                 )}
               >
@@ -118,9 +113,9 @@ export function Modal({
 
                   {/* Header */}
 
-                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4 dark:border-slate-700">
+                  <div className="flex items-center justify-between border-b border-[var(--border-soft)] bg-[var(--surface-base)] px-4 py-3 sm:px-6 sm:py-4">
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
 
                       {Icon && (
 
@@ -129,7 +124,7 @@ export function Modal({
                       )}
 
                       <Dialog.Title
-                        className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white"
+                        className="break-words text-base font-semibold text-[var(--text-primary)] sm:text-lg"
                       >
 
                         {title}
@@ -142,7 +137,7 @@ export function Modal({
 
                       <button
                         onClick={onClose}
-                        className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 sm:h-9 sm:w-9 dark:hover:bg-slate-800"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-hover)] sm:h-9 sm:w-9"
                       >
 
                         <X className="h-5 w-5" />
@@ -165,7 +160,7 @@ export function Modal({
 
                   {footer && (
 
-                    <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3 sm:flex sm:items-center sm:justify-end sm:px-6 sm:py-4 dark:border-slate-700">
+                    <div className="grid grid-cols-1 gap-2 border-t border-[var(--border-soft)] bg-[var(--surface-base)] px-4 py-3 min-[380px]:grid-cols-2 sm:flex sm:items-center sm:justify-end sm:px-6 sm:py-4">
 
                       {footer}
 

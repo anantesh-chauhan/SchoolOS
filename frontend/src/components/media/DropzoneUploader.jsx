@@ -48,8 +48,8 @@ export default function DropzoneUploader({
         duration-200
         ${
           isDragging
-            ? "border-blue-500 bg-blue-50 shadow-lg"
-            : "border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100"
+            ? "border-[var(--school-primary)] bg-[var(--school-primary-soft)] shadow-lg"
+            : "border-[var(--border-soft)] bg-[var(--surface-muted)] hover:border-[var(--school-primary)] hover:bg-[var(--surface-hover)]"
         }
       `}
     >
@@ -91,8 +91,8 @@ export default function DropzoneUploader({
             p-4
             ${
               isDragging
-                ? "bg-blue-100 text-blue-600"
-                : "bg-white text-slate-500 shadow-sm"
+                ? "bg-[var(--surface-elevated)] text-[var(--school-primary)]"
+                : "bg-[var(--surface-base)] text-[var(--text-muted)] shadow-sm"
             }
           `}
         >
@@ -107,7 +107,7 @@ export default function DropzoneUploader({
           className="
             text-sm
             font-semibold
-            text-slate-800
+            text-[var(--text-primary)]
           "
         >
 
@@ -122,7 +122,7 @@ export default function DropzoneUploader({
             mt-2
             max-w-xs
             text-xs
-            text-slate-500
+            text-[var(--text-muted)]
           "
         >
 
@@ -160,7 +160,7 @@ export default function DropzoneUploader({
             inset-0
             rounded-2xl
             ring-2
-            ring-blue-400
+            ring-[var(--school-primary)]
             ring-offset-2
             pointer-events-none
           "

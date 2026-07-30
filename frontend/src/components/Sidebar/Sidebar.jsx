@@ -4,7 +4,7 @@ import SidebarGroup from './SidebarGroup';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
-const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, user, branding, handleLogout, mobile = false }) => {
+const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, user, branding, handleLogout, mobile = false, onNavigate }) => {
   const [openGroup, setOpenGroup] = useState(null);
 
   const location = useLocation();
@@ -38,11 +38,12 @@ const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, use
     // If no match, keep current openGroup unchanged (do not collapse)
   }, [location.pathname, groupedItems]);
 
-  const sidePanelClasses = desktopCollapsed ? 'w-20' : 'w-[260px]';
+  const isCollapsed = mobile ? false : desktopCollapsed;
+  const sidePanelClasses = mobile ? 'w-full' : isCollapsed ? 'w-20' : 'w-[260px]';
 
   return (
-    <aside className={`${sidePanelClasses} border-r border-slate-200 bg-white flex h-full flex-col shadow-sm transition-[width,background-color,border-color] duration-300 dark:border-slate-800 dark:bg-slate-950`}>
-      <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between transition-colors dark:border-slate-800">
+    <aside className={`${sidePanelClasses} flex h-full flex-col border-r border-[var(--border-soft)] bg-[var(--surface-sidebar)] shadow-[4px_0_24px_rgb(var(--school-focus-rgb)/0.06)] transition-[width,background-color,border-color] duration-300`}>
+      <div className="flex h-16 items-center justify-between border-b border-[var(--border-soft)] px-4 transition-colors">
         <div className="flex items-center gap-2 overflow-hidden">
           <div className="h-10 w-10 rounded-xl overflow-hidden bg-slate-100 text-white font-bold flex items-center justify-center dark:bg-slate-800">
             {branding?.logoUrl ? (
@@ -51,10 +52,10 @@ const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, use
               <div className="h-full w-full flex items-center justify-center brand-bg-primary">S</div>
             )}
           </div>
-          {!desktopCollapsed && (
-            <div>
-              <p className="font-semibold text-slate-900 dark:text-slate-100">{branding?.schoolName || 'SchoolOS'}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">School Management SaaS</p>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-[var(--text-primary)]">{branding?.schoolName || 'SchoolOS'}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">School learning workspace</p>
             </div>
           )}
         </div>
@@ -63,7 +64,7 @@ const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, use
           <button
             type="button"
             onClick={() => setDesktopCollapsed((p) => !p)}
-            className="hidden lg:inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100 active:scale-[0.97] dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
+            className="hidden h-8 w-8 items-center justify-center rounded-md border border-[var(--border-soft)] text-[var(--text-muted)] transition hover:bg-[var(--surface-hover)] active:scale-[0.97] lg:inline-flex"
             aria-label="Toggle sidebar collapse"
           >
             {desktopCollapsed ? <Menu size={16} /> : <X size={16} />}
@@ -78,19 +79,20 @@ const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, use
             group={group}
             isOpen={openGroup === group.group}
             onToggle={() => toggleGroup(group.group)}
-            desktopCollapsed={desktopCollapsed}
+            desktopCollapsed={isCollapsed}
+            onNavigate={onNavigate}
           />
         ))}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 transition-colors dark:border-slate-800">
+      <div className="border-t border-[var(--border-soft)] p-3 transition-colors">
         <button
           type="button"
           onClick={handleLogout}
           className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-red-700 transition hover:bg-red-50 active:scale-[0.98] dark:text-red-300 dark:hover:bg-red-950/40"
         >
           <LogOut size={18} />
-          {!desktopCollapsed && <span>Logout</span>}
+          {!isCollapsed && <span>Logout</span>}
         </button>
       </div>
     </aside>

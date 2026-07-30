@@ -39,6 +39,7 @@ import NotificationCenter from '../components/ui/NotificationCenter';
 import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
 import ReportIssueButton from '../components/issue-report/ReportIssueButton';
+import { filterNavigation } from '../security/permissions';
 
 
 const themeOptions = [
@@ -51,7 +52,7 @@ function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="inline-flex items-center rounded-xl border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
+    <div className="inline-flex items-center rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] p-1 shadow-sm">
       {themeOptions.map((option) => {
         const Icon = option.icon;
         const active = theme === option.value;
@@ -62,8 +63,8 @@ function ThemeToggle() {
             onClick={() => setTheme(option.value)}
             className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] ${
               active
-                ? 'bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-950'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                ? 'bg-[var(--school-primary)] text-[var(--on-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]'
             }`}
             aria-label={`Use ${option.label.toLowerCase()} theme`}
             title={`${option.label} theme`}
@@ -133,6 +134,9 @@ const DashboardLayout = ({ children, role }) => {
     ],
     SCHOOL_OWNER: [
       { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/school' }] },
+      { group: 'School Identity', icon: Settings, items: [
+        { label: 'Theme & Branding', icon: Settings, href: '/dashboard/school/settings' },
+      ] },
       { group: 'People & Access', icon: Users, items: [
         { label: 'Students', icon: Users, href: '/dashboard/admin/students/add' },
         { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
@@ -186,7 +190,6 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Gallery Studio', icon: Image, href: '/dashboard/admin/gallery' },
           { label: 'Gallery', icon: Image, href: '/dashboard/gallery' },
           { label: 'Widget Hub', icon: LayoutGrid, href: '/dashboard/widgets' },
-          { label: 'School Branding', icon: Settings, href: '/dashboard/school/settings' },
         ],
       },
     ],
@@ -404,9 +407,10 @@ const DashboardLayout = ({ children, role }) => {
     ],
   };
 
-  const groupedItems = (roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] }));
+  let groupedItems = (roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] }));
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
+  groupedItems = filterNavigation(groupedItems, user);
   const profileRouteByRole = {
     PLATFORM_OWNER: '/dashboard/platform/profile',
     SCHOOL_OWNER: '/dashboard/school/profile',
@@ -456,7 +460,7 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   return (
-    <div className="flex h-screen min-h-[100dvh] bg-slate-50 text-slate-950 transition-colors duration-300 dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex h-[100dvh] min-h-[100dvh] bg-[var(--background)] text-[var(--text-primary)] transition-colors duration-300">
       <DateTimeTopBar />
 
       {sidebarOpen && (
@@ -476,6 +480,7 @@ const DashboardLayout = ({ children, role }) => {
                   branding={branding}
                   handleLogout={handleLogout}
                   mobile
+                  onNavigate={() => setSidebarOpen(false)}
                 />
               </div>
         </div>
@@ -493,7 +498,7 @@ const DashboardLayout = ({ children, role }) => {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 pt-6">
-        <header className="h-14 shrink-0 border-b border-slate-200/70 bg-white/75 px-3 shadow-[0_1px_0_rgb(15_23_42_/_0.03)] backdrop-blur supports-[backdrop-filter]:bg-white/65 sm:h-16 sm:px-6 flex items-center justify-between transition-colors duration-300 dark:border-slate-800 dark:bg-slate-950/75 dark:shadow-[0_1px_0_rgb(148_163_184_/_0.08)] dark:supports-[backdrop-filter]:bg-slate-950/65">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface-elevated)_88%,transparent)] px-3 shadow-[0_1px_0_rgb(var(--school-focus-rgb)/0.08)] backdrop-blur sm:h-16 sm:px-6 transition-colors duration-300">
 
 
 
@@ -501,16 +506,17 @@ const DashboardLayout = ({ children, role }) => {
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="inline-flex lg:hidden h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-700 transition hover:bg-slate-100 active:scale-[0.97] dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-900"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--border-soft)] text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] active:scale-[0.97] lg:hidden"
               aria-label="Open sidebar"
+              aria-expanded={sidebarOpen}
             >
               <Menu size={18} />
             </button>
 
-            <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 truncate dark:text-slate-400">
+            <div className="hidden items-center gap-2 truncate text-sm text-[var(--text-muted)] md:flex">
               {breadcrumb.map((item, index) => (
                 <React.Fragment key={item + index}>
-                  <span className={index === breadcrumb.length - 1 ? 'text-slate-900 font-semibold dark:text-slate-100' : ''}>{item}</span>
+                  <span className={index === breadcrumb.length - 1 ? 'font-semibold text-[var(--text-primary)]' : ''}>{item}</span>
                   {index < breadcrumb.length - 1 && <span>/</span>}
                 </React.Fragment>
               ))}
@@ -520,7 +526,7 @@ const DashboardLayout = ({ children, role }) => {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 placeholder="Search classes, sections, subjects..."
-                className="h-10 w-full rounded-2xl border border-slate-200 bg-white/80 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm backdrop-blur transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="h-10 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-sm transition-colors focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
               />
             </div>
 
@@ -535,24 +541,26 @@ const DashboardLayout = ({ children, role }) => {
               <button
                 type="button"
                 onClick={() => setProfileOpen((prev) => !prev)}
-                className="h-10 px-2 rounded-2xl border border-slate-200 flex items-center gap-2 bg-white/80 shadow-sm hover:bg-white transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 dark:border-slate-800 dark:bg-slate-900/80 dark:hover:bg-slate-900"
+                className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] px-2 shadow-sm transition-all duration-200 hover:bg-[var(--surface-hover)] active:scale-[0.97] focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
+                aria-expanded={profileOpen}
+                aria-haspopup="menu"
               >
 
-                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-xs font-bold flex items-center justify-center shadow-sm">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primaryGradient text-xs font-bold text-[var(--on-primary)] shadow-sm">
 
                   {user?.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold text-slate-900 leading-none dark:text-slate-100">{user?.name || 'User'}</p>
+                  <p className="text-xs font-semibold leading-none text-[var(--text-primary)]">{user?.name || 'User'}</p>
                   <p className={`text-[10px] mt-1 px-1.5 py-0.5 rounded ${getRoleColor(role)}`}>
                     {(role || 'UNKNOWN').replace(/_/g, ' ')}
                   </p>
                 </div>
-                <ChevronDown size={14} className="text-slate-500 dark:text-slate-400" />
+                <ChevronDown size={14} className="hidden text-[var(--text-muted)] min-[390px]:block" />
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white/95 backdrop-blur shadow-xl p-2 z-20 animate-slideIn dark:border-slate-800 dark:bg-slate-900/95">
+                <div className="absolute right-0 z-20 mt-2 w-56 animate-slideIn rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] p-2 shadow-xl">
 
                   <button
                     type="button"
@@ -560,7 +568,7 @@ const DashboardLayout = ({ children, role }) => {
                       setProfileOpen(false);
                       navigate(profileRouteByRole[role] || '/dashboard');
                     }}
-                    className="w-full text-left rounded-xl px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
 
                   >
                     My Profile
@@ -583,12 +591,12 @@ const DashboardLayout = ({ children, role }) => {
           <div className="mx-auto w-full max-w-7xl">
 
             <div className="mb-3 sm:hidden">
-              <p className="text-xs text-slate-500 dark:text-slate-400">{breadcrumb.join(' / ')}</p>
+              <p className="text-xs text-[var(--text-muted)]">{breadcrumb.join(' / ')}</p>
               <div className="mt-2 relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   placeholder="Search classes, sections, subjects..."
-                  className="h-10 w-full rounded-2xl border border-slate-200 bg-white/80 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 shadow-sm backdrop-blur transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-100 dark:placeholder:text-slate-500"
+                  className="h-10 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-sm transition-colors focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
                 />
               </div>
             </div>
@@ -600,7 +608,7 @@ const DashboardLayout = ({ children, role }) => {
 
         </main>
 
-        <footer className="hidden border-t border-slate-200/70 bg-white/60 px-4 py-2 text-center text-[11px] text-slate-500 backdrop-blur sm:block dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-400">
+        <footer className="hidden border-t border-[var(--border-soft)] bg-[var(--surface-sidebar)] px-4 py-2 text-center text-[11px] text-[var(--text-muted)] sm:block">
           © {new Date().getFullYear()} SchoolOS
         </footer>
         <ReportIssueButton />

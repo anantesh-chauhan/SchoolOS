@@ -17,6 +17,7 @@ import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { schoolSettingsService } from '../services/schoolSettingsService';
+import { applySchoolPalette, findSchoolPalette } from '../theme/schoolPalettes';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -93,6 +94,12 @@ export default function LoginPage() {
       mounted = false;
     };
   }, [searchParams]);
+
+  useEffect(() => {
+    if (branding) {
+      applySchoolPalette(findSchoolPalette(branding.primaryColor, branding.secondaryColor));
+    }
+  }, [branding]);
 
   useEffect(() => {
     let mounted = true;
@@ -273,13 +280,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto w-full grid min-h-screen lg:grid-cols-[1.2fr_0.8fr]">
+    <div className="min-h-[100dvh] bg-slate-50">
+      <div className="mx-auto grid min-h-[100dvh] w-full lg:grid-cols-[1.2fr_0.8fr]">
         <motion.section
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6 }}
-          className="relative overflow-hidden p-8 md:p-16 text-white lg:flex lg:flex-col lg:justify-center"
+          className="relative overflow-hidden p-6 text-white sm:p-8 md:p-16 lg:flex lg:flex-col lg:justify-center"
           style={{
             backgroundImage: `linear-gradient(165deg, ${branding?.primaryColor || '#0e7490'} 0%, ${branding?.secondaryColor || '#1e3a8a'} 100%)`,
           }}
@@ -306,7 +313,7 @@ export default function LoginPage() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="mt-8 text-5xl md:text-6xl font-black tracking-tight"
+              className="mt-5 text-3xl font-black tracking-tight sm:mt-8 sm:text-5xl md:text-6xl"
             >
               {branding?.schoolName || 'SchoolOS'}
             </motion.h1>
@@ -315,7 +322,7 @@ export default function LoginPage() {
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="mt-4 text-white/80 text-xl leading-relaxed font-light"
+              className="mt-3 text-base font-light leading-relaxed text-white/80 sm:mt-4 sm:text-xl"
             >
               A modern school operating system for Indian institutions to run academics, people, and outcomes on one platform.
             </motion.p>
@@ -324,7 +331,7 @@ export default function LoginPage() {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="mt-12 grid gap-4"
+              className="mt-8 hidden gap-4 sm:grid lg:mt-12"
             >
               {featureList.map((feature) => {
                 const Icon = feature.icon;
@@ -344,7 +351,7 @@ export default function LoginPage() {
             </motion.div>
 
             {/* Mini Dashboard Mockup */}
-            <div className="mt-12 relative">
+            <div className="relative mt-12 hidden sm:block">
               <div className="h-48 w-full rounded-2xl border border-white/20 bg-white/5 backdrop-blur-sm p-6 overflow-hidden">
                 <div className="flex gap-2 mb-4">
                   <div className="h-3 w-3 rounded-full bg-rose-400/50" />
@@ -366,10 +373,10 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.05 }}
-          className="p-6 sm:p-12 lg:p-20 flex items-center"
+          className="flex items-center p-4 sm:p-12 lg:p-20"
         >
           <div className="w-full max-w-lg mx-auto relative">
-            <div className="relative rounded-3xl bg-white/80 shadow-2xl shadow-slate-200/60 border border-slate-200 backdrop-blur p-8 sm:p-10">
+            <div className="relative rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-2xl shadow-slate-200/60 backdrop-blur sm:rounded-3xl sm:p-10">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Sign in</h2>

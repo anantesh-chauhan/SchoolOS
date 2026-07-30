@@ -22,10 +22,10 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-96 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[3px]">
+      <div className="max-h-[85dvh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] p-6 text-[var(--text-primary)] shadow-xl">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-slate-900">Student Credentials</h2>
+          <h2 className="text-2xl font-bold text-[var(--text-primary)]">Student Credentials</h2>
           <button
             onClick={onClose}
             className="text-slate-500 hover:text-slate-700 text-2xl"
@@ -67,7 +67,7 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
               />
               <button
                 onClick={() => handleCopyToClipboard(credentials.admissionNo || credentials.serialNo, 'Admission Number')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+                className="rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
               >
                 Copy
               </button>
@@ -88,7 +88,7 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
               />
               <button
                 onClick={() => handleCopyToClipboard(credentials.studentUserId, 'Student ID')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+                className="rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
               >
                 Copy
               </button>
@@ -109,7 +109,7 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
               />
               <button
                 onClick={() => handleCopyToClipboard(credentials.studentPassword, 'Student Password')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+                className="rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
               >
                 Copy
               </button>
@@ -130,7 +130,7 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
               />
               <button
                 onClick={() => handleCopyToClipboard(credentials.parentUserId, 'Parent ID')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+                className="rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
               >
                 Copy
               </button>
@@ -151,7 +151,7 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
               />
               <button
                 onClick={() => handleCopyToClipboard(credentials.parentPassword, 'Parent Password')}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+                className="rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
               >
                 Copy
               </button>
@@ -164,14 +164,14 @@ const CredentialsModal = ({ isOpen, credentials = null, onClose }) => {
           {credentials.pdfUrl && (
             <button
               onClick={handleDownloadPDF}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium"
+              className="flex-1 rounded bg-[var(--school-primary)] px-4 py-2 font-medium text-[var(--on-primary)] hover:bg-[var(--school-primary-hover)]"
             >
               Download PDF
             </button>
           )}
           <button
             onClick={onClose}
-            className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded font-medium"
+            className="flex-1 rounded bg-[var(--surface-hover)] px-4 py-2 font-medium text-[var(--text-primary)] hover:bg-[var(--school-primary-soft)]"
           >
             Close
           </button>

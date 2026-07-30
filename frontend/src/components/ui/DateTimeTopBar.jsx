@@ -34,7 +34,7 @@ const DateTimeTopBar = () => {
       aria-label="Current date and time"
     >
       {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-r from-white/85 via-slate-50/90 to-white/85 dark:from-slate-950/85 dark:via-slate-900/90 dark:to-slate-950/85 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-800/70" />
+      <div className="absolute inset-0 border-b border-[var(--border-soft)] bg-[color-mix(in_srgb,var(--surface-elevated)_90%,transparent)] backdrop-blur-xl" />
 
       {/* Decorative Glow */}
       <div className="absolute inset-0 opacity-40">
@@ -43,16 +43,16 @@ const DateTimeTopBar = () => {
       </div>
 
       {/* Content */}
-      <div className="relative flex h-full items-center justify-center gap-2 text-[10px] font-semibold tracking-wide text-slate-700 dark:text-slate-200">
+      <div className="relative flex h-full items-center justify-center gap-2 text-[10px] font-semibold tracking-wide text-[var(--text-primary)]">
         <span className="flex items-center gap-1">
-          <CalendarDays size={10} className="text-blue-600 dark:text-cyan-400" />
+          <CalendarDays size={10} className="text-[var(--school-primary)]" />
           {date}
         </span>
 
-        <span className="h-1 w-1 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.8)] animate-pulse" />
+        <span className="h-1 w-1 rounded-full bg-[var(--school-primary)] animate-pulse" />
 
         <span className="flex items-center gap-1 font-mono">
-          <Clock3 size={10} className="text-emerald-600 dark:text-emerald-400" />
+          <Clock3 size={10} className="text-[var(--school-secondary)]" />
           {time}
         </span>
       </div>

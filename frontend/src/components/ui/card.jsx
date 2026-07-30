@@ -20,17 +20,13 @@ export function Card({
       className={cn(
 
         "rounded-xl sm:rounded-2xl",
-        "border border-slate-200",
-        "bg-white",
-        "shadow-sm shadow-slate-200/70",
+        "border border-[var(--border-soft)]",
+        "bg-[var(--surface-base)] text-[var(--text-primary)]",
+        "shadow-[0_8px_24px_rgb(var(--school-focus-rgb)/0.07)]",
 
         "transition-all duration-300",
 
-        hover && "hover:shadow-md hover:-translate-y-[2px]",
-
-        "dark:bg-slate-900",
-        "dark:border-slate-800",
-        "dark:shadow-[0_10px_30px_rgba(3,10,24,0.25)]",
+        hover && "hover:border-[color-mix(in_srgb,var(--school-primary)_35%,var(--border-soft))] hover:shadow-[0_12px_28px_rgb(var(--school-focus-rgb)/0.11)] hover:-translate-y-px",
 
         className
 
@@ -60,13 +56,11 @@ export function CardHeader({
     <div
       className={cn(
 
-        "flex items-center justify-between",
+        "flex flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center",
 
-        "border-b border-slate-200",
+        "border-b border-[var(--border-soft)]",
 
         "px-4 py-3 sm:px-6 sm:py-4",
-
-        "dark:border-slate-800",
 
         className
 
@@ -102,9 +96,7 @@ export function CardTitle({
 
         "tracking-tight",
 
-        "text-slate-900",
-
-        "dark:text-white",
+        "text-[var(--text-primary)]",
 
         className
 
@@ -136,9 +128,7 @@ export function CardDescription({
 
         "text-sm",
 
-        "text-slate-500",
-
-        "dark:text-slate-400",
+        "text-[var(--text-muted)]",
 
         className
 
@@ -198,15 +188,13 @@ export function CardFooter({
     <div
       className={cn(
 
-        "flex items-center justify-end",
+        "grid grid-cols-1 items-center justify-end sm:flex",
 
         "gap-2",
 
-        "border-t border-slate-200",
+        "border-t border-[var(--border-soft)]",
 
         "px-4 py-3 sm:px-6 sm:py-4",
-
-        "dark:border-slate-800",
 
         className
 
