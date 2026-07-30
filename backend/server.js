@@ -105,7 +105,9 @@ app.use(express.urlencoded({
   parameterLimit: 1000,
 }));
 app.use('/api', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   next();
 });
 app.use(analyticsInvalidationMiddleware);
@@ -194,10 +196,20 @@ app.use('/api/analytics', analyticsRoutes);
 if (existsSync(frontendIndex)) {
   app.use(express.static(frontendDirectory, {
     index: false,
-    maxAge: isProduction ? '1y' : 0,
+    maxAge: 0,
     setHeaders(res, filePath) {
-      if (path.basename(filePath) === 'index.html') {
+      const fileName = path.basename(filePath);
+      const isHashedAsset = path.basename(path.dirname(filePath)) === 'assets'
+        && /-[A-Za-z0-9_-]{8,}\./.test(fileName);
+
+      if (fileName === 'index.html' || fileName === 'sw.js') {
         res.setHeader('Cache-Control', 'no-cache');
+      } else if (fileName === 'manifest.webmanifest') {
+        res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+      } else if (isHashedAsset || /^workbox-[A-Za-z0-9_-]+\.js$/.test(fileName)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=86400, must-revalidate');
       }
     },
   }));

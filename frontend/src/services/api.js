@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearPrivateClientState } from '../lib/queryClient';
 
 const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
 const browserIsLocal = typeof window !== 'undefined'
@@ -13,11 +14,15 @@ export const API_BASE_URL = configuredApiBaseUrl && (!configuredApiIsLocal || br
   : (import.meta.env.PROD ? '/api' : 'http://localhost:5000/api');
 let isRefreshing = false;
 let pendingRequests = [];
+const SAFE_METHODS = new Set(['get', 'head', 'options']);
+const OFFLINE_MUTATION_EVENT = 'schoolos:offline-mutation-blocked';
 
 const clearSession = () => {
   localStorage.removeItem('authToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
+  sessionStorage.removeItem('schoolosInstantAccounts');
+  clearPrivateClientState();
 };
 
 const subscribeTokenRefresh = (resolve, reject) => {
@@ -43,6 +48,19 @@ const apiClient = axios.create({
 
 // Interceptor to add token to requests
 apiClient.interceptors.request.use((config) => {
+  const method = String(config.method || 'get').toLowerCase();
+  if (
+    typeof navigator !== 'undefined'
+    && navigator.onLine === false
+    && !SAFE_METHODS.has(method)
+  ) {
+    const error = new Error('An internet connection is required to save this change.');
+    error.code = 'SCHOOL_OS_OFFLINE';
+    error.isOffline = true;
+    window.dispatchEvent(new CustomEvent(OFFLINE_MUTATION_EVENT));
+    return Promise.reject(error);
+  }
+
   const token = localStorage.getItem('authToken');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

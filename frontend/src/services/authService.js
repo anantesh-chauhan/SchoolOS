@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { clearPrivateClientState } from '../lib/queryClient';
 
 const roleRoutes = {
   PLATFORM_OWNER: '/dashboard/platform',
@@ -18,6 +19,8 @@ export const authService = {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    sessionStorage.removeItem('schoolosInstantAccounts');
+    clearPrivateClientState();
   },
 
   login: async (email, password) => {

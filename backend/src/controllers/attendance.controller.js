@@ -497,7 +497,7 @@ export const listPublicCalendarDays = async (req, res) => {
     const school = await prisma.school.findFirst({ where: { id: schoolId, status: 'ACTIVE' }, select: { id: true, schoolName: true, schoolCode: true } });
     if (!school) return res.status(404).json({ success: false, message: 'School not found' });
     const days = await prisma.academicCalendarDay.findMany({ where: { schoolId, isVisible: true, isSchoolWide: true, applicableRoles: { isEmpty: true }, ...(range ? { calendarDate: { gte: range.start, lt: range.end } } : {}), ...(req.query.academicSession ? { academicSession: String(req.query.academicSession) } : {}) }, orderBy: { calendarDate: 'asc' } });
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     return res.json({ success: true, data: { school, month: req.query.month || null, academicSession: req.query.academicSession || null, days: days.map((day) => ({ id: day.id, date: day.calendarDate.toISOString().slice(0, 10), dayType: day.dayType, title: day.title, description: day.description, academicSession: day.academicSession, updatedAt: day.updatedAt })) } });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message || 'Failed to load public academic calendar' });

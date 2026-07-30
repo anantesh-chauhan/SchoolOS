@@ -2,6 +2,9 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import NetworkStatus from './components/pwa/NetworkStatus';
+import PWAInstallPrompt from './components/pwa/PWAInstallPrompt';
+import PWAUpdatePrompt from './components/pwa/PWAUpdatePrompt';
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const StudentLoginPage = lazy(() => import('./pages/StudentLoginPage'));
@@ -102,6 +105,7 @@ const ChapterAnalyticsPage = lazy(() => import('./features/analytics/pages/Chapt
 const AnalyticsConfigurationPage = lazy(() => import('./features/analytics/pages/AnalyticsConfigurationPage'));
 const SchoolAnalyticsPage = lazy(() => import('./features/analytics/pages/SchoolAnalyticsPage'));
 const ClassAnalyticsPage = lazy(() => import('./features/analytics/pages/ClassAnalyticsPage'));
+const OfflinePage = lazy(() => import('./pages/OfflinePage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -115,7 +119,8 @@ const AppFallback = () => (
 
 export default function App() {
   return (
-    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Router basename={import.meta.env.BASE_URL} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <NetworkStatus />
       <Toaster
         position="top-right"
         toastOptions={{
@@ -131,6 +136,7 @@ export default function App() {
           <Route path="/parent-login" element={<StudentLoginPage />} />
           <Route path="/account-recovery" element={<AccountRecoveryPage />} />
           <Route path="/fees/verify/:code" element={<ReceiptVerificationPage />} />
+          <Route path="/offline" element={<OfflinePage />} />
           <Route path="/homework" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><HomeworkWorkspacePage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','HR','TEACHER','PARENT','STUDENT','STAFF']}><NotificationCenterPage /></ProtectedRoute>} />
           <Route path="/communication" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><CommunicationWorkspacePage /></ProtectedRoute>} />
@@ -574,6 +580,10 @@ export default function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>
+      <div className="pwa-prompt-stack" aria-live="polite">
+        <PWAUpdatePrompt />
+        <PWAInstallPrompt />
+      </div>
     </Router>
   );
 }
