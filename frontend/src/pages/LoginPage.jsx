@@ -50,7 +50,7 @@ export default function LoginPage() {
       try {
         const user = await authService.validateSession();
         if (mounted && user?.role) {
-          navigate(authService.getDashboardRouteByRole(user.role), { replace: true });
+          navigate(authService.getPostLoginRoute(user), { replace: true });
           return;
         }
       } catch (error) {
@@ -239,7 +239,7 @@ export default function LoginPage() {
     }
 
     toast.success(`Welcome back, ${user.name}`);
-    redirectByRole(user.role);
+    navigate(authService.getPostLoginRoute(user));
   };
 
   const handleLogin = async (event) => {
@@ -268,8 +268,8 @@ export default function LoginPage() {
 
     try {
       const { user } = await authService.instantLogin(account.accountKey);
-      toast.success(`Welcome, ${user.name}`);
-      redirectByRole(user.role);
+      toast.success(`Welcome, ${user.name} · ${user.activeRole?.label || account.workspaceLabel || account.role.replace(/_/g, ' ')}`);
+      navigate(authService.getPostLoginRoute(user));
     } catch (error) {
       const message = error?.message || 'Instant login failed.';
       setErrors({ submit: message });
@@ -487,7 +487,7 @@ export default function LoginPage() {
                   placeholder="Search instant accounts..."
                   className="mb-3 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 />
-                <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="mb-3 grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                   {[['role', 'All roles', instantFilterOptions.roles], ['school', 'All schools', instantFilterOptions.schools], ['className', 'All classes', instantFilterOptions.classes], ['section', 'All sections', instantFilterOptions.sections]].map(([field, placeholder, options]) => (
                     <select key={field} value={instantFilters[field]} onChange={(event) => setInstantFilters((old) => ({ ...old, [field]: event.target.value, ...(field === 'className' ? { section: '' } : {}) }))} className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-blue-500">
                       <option value="">{placeholder}</option>{options.map((option) => <option key={option} value={option}>{option.replace(/_/g, ' ')}</option>)}
@@ -522,9 +522,10 @@ export default function LoginPage() {
                           </div>
                         )}
                         {group.users.map((user) => (
-                          <div key={user.accountKey || user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex items-start justify-between gap-3 shadow-sm hover:border-blue-200 transition-colors">
+                          <div key={user.accountKey || user.email} className="bg-white border border-slate-200/60 rounded-xl p-3 flex flex-col items-stretch gap-3 shadow-sm hover:border-blue-200 transition-colors min-[420px]:flex-row min-[420px]:items-start min-[420px]:justify-between">
                             <div className="min-w-0">
                               <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
+                              <p className="mt-1 w-fit rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">{user.workspaceLabel || user.role.replace(/_/g, ' ')}</p>
                               <p className="text-[11px] text-slate-400 truncate mt-0.5">{user.email}</p>
                               {(user.schoolName || user.assignmentPreview) && (
                                 <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
@@ -537,7 +538,7 @@ export default function LoginPage() {
                               type="button"
                               onClick={() => handleInstantLogin(user)}
                               disabled={Boolean(instantLoginEmail)}
-                              className="shrink-0 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white text-[11px] font-bold px-3 py-1.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                              className="h-10 shrink-0 rounded-xl bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition-all hover:bg-emerald-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                               aria-label={`Instant login as ${user.name}`}
                             >
                               {instantLoginEmail === user.accountKey ? 'Logging...' : 'Instant Login'}

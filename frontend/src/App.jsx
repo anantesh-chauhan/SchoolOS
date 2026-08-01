@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -109,6 +109,10 @@ const ClassAnalyticsPage = lazy(() => import('./features/analytics/pages/ClassAn
 const ExaminationWorkspacePage = lazy(() => import('./pages/examinations/ExaminationHubPage'));
 const OfflinePage = lazy(() => import('./pages/OfflinePage'));
 const PermissionDeniedPage = lazy(() => import('./pages/PermissionDeniedPage'));
+const WorkspaceSelectionPage = lazy(() => import('./pages/WorkspaceSelectionPage'));
+const ClassTeacherDashboard = lazy(() => import('./pages/dashboards/ClassTeacherDashboard'));
+const RoleManagementPage = lazy(() => import('./pages/admin/RoleManagementPage'));
+const SessionExpiredPage = lazy(() => import('./pages/SessionExpiredPage'));
 
 const AppFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 transition-colors dark:bg-slate-950">
@@ -121,6 +125,12 @@ const AppFallback = () => (
 );
 
 export default function App() {
+  const [workspaceVersion, setWorkspaceVersion] = useState(0);
+  useEffect(() => {
+    const remountWorkspace = () => setWorkspaceVersion((version) => version + 1);
+    window.addEventListener('schoolos:workspace-changed', remountWorkspace);
+    return () => window.removeEventListener('schoolos:workspace-changed', remountWorkspace);
+  }, []);
   return (
     <Router basename={import.meta.env.BASE_URL} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <NetworkStatus />
@@ -132,8 +142,10 @@ export default function App() {
         }}
       />
       <Suspense fallback={<AppFallback />}>
-        <Routes>
+        <Routes key={workspaceVersion}>
           <Route path="/permission-denied" element={<PermissionDeniedPage />} />
+          <Route path="/session-expired" element={<SessionExpiredPage />} />
+          <Route path="/choose-workspace" element={<ProtectedRoute><WorkspaceSelectionPage /></ProtectedRoute>} />
           {/* Login Route */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/student-login" element={<StudentLoginPage />} />
@@ -143,7 +155,7 @@ export default function App() {
           <Route path="/offline" element={<OfflinePage />} />
           <Route path="/homework" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><HomeworkWorkspacePage /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','HR','TEACHER','PARENT','STUDENT','STAFF']}><NotificationCenterPage /></ProtectedRoute>} />
-          <Route path="/communication" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><CommunicationWorkspacePage /></ProtectedRoute>} />
+          <Route path="/communication" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','CLASS_TEACHER','PARENT','STUDENT','STAFF']}><CommunicationWorkspacePage /></ProtectedRoute>} />
           <Route path="/analytics/students" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><StudentAnalyticsListPage /></ProtectedRoute>} />
           <Route path="/analytics/students/:studentId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><StudentAnalyticsPage /></ProtectedRoute>} />
           <Route path="/analytics/students/:studentId/subjects/:subjectId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><SubjectAnalyticsPage /></ProtectedRoute>} />
@@ -152,11 +164,12 @@ export default function App() {
           <Route path="/analytics/school" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER']}><SchoolAnalyticsPage /></ProtectedRoute>} />
           <Route path="/analytics/classes/:classId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER']}><ClassAnalyticsPage /></ProtectedRoute>} />
           <Route path="/analytics/sections/:sectionId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER']}><ClassAnalyticsPage sectionMode /></ProtectedRoute>} />
-          <Route path="/examinations" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','PRINCIPAL','EXAM_COORDINATOR','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><ExaminationWorkspacePage /></ProtectedRoute>} />
-          <Route path="/dashboard/hr" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><HRWorkspacePage /></ProtectedRoute>} />
+          <Route path="/examinations" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','PRINCIPAL','EXAM_COORDINATOR','EXAM_CONTROLLER','ADMIN','CURRICULUM_MANAGER','TEACHER','CLASS_TEACHER','PARENT','STUDENT']}><ExaminationWorkspacePage /></ProtectedRoute>} />
+          <Route path="/dashboard/hr" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR','HR_MANAGER']}><HRWorkspacePage /></ProtectedRoute>} />
+          <Route path="/dashboard/class-teacher" element={<ProtectedRoute allowedRoles={['CLASS_TEACHER']}><ClassTeacherDashboard /></ProtectedRoute>} />
           <Route path="/my/hr" element={<ProtectedRoute allowedRoles={['HR','TEACHER','STAFF']}><EmployeeSelfServicePage /></ProtectedRoute>} />
           <Route path="/attendance" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><AttendanceDashboardPage /></ProtectedRoute>} />
-          <Route path="/attendance/students/class/:classId/section/:sectionId/month/:month" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','TEACHER']}><MonthlyClassAttendancePage /></ProtectedRoute>} />
+          <Route path="/attendance/students/class/:classId/section/:sectionId/month/:month" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','TEACHER','CLASS_TEACHER']}><MonthlyClassAttendancePage /></ProtectedRoute>} />
           <Route path="/attendance/students/:studentId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','TEACHER','STUDENT','PARENT']}><StudentAttendanceProfilePage /></ProtectedRoute>} />
           <Route path="/attendance/employees/month/:month" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><EmployeeMonthlyAttendancePage /></ProtectedRoute>} />
           <Route path="/attendance/corrections" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><AttendanceCorrectionsPage /></ProtectedRoute>} />
@@ -167,6 +180,7 @@ export default function App() {
           <Route path="/platform/issues" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><IssueManagementPage /></ProtectedRoute>} />
 
         {/* Dashboard Routes */}
+        <Route path="/dashboard/admin/roles" element={<ProtectedRoute allowedRoles={['ADMIN','SCHOOL_OWNER','PRINCIPAL']} requiredPermissions={['staffing.manage']}><RoleManagementPage /></ProtectedRoute>} />
 
         <Route
           path="/dashboard/admin/students/add"
@@ -543,8 +557,8 @@ export default function App() {
           <Route path="/teacher/polls" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollsPage /></ProtectedRoute>} />
           <Route path="/teacher/polls/:pollId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollPage /></ProtectedRoute>} />
           <Route path="/teacher/performance" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPerformancePage /></ProtectedRoute>} />
-          <Route path="/teacher/my-class" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherMyClassPage /></ProtectedRoute>} />
-          <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['TEACHER']}><StudentAttendancePage /></ProtectedRoute>} />
+          <Route path="/teacher/my-class" element={<ProtectedRoute allowedRoles={['TEACHER','CLASS_TEACHER']}><TeacherMyClassPage /></ProtectedRoute>} />
+          <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['TEACHER','CLASS_TEACHER']}><StudentAttendancePage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/teacher/attendance"

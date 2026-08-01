@@ -7,13 +7,14 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import { teacherDashboardService } from '../../services/teacherDashboardService';
 import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 import { Badge, Empty, ErrorState, Loading, Panel, Progress } from '../../components/student/StudentUI';
+import { workspaceQueryKey } from '../../lib/queryClient';
 
 const flatten = (groups = []) => groups.flatMap((group) => group.sections.flatMap((section) => section.subjects.map((subject) => ({ ...subject, className: group.className, sectionName: section.sectionName }))));
 
 export default function TeacherDashboard() {
-  const dashboard = useQuery({ queryKey: ['teacher-dashboard'], queryFn: teacherDashboardService.getDashboard });
-  const assignments = useQuery({ queryKey: ['teacher-assignments'], queryFn: teacherDashboardService.getAssignments });
-  const polls = useQuery({ queryKey: ['teacher-polls'], queryFn: chapterFeedbackService.getTeacherPolls });
+  const dashboard = useQuery({ queryKey: workspaceQueryKey('teacher-dashboard'), queryFn: teacherDashboardService.getDashboard });
+  const assignments = useQuery({ queryKey: workspaceQueryKey('teacher-assignments'), queryFn: teacherDashboardService.getAssignments });
+  const polls = useQuery({ queryKey: workspaceQueryKey('teacher-polls'), queryFn: chapterFeedbackService.getTeacherPolls });
   if (dashboard.isLoading || assignments.isLoading || polls.isLoading) return <DashboardLayout role="TEACHER"><Loading /></DashboardLayout>;
   const failed = dashboard.isError || assignments.isError || polls.isError;
   if (failed) return <DashboardLayout role="TEACHER"><ErrorState error={dashboard.error || assignments.error || polls.error} retry={() => { dashboard.refetch(); assignments.refetch(); polls.refetch(); }} /></DashboardLayout>;

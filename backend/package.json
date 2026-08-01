@@ -8,6 +8,7 @@
     "node": "20.x"
   },
   "scripts": {
+    "seed:multi-role": "node prisma/seedMultiRoleWorkspaces.js",
     "postinstall": "prisma generate",
     "frontend:install": "node scripts/frontendInstall.js",
     "frontend:build": "node scripts/frontendBuild.js",

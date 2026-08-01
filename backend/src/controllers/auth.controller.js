@@ -2,6 +2,16 @@ import bcryptjs from 'bcryptjs';
 import prisma from '../config/prisma.client.js';
 import { generateRefreshToken, generateToken, verifyRefreshToken } from '../utils/jwt.util.js';
 import { permissionsForRole } from '../config/permissions.js';
+import {
+  buildWorkspaceContext,
+  chooseActiveAssignment,
+  createSessionPayload,
+  getAvailableAssignments,
+  getClassTeacherContext,
+  recordWorkspaceAudit,
+  ROLE_METADATA,
+} from '../services/workspace.service.js';
+import { revokeAllAuthSessions, revokeAuthSession, saveAuthSession, validateRefreshSession } from '../services/authSession.service.js';
 
 const normalizeLoginId = (value) => String(value ?? '').trim().toLowerCase();
 const instantLoginEnabled = () => process.env.NODE_ENV !== 'production' || process.env.ENABLE_INSTANT_LOGIN === 'true';
@@ -141,6 +151,12 @@ export const login = async (req, res) => {
         isActive: true,
         alternateMobile: true,
         profileImage: true,
+        sessionVersion: true,
+        lastActiveRoleId: true,
+        roleAssignments: {
+          where: { isActive: true },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
         school: {
           select: {
             id: true,
@@ -221,19 +237,23 @@ export const login = async (req, res) => {
       : null;
 
     // Generate JWT token
+    const availableAssignments = (user.roleAssignments || []).filter((assignment) => {
+      const now = new Date();
+      return assignment.schoolId === user.schoolId
+        && (!assignment.validFrom || new Date(assignment.validFrom) <= now)
+        && (!assignment.validUntil || new Date(assignment.validUntil) > now);
+    });
+    const activeAssignment = chooseActiveAssignment(availableAssignments, user.lastActiveRoleId);
     const tokenPayload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      schoolId: user.schoolId,
-      employeeId: user.employeeId,
-      sessionVersion: user.sessionVersion,
+      ...createSessionPayload(user, activeAssignment),
       ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
+    const workspace = buildWorkspaceContext(user, availableAssignments, activeAssignment);
+    const classTeacherContext = await getClassTeacherContext(user, activeAssignment);
 
     const token = generateToken(tokenPayload);
     const refreshToken = generateRefreshToken(tokenPayload);
+    if (activeAssignment) await saveAuthSession(req, tokenPayload, refreshToken);
 
     // Return success response
     res.json({
@@ -247,7 +267,7 @@ export const login = async (req, res) => {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: tokenPayload.role,
           schoolId: user.schoolId,
           studentId: linkedStudent?.id || null,
           linkedStudent,
@@ -262,7 +282,11 @@ export const login = async (req, res) => {
           school: user.school,
           class: user.class,
           section: user.section,
+          classTeacherContext,
+          roleScope: activeAssignment?.scopes || [],
+          ...workspace,
         },
+        ...workspace,
       },
     });
   } catch (error) {
@@ -322,6 +346,7 @@ export const getMe = async (req, res) => {
         mustChangePassword: true,
         isActive: true,
         sessionVersion: true,
+        lastActiveRoleId: true,
         lockedUntil: true,
         failedLoginAttempts: true,
         alternateMobile: true,
@@ -383,14 +408,19 @@ export const getMe = async (req, res) => {
         })
       : null;
 
+    const availableAssignments = await getAvailableAssignments(user.id, user.schoolId);
+    const activeAssignment = availableAssignments.find((item) => item.id === req.user.roleAssignmentId)
+      || chooseActiveAssignment(availableAssignments, user.lastActiveRoleId);
+    const workspace = buildWorkspaceContext(user, availableAssignments, activeAssignment);
+    const classTeacherContext = await getClassTeacherContext(user, activeAssignment);
+
     res.json({
       success: true,
       data: {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
-        permissions: permissionsForRole(user.role),
+        role: activeAssignment?.role || req.user.role || user.role,
         schoolId: user.schoolId,
         studentId: linkedStudent?.id || null,
         linkedStudent,
@@ -405,6 +435,9 @@ export const getMe = async (req, res) => {
         school: user.school,
         class: user.class,
         section: user.section,
+        classTeacherContext,
+        roleScope: activeAssignment?.scopes || [],
+        ...workspace,
       },
     });
   } catch (error) {
@@ -627,8 +660,7 @@ export const loginParent = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    // JWT tokens are stateless, so we just return success
-    // Client should remove token from storage
+    await revokeAuthSession(req.user.sessionId, req.user.id);
     res.json({
       success: true,
       message: 'Logout successful',
@@ -676,6 +708,11 @@ export const refreshSession = async (req, res) => {
       });
     }
 
+    const refreshSession = await validateRefreshSession(decoded, incomingToken);
+    if (refreshSession === false) {
+      return res.status(401).json({ success: false, message: 'Refresh token was already used or revoked', code: 'REFRESH_REUSE_DETECTED' });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       include: { school: true },
@@ -708,19 +745,22 @@ export const refreshSession = async (req, res) => {
         })
       : null;
 
+    const assignments = await getAvailableAssignments(user.id, user.schoolId);
+    const activeAssignment = decoded.roleAssignmentId
+      ? assignments.find((item) => item.id === decoded.roleAssignmentId)
+      : chooseActiveAssignment(assignments, user.lastActiveRoleId);
+    if (decoded.roleAssignmentId && !activeAssignment) {
+      return res.status(401).json({ success: false, message: 'Workspace access was revoked', code: 'ROLE_REVOKED' });
+    }
     const payload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      schoolId: user.schoolId,
-      employeeId: user.employeeId,
-      sessionVersion: user.sessionVersion,
+      ...createSessionPayload(user, activeAssignment, decoded.sessionId),
       ...(linkedStudent ? { studentId: linkedStudent.id } : {}),
     };
+    const workspace = buildWorkspaceContext(user, assignments, activeAssignment);
 
     const accessToken = generateToken(payload);
     const refreshToken = generateRefreshToken(payload);
+    if (activeAssignment) await saveAuthSession(req, payload, refreshToken);
 
     return res.json({
       success: true,
@@ -733,11 +773,13 @@ export const refreshSession = async (req, res) => {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role,
+          role: payload.role,
           schoolId: user.schoolId,
           studentId: linkedStudent?.id || null,
           school: user.school,
+          ...workspace,
         },
+        ...workspace,
       },
     });
   } catch (error) {
@@ -746,6 +788,102 @@ export const refreshSession = async (req, res) => {
       message: error.message || 'Failed to refresh session',
       code: 'REFRESH_FAILED',
     });
+  }
+};
+
+export const logoutAllDevices = async (req, res) => {
+  await revokeAllAuthSessions(req.user.id);
+  return res.json({ success: true, message: 'Signed out from all devices' });
+};
+
+export const switchRole = async (req, res) => {
+  try {
+    const roleAssignmentId = String(req.body?.roleAssignmentId || '').trim();
+    if (!roleAssignmentId) {
+      return res.status(400).json({ success: false, message: 'Choose a workspace', code: 'MISSING_ROLE_ASSIGNMENT' });
+    }
+
+    const now = new Date();
+    const user = await prisma.user.findFirst({
+      where: { id: req.user.id, isActive: true },
+      include: { school: true },
+    });
+    if (!user || !user.schoolId || user.school?.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'Your school account is not active', code: 'ACCOUNT_INACTIVE' });
+    }
+
+    const assignment = await prisma.userSchoolRole.findFirst({
+      where: {
+        id: roleAssignmentId,
+        userId: user.id,
+        schoolId: req.user.schoolId,
+        isActive: true,
+        AND: [
+          { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+          { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+        ],
+      },
+    });
+    if (!assignment) {
+      return res.status(403).json({ success: false, message: 'That workspace is not available', code: 'INVALID_ROLE_ASSIGNMENT' });
+    }
+
+    const previous = req.user.roleAssignmentId
+      ? await prisma.userSchoolRole.findUnique({ where: { id: req.user.roleAssignmentId } })
+      : null;
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { lastActiveRoleId: assignment.id } });
+      if (req.body?.setDefault === true) {
+        await tx.userSchoolRole.updateMany({ where: { userId: user.id, schoolId: assignment.schoolId }, data: { isDefault: false } });
+        await tx.userSchoolRole.update({ where: { id: assignment.id }, data: { isDefault: true } });
+        assignment.isDefault = true;
+      }
+    });
+    const payload = createSessionPayload(user, assignment, req.user.sessionId);
+    const accessToken = generateToken(payload);
+    const refreshToken = generateRefreshToken(payload);
+    const assignments = await getAvailableAssignments(user.id, assignment.schoolId);
+    const workspace = buildWorkspaceContext({ ...user, lastActiveRoleId: assignment.id }, assignments, assignment);
+    const classTeacherContext = await getClassTeacherContext(user, assignment);
+    await saveAuthSession(req, payload, refreshToken);
+
+    await recordWorkspaceAudit(req, {
+      userId: user.id,
+      schoolId: assignment.schoolId,
+      activeRole: assignment.role,
+      roleAssignmentId: assignment.id,
+      sessionId: payload.sessionId,
+      action: 'WORKSPACE_SWITCHED',
+      entityType: 'UserSchoolRole',
+      entityId: assignment.id,
+      oldValue: previous ? { assignmentId: previous.id, role: previous.role } : undefined,
+      newValue: { assignmentId: assignment.id, role: assignment.role },
+    });
+
+    return res.json({
+      success: true,
+      message: `Switched to ${workspace.activeRole.label} workspace`,
+      data: {
+        token: accessToken,
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: assignment.role,
+          schoolId: assignment.schoolId,
+          school: user.school,
+          classTeacherContext,
+          roleScope: assignment.scopes || [],
+          ...workspace,
+        },
+        ...workspace,
+      },
+    });
+  } catch (error) {
+    console.error('Switch role error:', error);
+    return res.status(500).json({ success: false, message: 'Could not switch workspace', code: 'SWITCH_ROLE_FAILED' });
   }
 };
 
@@ -758,7 +896,7 @@ export const getDemoAccounts = async (req, res) => {
     const [users, portalStudents] = await Promise.all([prisma.user.findMany({
       where: {
         isActive: true,
-        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'PRINCIPAL', 'EXAM_COORDINATOR', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'TEACHER', 'STAFF'] },
+        role: { in: ['PLATFORM_OWNER', 'SCHOOL_OWNER', 'PRINCIPAL', 'EXAM_COORDINATOR', 'EXAM_CONTROLLER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'HR_MANAGER', 'TEACHER', 'CLASS_TEACHER', 'STAFF'] },
       },
       select: {
         id: true,
@@ -768,6 +906,12 @@ export const getDemoAccounts = async (req, res) => {
         role: true,
         schoolId: true,
         employeeId: true,
+        lastActiveRoleId: true,
+        roleAssignments: {
+          where: { isActive: true },
+          include: { scopes: true },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+        },
         school: { select: { id: true, schoolName: true } },
         class: { select: { className: true } },
         section: { select: { sectionName: true } },
@@ -789,8 +933,9 @@ export const getDemoAccounts = async (req, res) => {
       orderBy: [{ schoolId: 'asc' }, { className: 'asc' }, { section: 'asc' }, { studentFirstName: 'asc' }],
     })]);
 
-    const teacherEmails = users.filter((user) => user.role === 'TEACHER').map((user) => user.email);
-    const teacherUsers = users.filter((user) => user.role === 'TEACHER');
+    const teacherUsers = users.filter((user) => user.role === 'TEACHER'
+      || user.roleAssignments.some((item) => ['TEACHER', 'CLASS_TEACHER'].includes(item.role)));
+    const teacherEmails = teacherUsers.map((user) => user.email);
     const teacherContactEmails = teacherUsers.map((user) => user.contactEmail).filter(Boolean);
     const teacherEmployeeIds = teacherUsers.map((user) => user.employeeId).filter(Boolean);
     const teachers = teacherUsers.length
@@ -829,44 +974,63 @@ export const getDemoAccounts = async (req, res) => {
     const labelByRole = {
       PLATFORM_OWNER: 'Platform Owner',
       SCHOOL_OWNER: 'School Owners',
+      PRINCIPAL: 'Principals',
+      EXAM_COORDINATOR: 'Exam Controllers',
+      EXAM_CONTROLLER: 'Exam Controllers',
       ADMIN: 'Administrators',
       TEACHER: 'Teachers',
+      CLASS_TEACHER: 'Class Teachers',
       STUDENT: 'Students',
       PARENT: 'Parents',
       STAFF: 'Staff',
       CURRICULUM_MANAGER: 'Curriculum Managers',
       FEE_MANAGER: 'Fee Managers',
       HR: 'Human Resources',
+      HR_MANAGER: 'Human Resources',
     };
 
-    const groups = ['Platform Owner', 'School Owners', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Human Resources', 'Teachers', 'Staff', 'Students', 'Parents']
+    const groups = ['Platform Owner', 'School Owners', 'Principals', 'Exam Controllers', 'Administrators', 'Curriculum Managers', 'Fee Managers', 'Human Resources', 'Class Teachers', 'Teachers', 'Staff', 'Students', 'Parents']
       .map((role) => ({ role, users: [] }));
     const groupByLabel = new Map(groups.map((group) => [group.role, group]));
     users.forEach((user) => {
       if (['STUDENT', 'PARENT'].includes(user.role)) return;
-      const label = labelByRole[user.role];
-      if (!label || !groupByLabel.has(label)) return;
-      const teacher = user.role === 'TEACHER'
+      const now = new Date();
+      const activeAssignments = user.roleAssignments.filter((item) =>
+        item.schoolId === user.schoolId
+        && (!item.validFrom || new Date(item.validFrom) <= now)
+        && (!item.validUntil || new Date(item.validUntil) > now));
+      const workspaces = activeAssignments.length ? activeAssignments : [{ id: null, role: user.role, scopes: [] }];
+      const teacher = workspaces.some((item) => ['TEACHER', 'CLASS_TEACHER'].includes(item.role))
         ? teacherByLoginEmail.get(user.email)
           || teacherByContactEmail.get(user.contactEmail)
           || teacherByEmployee.get(`${user.schoolId}:${user.employeeId}`)
         : null;
-      const assignmentPreview = teacher?.teacherAssignments?.length
-        ? teacher.teacherAssignments
-            .slice(0, 4)
-            .map((row) => `${row.class.className}-${row.section.sectionName} ${row.subject.subjectName}`)
-            .join(', ')
-        : '';
-
-      groupByLabel.get(label).users.push({
-        accountKey: `user:${user.id}`,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        schoolName: user.school?.schoolName || teacher?.school?.schoolName || 'Platform',
-        className: user.class?.className || teacher?.teacherAssignments?.[0]?.class?.className || null,
-        sectionName: user.section?.sectionName || teacher?.teacherAssignments?.[0]?.section?.sectionName || null,
-        assignmentPreview,
+      workspaces.forEach((workspace) => {
+        const label = labelByRole[workspace.role];
+        if (!label || !groupByLabel.has(label)) return;
+        const isClassTeacher = workspace.role === 'CLASS_TEACHER';
+        const relevantAssignments = isClassTeacher
+          ? (teacher?.teacherAssignments || []).filter((row) => ['CLASS_TEACHER', 'BOTH'].includes(row.roleType))
+          : (teacher?.teacherAssignments || []);
+        const scoped = workspace.scopes?.[0];
+        const assignmentPreview = relevantAssignments.length
+          ? relevantAssignments.slice(0, 4).map((row) => `${row.class.className}-${row.section.sectionName}${isClassTeacher ? ' · Class Teacher' : ` ${row.subject.subjectName}`}`).join(', ')
+          : isClassTeacher ? 'Class-teacher section is awaiting allocation' : ROLE_METADATA[workspace.role]?.description || '';
+        const firstAssignment = relevantAssignments[0];
+        const className = user.class?.className || firstAssignment?.class?.className || null;
+        const sectionName = user.section?.sectionName || firstAssignment?.section?.sectionName || null;
+        groupByLabel.get(label).users.push({
+          accountKey: workspace.id ? `workspace:${user.id}:${workspace.id}` : `user:${user.id}`,
+          name: user.name,
+          email: user.email,
+          role: workspace.role,
+          workspaceLabel: ROLE_METADATA[workspace.role]?.label || workspace.role,
+          schoolName: user.school?.schoolName || teacher?.school?.schoolName || 'Platform',
+          className,
+          sectionName,
+          scope: scoped || null,
+          assignmentPreview,
+        });
       });
     });
 
@@ -916,8 +1080,8 @@ export const instantLogin = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Instant login is disabled' });
     }
 
-    const [accountType, accountId] = String(req.body.accountKey || '').split(':');
-    if (!accountId || !['user', 'student', 'parent'].includes(accountType)) {
+    const [accountType, accountId, requestedAssignmentId] = String(req.body.accountKey || '').split(':');
+    if (!accountId || !['workspace', 'user', 'student', 'parent'].includes(accountType)) {
       return res.status(400).json({ success: false, message: 'A valid instant-login account is required' });
     }
 
@@ -944,25 +1108,35 @@ export const instantLogin = async (req, res) => {
         id: true, email: true, name: true, role: true, schoolId: true, classId: true, sectionId: true,
         contactEmail: true, employeeId: true, joiningYear: true, mustChangePassword: true,
         alternateMobile: true, profileImage: true, sessionVersion: true,
+        lastActiveRoleId: true,
         school: { select: { id: true, schoolName: true, schoolCode: true, logoUrl: true, address: true, city: true, state: true, phone: true, email: true, status: true } },
         class: { select: { id: true, className: true, classOrder: true } },
         section: { select: { id: true, sectionName: true, sectionOrder: true, classId: true } },
       },
     });
     if (!user) return res.status(404).json({ success: false, message: 'Account is no longer active' });
+    if (user.role !== 'PLATFORM_OWNER' && user.school?.status !== 'ACTIVE') {
+      return res.status(403).json({ success: false, message: 'School access is inactive' });
+    }
 
-    const payload = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      schoolId: user.schoolId,
-      employeeId: user.employeeId,
-      sessionVersion: user.sessionVersion,
-    };
+    const assignments = await getAvailableAssignments(user.id, user.schoolId);
+    let activeAssignment = requestedAssignmentId
+      ? assignments.find((item) => item.id === requestedAssignmentId)
+      : chooseActiveAssignment(assignments, user.lastActiveRoleId);
+    if (accountType === 'workspace' && !activeAssignment) {
+      return res.status(403).json({ success: false, message: 'That demo workspace is no longer active' });
+    }
+    if (activeAssignment) {
+      activeAssignment = await prisma.userSchoolRole.findUnique({ where: { id: activeAssignment.id }, include: { scopes: true } });
+    }
+    const payload = createSessionPayload(user, activeAssignment);
     const token = generateToken(payload);
     const refreshToken = generateRefreshToken(payload);
-    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+    if (activeAssignment) await saveAuthSession(req, payload, refreshToken);
+    await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date(), ...(activeAssignment ? { lastActiveRoleId: activeAssignment.id } : {}) } });
+
+    const classTeacherContext = await getClassTeacherContext(user, activeAssignment);
+    const workspace = buildWorkspaceContext({ ...user, lastActiveRoleId: activeAssignment?.id || null }, assignments, activeAssignment);
 
     return res.json({
       success: true,
@@ -971,7 +1145,15 @@ export const instantLogin = async (req, res) => {
         token,
         accessToken: token,
         refreshToken,
-        user: { ...user, studentId: null },
+        user: {
+          ...user,
+          role: payload.role,
+          studentId: null,
+          classTeacherContext,
+          roleScope: activeAssignment?.scopes || [],
+          ...workspace,
+        },
+        ...workspace,
       },
     });
   } catch (error) {

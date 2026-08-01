@@ -49,6 +49,6 @@ router.put(
 
 // Admin routes
 router.put('/:id', authMiddleware, requireRole('ADMIN'), profileController.adminUpdateUser);
-router.get('/', authMiddleware, requireRole('ADMIN'), profileController.getUsers);
+router.get('/', authMiddleware, requireRole('ADMIN', 'SCHOOL_OWNER'), profileController.getUsers);
 
 export default router;

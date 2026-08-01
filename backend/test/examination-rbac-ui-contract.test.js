@@ -37,3 +37,40 @@ test('frontend route uses the role-specific examination hub', async () => {
   assert.doesNotMatch(layout.slice(0, layout.indexOf('const DashboardLayout')), /roleMenuConfig\.PRINCIPAL/);
 });
 
+test('examination creation uses a bounded atomic nested write', async () => {
+  const source = await readFile(new URL('../src/modules/examinations/examination.controller.js', import.meta.url), 'utf8');
+  const createHandler = source.slice(source.indexOf('export const create ='), source.indexOf('export const update ='));
+  assert.match(createHandler, /Promise\.all\(\[/);
+  assert.match(createHandler, /cohorts:\s*\{\s*create:\s*preparedCohorts\s*\}/);
+  assert.match(createHandler, /const examinationId = randomUUID\(\)/);
+  assert.match(createHandler, /return \{ examinationId, subjectId:/);
+  assert.match(createHandler, /id:\s*examinationId/);
+  assert.doesNotMatch(createHandler, /\$transaction\(async/);
+  assert.doesNotMatch(createHandler, /for \(const \[index, allocation\]/);
+});
+
+test('class-teacher attendance uses workspace scope without privileged fetches', async () => {
+  const source = await readFile(new URL('../../frontend/src/pages/attendance/StudentAttendancePage.jsx', import.meta.url), 'utf8');
+  const routes = await readFile(new URL('../src/routes/attendance.js', import.meta.url), 'utf8');
+  assert.match(source, /useAcademicStructure\(\{ enabled: isAdmin, retry: false \}\)/);
+  assert.match(source, /enabled: user\?\.role === 'TEACHER'/);
+  assert.match(source, /user\.classTeacherContext\?\.sections/);
+  assert.doesNotMatch(source, /enabled: \['TEACHER', 'CLASS_TEACHER'\]/);
+  for (const endpoint of ["'/students'", "'/class-month'", "'/class-register'"]) {
+    const line = routes.split('\n').find((row) => row.includes(`router.get(${endpoint}`));
+    assert.match(line || '', /'CLASS_TEACHER'/);
+  }
+});
+
+test('workspace switches remount same-route role workspaces', async () => {
+  const app = await readFile(new URL('../../frontend/src/App.jsx', import.meta.url), 'utf8');
+  assert.match(app, /schoolos:workspace-changed/);
+  assert.match(app, /<Routes key=\{workspaceVersion\}>/);
+});
+
+test('examination metadata identifies sections with ready allocations', async () => {
+  const source = await readFile(new URL('../src/modules/examinations/examination.controller.js', import.meta.url), 'utf8');
+  const handler = source.slice(source.indexOf('export const metadata ='), source.indexOf('export const roleDashboard ='));
+  assert.match(handler, /sectionSubjectAllocation\.groupBy/);
+  assert.match(handler, /allocationReadiness/);
+});

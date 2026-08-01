@@ -1,5 +1,5 @@
 import express from 'express';
-import { login, loginStudent, loginParent, getMe, logout, refreshSession, getDemoAccounts, instantLogin } from '../controllers/auth.controller.js';
+import { login, loginStudent, loginParent, getMe, logout, logoutAllDevices, refreshSession, getDemoAccounts, instantLogin, switchRole } from '../controllers/auth.controller.js';
 import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
@@ -14,6 +14,8 @@ router.post('/instant-login', instantLogin);
 
 // Protected routes
 router.get('/me', authMiddleware, getMe);
+router.post('/switch-role', authMiddleware, switchRole);
 router.post('/logout', authMiddleware, logout);
+router.post('/logout-all', authMiddleware, logoutAllDevices);
 
 export default router;

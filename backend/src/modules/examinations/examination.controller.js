@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import QRCode from 'qrcode';
+import { randomUUID } from 'node:crypto';
 import prisma from '../../config/prisma.client.js';
 import { assignRanks, calculateStudent, DEFAULT_GRADE_RULES } from './examination.engine.js';
 
@@ -7,8 +8,12 @@ const ok = (res, data, status = 200) => res.status(status).json({ success: true,
 const fail = (res, status, message, details) => res.status(status).json({ success: false, message, details });
 const schoolId = (req) => req.user?.schoolId || req.query.schoolId;
 const actorId = (req) => req.user?.id || 'system';
-const MANAGERS = new Set(['ADMIN', 'CURRICULUM_MANAGER', 'EXAM_COORDINATOR']);
-const APPROVERS = new Set(['PRINCIPAL', 'EXAM_COORDINATOR']);
+const MANAGERS = new Set(['ADMIN', 'CURRICULUM_MANAGER', 'EXAM_COORDINATOR', 'EXAM_CONTROLLER']);
+const APPROVERS = new Set(['PRINCIPAL', 'EXAM_COORDINATOR', 'EXAM_CONTROLLER']);
+const DEFAULT_EXAM_COMPONENTS = [
+  { name: 'Theory', code: 'THEORY', maximumMarks: 80, passingMarks: 26, weightage: 100, isMandatory: true },
+  { name: 'Internal Assessment', code: 'INTERNAL', maximumMarks: 20, passingMarks: 7, weightage: 100, isMandatory: true },
+];
 
 const audit = (req, data) => prisma.examinationAuditLog.create({ data: {
   schoolId: schoolId(req), actorId: actorId(req), ipAddress: req.ip, userAgent: req.get('user-agent'), ...data,
@@ -17,7 +22,7 @@ const audit = (req, data) => prisma.examinationAuditLog.create({ data: {
 const findExam = (id, tenantId, include = {}) => prisma.examination.findFirst({ where: { id, schoolId: tenantId }, include });
 
 const teacherForUser = async (req) => {
-  if (req.user.role !== 'TEACHER') return null;
+  if (!['TEACHER', 'CLASS_TEACHER'].includes(req.user.role)) return null;
   const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { email: true, employeeId: true } });
   return prisma.teacher.findFirst({ where: { schoolId: req.user.schoolId, isActive: true, OR: [{ email: user?.email }, ...(user?.employeeId ? [{ employeeId: user.employeeId }] : [])] }, select: { id: true } });
 };
@@ -46,13 +51,18 @@ const rosterForCohort = async (cohort) => prisma.student.findMany({
 export const metadata = async (req, res, next) => {
   try {
     const tenantId = schoolId(req);
-    const [sessions, classes, gradeScales, rules] = await Promise.all([
+    const [sessions, classes, gradeScales, rules, allocationReadiness] = await Promise.all([
       prisma.academicSession.findMany({ where: { schoolId: tenantId }, orderBy: { startDate: 'desc' } }),
       prisma.class.findMany({ where: { schoolId: tenantId, deletedAt: null }, include: { sections: { where: { deletedAt: null }, orderBy: { sectionOrder: 'asc' } } }, orderBy: { classOrder: 'asc' } }),
       prisma.examinationGradeScale.findMany({ where: { schoolId: tenantId, isActive: true } }),
       prisma.examinationRuleSet.findMany({ where: { schoolId: tenantId, isActive: true } }),
+      prisma.sectionSubjectAllocation.groupBy({
+        by: ['academicSessionId', 'sectionId'],
+        where: { schoolId: tenantId, status: { in: ['READY', 'TIMETABLED'] } },
+        _count: true,
+      }),
     ]);
-    ok(res, { sessions, classes, gradeScales, rules });
+    ok(res, { sessions, classes, gradeScales, rules, allocationReadiness: allocationReadiness.map((row) => ({ academicSessionId: row.academicSessionId, sectionId: row.sectionId, subjectCount: row._count })) });
   } catch (error) { next(error); }
 };
 
@@ -67,8 +77,12 @@ export const roleDashboard = async (req, res, next) => {
       return ok(res, { scope: 'PLATFORM', schools, statusCounts: Object.fromEntries(grouped.map((item) => [item.status, item._count])), recent });
     }
     const tenantId = schoolId(req);
-    const scope = req.user.role === 'TEACHER' ? await teacherScope(req) : null;
-    const examWhere = { schoolId: tenantId, ...(scope ? { cohorts: { some: { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] } } } : {}) };
+    const teacherWorkspace = ['TEACHER', 'CLASS_TEACHER'].includes(req.user.role);
+    const scope = teacherWorkspace ? await teacherScope(req) : null;
+    const scopedCohorts = scope ? (req.user.role === 'CLASS_TEACHER'
+      ? { sectionId: { in: scope.classTeacherSectionIds } }
+      : { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] }) : null;
+    const examWhere = { schoolId: tenantId, ...(scope ? { cohorts: { some: scopedCohorts } } : {}) };
     const [grouped, exams, resultCount, reportCardCount] = await Promise.all([
       prisma.examination.groupBy({ by: ['status'], where: examWhere, _count: true }),
       prisma.examination.findMany({ where: examWhere, take: 8, orderBy: { updatedAt: 'desc' }, include: { academicSession: { select: { name: true } }, _count: { select: { cohorts: true, results: true } } } }),
@@ -76,8 +90,8 @@ export const roleDashboard = async (req, res, next) => {
       prisma.examinationReportCard.count({ where: { examination: { schoolId: tenantId } } }),
     ]);
     let workQueue = [];
-    if (req.user.role === 'TEACHER') {
-      const subjectQueue = await prisma.examinationSubject.findMany({ where: { teacherId: scope.teacherId, examination: { schoolId: tenantId, status: { in: ['MARK_ENTRY_OPEN', 'MARK_ENTRY_CLOSED'] } }, status: { in: ['PENDING', 'DRAFT', 'REJECTED', 'SUBMITTED'] } }, take: 50, orderBy: { examination: { startDate: 'asc' } }, include: { examination: { select: { id: true, name: true, status: true, endDate: true } }, subject: { select: { subjectName: true } }, cohort: { include: { class: { select: { className: true } }, section: { select: { sectionName: true } } } } } });
+    if (teacherWorkspace) {
+      const subjectQueue = req.user.role === 'TEACHER' ? await prisma.examinationSubject.findMany({ where: { teacherId: scope.teacherId, examination: { schoolId: tenantId, status: { in: ['MARK_ENTRY_OPEN', 'MARK_ENTRY_CLOSED'] } }, status: { in: ['PENDING', 'DRAFT', 'REJECTED', 'SUBMITTED'] } }, take: 50, orderBy: { examination: { startDate: 'asc' } }, include: { examination: { select: { id: true, name: true, status: true, endDate: true } }, subject: { select: { subjectName: true } }, cohort: { include: { class: { select: { className: true } }, section: { select: { sectionName: true } } } } } }) : [];
       const reviewQueue = await prisma.examinationCohort.findMany({ where: { schoolId: tenantId, sectionId: { in: scope.classTeacherSectionIds }, status: 'READY_FOR_CLASS_REVIEW' }, take: 30, include: { examination: { select: { id: true, name: true, status: true } }, class: { select: { className: true } }, section: { select: { sectionName: true } }, _count: { select: { subjects: true } } } });
       workQueue = [...subjectQueue.map((item) => ({ type: 'MARK_ENTRY', ...item })), ...reviewQueue.map((item) => ({ type: 'CLASS_REVIEW', ...item }))];
     } else {
@@ -148,8 +162,12 @@ export const saveRuleSet = async (req, res, next) => {
 
 export const list = async (req, res, next) => {
   try {
-    const scope = req.user.role === 'TEACHER' ? await teacherScope(req) : null;
-    const where = { schoolId: schoolId(req), ...(req.query.status ? { status: req.query.status } : {}), ...(scope ? { cohorts: { some: { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] } } } : {}) };
+    const teacherWorkspace = ['TEACHER', 'CLASS_TEACHER'].includes(req.user.role);
+    const scope = teacherWorkspace ? await teacherScope(req) : null;
+    const cohortScope = scope && (req.user.role === 'CLASS_TEACHER'
+      ? { sectionId: { in: scope.classTeacherSectionIds } }
+      : { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] });
+    const where = { schoolId: schoolId(req), ...(req.query.status ? { status: req.query.status } : {}), ...(cohortScope ? { cohorts: { some: cohortScope } } : {}) };
     const exams = await prisma.examination.findMany({ where, orderBy: { startDate: 'desc' }, include: { academicSession: { select: { name: true } }, cohorts: { include: { class: { select: { className: true } }, section: { select: { sectionName: true } }, subjects: { select: { id: true, status: true } } } } } });
     ok(res, exams);
   } catch (error) { next(error); }
@@ -159,9 +177,9 @@ export const detail = async (req, res, next) => {
   try {
     let exam = await findExam(req.params.id, schoolId(req), { academicSession: true, cohorts: { include: { class: true, section: true, subjects: { include: { subject: true, components: { orderBy: { displayOrder: 'asc' } } } } } }, reviews: { orderBy: { createdAt: 'asc' } } });
     if (!exam) return fail(res, 404, 'Examination not found');
-    if (req.user.role === 'TEACHER') {
+    if (['TEACHER', 'CLASS_TEACHER'].includes(req.user.role)) {
       const scope = await teacherScope(req);
-      exam.cohorts = exam.cohorts.filter((cohort) => cohort.sectionId && (scope.classTeacherSectionIds.includes(cohort.sectionId) || cohort.subjects.some((subject) => subject.teacherId === scope.teacherId))).map((cohort) => ({ ...cohort, subjects: scope.classTeacherSectionIds.includes(cohort.sectionId) ? cohort.subjects : cohort.subjects.filter((subject) => subject.teacherId === scope.teacherId) }));
+      exam.cohorts = exam.cohorts.filter((cohort) => cohort.sectionId && (scope.classTeacherSectionIds.includes(cohort.sectionId) || (req.user.role === 'TEACHER' && cohort.subjects.some((subject) => subject.teacherId === scope.teacherId)))).map((cohort) => ({ ...cohort, subjects: scope.classTeacherSectionIds.includes(cohort.sectionId) ? cohort.subjects : cohort.subjects.filter((subject) => subject.teacherId === scope.teacherId) }));
       if (!exam.cohorts.length) return fail(res, 403, 'This examination is outside your allocation');
     }
     ok(res, exam);
@@ -173,35 +191,99 @@ export const create = async (req, res, next) => {
     if (!MANAGERS.has(req.user.role)) return fail(res, 403, 'Only examination managers can create examinations');
     const tenantId = schoolId(req);
     const { name, code, academicSessionId, startDate, endDate, resultDate, publicationDate, description, cohorts = [], calculationConfig, rankingConfig } = req.body;
-    if (!name || !code || !academicSessionId || !startDate || !endDate || !cohorts.length) return fail(res, 422, 'Name, code, session, dates and at least one section are required');
-    const session = await prisma.academicSession.findFirst({ where: { id: academicSessionId, schoolId: tenantId } });
+    const normalizedName = String(name || '').trim();
+    const normalizedCode = String(code || '').trim().toUpperCase();
+    if (!normalizedName || !normalizedCode || !academicSessionId || !startDate || !endDate || !Array.isArray(cohorts) || !cohorts.length) return fail(res, 422, 'Name, code, session, dates and at least one section are required');
+
+    const parsedStartDate = new Date(startDate);
+    const parsedEndDate = new Date(endDate);
+    const parsedResultDate = resultDate ? new Date(resultDate) : null;
+    const parsedPublicationDate = publicationDate ? new Date(publicationDate) : null;
+    if ([parsedStartDate, parsedEndDate, parsedResultDate, parsedPublicationDate].filter(Boolean).some((date) => Number.isNaN(date.getTime()))) return fail(res, 422, 'One or more examination dates are invalid');
+    if (parsedEndDate < parsedStartDate) return fail(res, 422, 'End date cannot be before start date');
+
+    const sectionIds = cohorts.map((cohort) => cohort?.sectionId).filter(Boolean);
+    if (sectionIds.length !== cohorts.length) return fail(res, 422, 'Every examination section needs a valid section identifier');
+    if (new Set(sectionIds).size !== sectionIds.length) return fail(res, 422, 'The same section cannot be added to an examination more than once');
+
+    // Resolve and validate the complete write graph before opening a transaction. This
+    // avoids one database round trip per section/subject on production databases.
+    const [session, sections, eligibleAllocations] = await Promise.all([
+      prisma.academicSession.findFirst({ where: { id: academicSessionId, schoolId: tenantId }, select: { id: true } }),
+      prisma.section.findMany({ where: { id: { in: sectionIds }, schoolId: tenantId, deletedAt: null }, select: { id: true, classId: true, sectionName: true } }),
+      prisma.sectionSubjectAllocation.findMany({
+        where: { schoolId: tenantId, academicSessionId, sectionId: { in: sectionIds }, status: { in: ['READY', 'TIMETABLED'] } },
+        select: { sectionId: true, subjectId: true, teacherId: true },
+      }),
+    ]);
     if (!session) return fail(res, 422, 'Academic session does not belong to this school');
-    const created = await prisma.$transaction(async (tx) => {
-      const exam = await tx.examination.create({ data: { schoolId: tenantId, academicSessionId, name: name.trim(), code: code.trim().toUpperCase(), description, startDate: new Date(startDate), endDate: new Date(endDate), resultDate: resultDate ? new Date(resultDate) : null, publicationDate: publicationDate ? new Date(publicationDate) : null, calculationConfig, rankingConfig, createdById: actorId(req) } });
-      for (const cohortInput of cohorts) {
-        const section = await tx.section.findFirst({ where: { id: cohortInput.sectionId, classId: cohortInput.classId, schoolId: tenantId, deletedAt: null } });
-        if (!section) throw Object.assign(new Error('Invalid class or section selection'), { status: 422 });
-        const cohort = await tx.examinationCohort.create({ data: { examinationId: exam.id, schoolId: tenantId, classId: cohortInput.classId, sectionId: cohortInput.sectionId } });
-        let allocations = [];
-        if (cohortInput.subjects?.length) {
-          const ids = cohortInput.subjects.map((item) => item.subjectId);
-          allocations = await tx.sectionSubjectAllocation.findMany({ where: { schoolId: tenantId, academicSessionId, sectionId: section.id, subjectId: { in: ids } } });
-          allocations = cohortInput.subjects.map((item) => ({ ...item, teacherId: item.teacherId || allocations.find((a) => a.subjectId === item.subjectId)?.teacherId }));
-        } else {
-          allocations = await tx.sectionSubjectAllocation.findMany({ where: { schoolId: tenantId, academicSessionId, sectionId: section.id, status: { in: ['READY', 'TIMETABLED'] } } });
-        }
-        if (!allocations.length) throw Object.assign(new Error(`No subject allocations found for section ${section.sectionName}`), { status: 422 });
-        for (const [index, allocation] of allocations.entries()) {
-          const examSubject = await tx.examinationSubject.create({ data: { examinationId: exam.id, cohortId: cohort.id, subjectId: allocation.subjectId, teacherId: allocation.teacherId || null, displayOrder: index, isOptional: Boolean(allocation.isOptional) } });
-          const components = allocation.components?.length ? allocation.components : [{ name: 'Theory', code: 'THEORY', maximumMarks: 80, passingMarks: 26, weightage: 100, isMandatory: true }, { name: 'Internal Assessment', code: 'INTERNAL', maximumMarks: 20, passingMarks: 7, weightage: 100, isMandatory: true }];
-          await tx.examinationComponent.createMany({ data: components.map((component, position) => ({ examSubjectId: examSubject.id, name: component.name, code: String(component.code || component.name).toUpperCase().replace(/\W+/g, '_'), maximumMarks: Number(component.maximumMarks), passingMarks: Number(component.passingMarks), weightage: Number(component.weightage ?? 100), isMandatory: component.isMandatory !== false, allowDecimal: Boolean(component.allowDecimal), displayOrder: position })) });
-        }
-      }
-      return exam;
+
+    const sectionById = new Map(sections.map((section) => [section.id, section]));
+    const allocationsBySection = new Map();
+    for (const allocation of eligibleAllocations) {
+      const sectionAllocations = allocationsBySection.get(allocation.sectionId) || [];
+      sectionAllocations.push(allocation);
+      allocationsBySection.set(allocation.sectionId, sectionAllocations);
+    }
+
+    // ExaminationSubject has required relations to both its cohort and examination.
+    // Supplying the ID up front lets the atomic nested write satisfy both relations.
+    const examinationId = randomUUID();
+    const preparedCohorts = cohorts.map((cohortInput) => {
+      const section = sectionById.get(cohortInput.sectionId);
+      if (!section || section.classId !== cohortInput.classId) throw Object.assign(new Error('Invalid class or section selection'), { status: 422 });
+      const available = allocationsBySection.get(section.id) || [];
+      const availableBySubject = new Map(available.map((allocation) => [allocation.subjectId, allocation]));
+      const requestedSubjects = Array.isArray(cohortInput.subjects) && cohortInput.subjects.length ? cohortInput.subjects : null;
+      const requestedIds = requestedSubjects?.map((item) => item?.subjectId);
+      if (requestedIds && (requestedIds.some((id) => !id) || new Set(requestedIds).size !== requestedIds.length)) throw Object.assign(new Error(`Subjects for section ${section.sectionName} must be valid and unique`), { status: 422 });
+      if (requestedIds?.some((id) => !availableBySubject.has(id))) throw Object.assign(new Error(`One or more subjects are not allocated to section ${section.sectionName}`), { status: 422 });
+
+      const subjects = (requestedSubjects || available).map((requested, index) => {
+        const allocation = availableBySubject.get(requested.subjectId) || requested;
+        const components = requested.components?.length ? requested.components : DEFAULT_EXAM_COMPONENTS;
+        const componentCodes = new Set();
+        const preparedComponents = components.map((component, position) => {
+          const maximumMarks = Number(component.maximumMarks);
+          const passingMarks = Number(component.passingMarks);
+          const weightage = Number(component.weightage ?? 100);
+          const componentName = String(component.name || '').trim();
+          const componentCode = String(component.code || componentName).trim().toUpperCase().replace(/\W+/g, '_');
+          if (!componentName || !componentCode || !Number.isFinite(maximumMarks) || maximumMarks <= 0 || !Number.isFinite(passingMarks) || passingMarks < 0 || passingMarks > maximumMarks || !Number.isFinite(weightage) || weightage <= 0) throw Object.assign(new Error(`Invalid marks component for section ${section.sectionName}`), { status: 422 });
+          if (componentCodes.has(componentCode)) throw Object.assign(new Error(`Duplicate marks component ${componentCode} for section ${section.sectionName}`), { status: 422 });
+          componentCodes.add(componentCode);
+          return { name: componentName, code: componentCode, maximumMarks, passingMarks, weightage, isMandatory: component.isMandatory !== false, allowDecimal: Boolean(component.allowDecimal), displayOrder: position };
+        });
+        return { examinationId, subjectId: allocation.subjectId, teacherId: allocation.teacherId || null, displayOrder: index, isOptional: Boolean(requested.isOptional), components: { create: preparedComponents } };
+      });
+      if (!subjects.length) throw Object.assign(new Error(`No ready subject allocations found for section ${section.sectionName}`), { status: 422 });
+      return { schoolId: tenantId, classId: cohortInput.classId, sectionId: section.id, subjects: { create: subjects } };
     });
+
+    // A nested write is atomic in Prisma and avoids the five-second interactive
+    // transaction timeout that the former sequential loop could exceed.
+    const created = await prisma.examination.create({ data: {
+      id: examinationId,
+      schoolId: tenantId,
+      academicSessionId,
+      name: normalizedName,
+      code: normalizedCode,
+      description,
+      startDate: parsedStartDate,
+      endDate: parsedEndDate,
+      resultDate: parsedResultDate,
+      publicationDate: parsedPublicationDate,
+      calculationConfig,
+      rankingConfig,
+      createdById: actorId(req),
+      cohorts: { create: preparedCohorts },
+    } });
     await audit(req, { examinationId: created.id, action: 'EXAM_CREATED', entityType: 'Examination', entityId: created.id, newValue: req.body });
     ok(res, created, 201);
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (error.code === 'P2002') return fail(res, 409, 'An examination with this code already exists for the selected academic session');
+    next(error);
+  }
 };
 
 export const update = async (req, res, next) => {
@@ -312,7 +394,7 @@ export const review = async (req, res, next) => {
       if (cohort.status !== 'READY_FOR_CLASS_REVIEW') return fail(res, 409, 'All subjects must be submitted before forwarding');
     }
     if (level === 'PRINCIPAL' && req.user.role !== 'PRINCIPAL') return fail(res, 403, 'Principal approval authority is required');
-    if (level === 'EXAM_COORDINATOR' && !['EXAM_COORDINATOR', 'ADMIN'].includes(req.user.role)) return fail(res, 403, 'Coordinator authority is required');
+    if (level === 'EXAM_COORDINATOR' && !['EXAM_COORDINATOR', 'EXAM_CONTROLLER', 'ADMIN'].includes(req.user.role)) return fail(res, 403, 'Coordinator authority is required');
     let cohortStatus;
     if (decision === 'REJECTED' || decision === 'CORRECTION_REQUESTED') cohortStatus = 'REJECTED';
     else if (level === 'CLASS_TEACHER') cohortStatus = 'FORWARDED';

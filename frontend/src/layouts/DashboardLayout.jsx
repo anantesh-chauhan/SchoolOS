@@ -43,6 +43,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import ReportIssueButton from '../components/issue-report/ReportIssueButton';
 import { filterNavigation } from '../security/permissions';
 import GlobalNavigator from '../components/navigation/GlobalNavigator';
+import RoleSwitcher from '../components/workspace/RoleSwitcher';
 
 
 const themeOptions = [
@@ -161,31 +162,31 @@ const DashboardLayout = ({ children, role }) => {
     });
   };
 
-  roleMenuConfig.PRINCIPAL = [
-    { group: 'Examinations', icon: GraduationCap, items: [
-      { label: 'Approval Dashboard', icon: ShieldCheck, href: '/examinations?view=approvals' },
-      { label: 'Published Results', icon: ClipboardCheck, href: '/examinations?view=results' },
-      { label: 'Examination Analytics', icon: Activity, href: '/examinations?view=analytics' },
-    ] },
-  ];
-  roleMenuConfig.EXAM_COORDINATOR = [
-    { group: 'Examinations', icon: GraduationCap, items: [
-      { label: 'Exam Control Centre', icon: GraduationCap, href: '/examinations' },
-      { label: 'Approval Queue', icon: ClipboardCheck, href: '/examinations?view=approvals' },
-      { label: 'Grade & Rule Setup', icon: Settings, href: '/examinations?view=configuration' },
-      { label: 'Result Registers', icon: BookOpenCheck, href: '/examinations?view=results' },
-      { label: 'Examination Audit', icon: ShieldCheck, href: '/examinations?view=audit' },
-    ] },
-    { group: 'Academic setup', icon: BookOpen, items: [
-      { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
-      { label: 'Teacher Summary', icon: UsersRound, href: '/dashboard/admin/teacher-assignment-summary' },
-    ] },
-  ];
   const [profileOpen, setProfileOpen] = useState(false);
   const user = authService.getCurrentUser();
   const { branding } = useBranding();
           
   const roleMenuConfig = {
+    PRINCIPAL: [
+      { group: 'Examinations', icon: GraduationCap, items: [
+        { label: 'Approval Dashboard', icon: ShieldCheck, href: '/examinations?view=approvals' },
+        { label: 'Published Results', icon: ClipboardCheck, href: '/examinations?view=results' },
+        { label: 'Examination Analytics', icon: Activity, href: '/examinations?view=analytics' },
+      ] },
+    ],
+    EXAM_COORDINATOR: [
+      { group: 'Examinations', icon: GraduationCap, items: [
+        { label: 'Exam Control Centre', icon: GraduationCap, href: '/examinations' },
+        { label: 'Approval Queue', icon: ClipboardCheck, href: '/examinations?view=approvals' },
+        { label: 'Grade & Rule Setup', icon: Settings, href: '/examinations?view=configuration' },
+        { label: 'Result Registers', icon: BookOpenCheck, href: '/examinations?view=results' },
+        { label: 'Examination Audit', icon: ShieldCheck, href: '/examinations?view=audit' },
+      ] },
+      { group: 'Academic setup', icon: BookOpen, items: [
+        { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
+        { label: 'Teacher Summary', icon: UsersRound, href: '/dashboard/admin/teacher-assignment-summary' },
+      ] },
+    ],
     PLATFORM_OWNER: [
       {
         group: 'Overview',
@@ -500,6 +501,25 @@ const DashboardLayout = ({ children, role }) => {
     ],
   };
 
+  roleMenuConfig.EXAM_CONTROLLER = roleMenuConfig.EXAM_COORDINATOR;
+  roleMenuConfig.HR_MANAGER = roleMenuConfig.HR;
+  roleMenuConfig.CLASS_TEACHER = [
+    { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/class-teacher' }] },
+    { group: 'My Section', icon: UsersRound, items: [
+      { label: 'Students', icon: Users, href: '/teacher/my-class' },
+      { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
+      { label: 'Result Verification', icon: GraduationCap, href: '/examinations' },
+    ] },
+    { group: 'Account', icon: Settings, items: [
+      { label: 'My HR & Payslips', icon: WalletCards, href: '/my/hr' },
+      { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
+    ] },
+  ];
+  const accessMenu = roleMenuConfig.ADMIN?.find((group) => group.group === 'People & Access');
+  if (accessMenu && !accessMenu.items.some((item) => item.href === '/dashboard/admin/roles')) {
+    accessMenu.items.push({ label: 'Assigned Responsibilities', icon: ShieldCheck, href: '/dashboard/admin/roles', permission: 'staffing.manage' });
+  }
+
   let groupedItems = organizeNavigation((roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] })));
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
@@ -509,8 +529,11 @@ const DashboardLayout = ({ children, role }) => {
     SCHOOL_OWNER: '/dashboard/school/profile',
     PRINCIPAL: '/examinations',
     EXAM_COORDINATOR: '/examinations',
+    EXAM_CONTROLLER: '/examinations',
     ADMIN: '/dashboard/admin/profile',
     TEACHER: '/dashboard/teacher/profile',
+    CLASS_TEACHER: '/dashboard/class-teacher',
+    HR_MANAGER: '/dashboard/hr',
     PARENT: '/dashboard/parent/profile',
     STUDENT: '/dashboard/student/profile',
     STAFF: '/dashboard/staff/profile',
@@ -624,6 +647,7 @@ const DashboardLayout = ({ children, role }) => {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-3">
+            <RoleSwitcher />
             <ThemeToggle />
 
             <NotificationCenter enabled={role !== 'PLATFORM_OWNER'} />

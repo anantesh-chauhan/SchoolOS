@@ -67,6 +67,10 @@ model User {
   securitySetupCompletedAt    DateTime?
   recoveryEnabled             Boolean   @default(false)
   sessionVersion              Int       @default(0)
+  lastActiveRoleId            String?
+  roleAssignments             UserSchoolRole[]
+  workspaceAuditEvents        WorkspaceAuditLog[]
+  authSessions                AuthSession[]
 
   @@unique([schoolId, employeeId])
   @@index([email])
@@ -74,6 +78,105 @@ model User {
   @@index([schoolId, role])
   @@index([classId])
   @@index([sectionId])
+}
+
+// A user's responsibilities are independent workspaces. User.role remains
+// temporarily for repeat-safe migration and compatibility with old clients.
+model UserSchoolRole {
+  id            String      @id @default(cuid())
+  userId        String
+  schoolId      String
+  role          Role
+  isActive      Boolean     @default(true)
+  isDefault     Boolean     @default(false)
+  validFrom     DateTime?
+  validUntil    DateTime?
+  assignmentNotes String?
+  assignedById  String?
+  updatedById   String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school        School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  scopes        RoleScope[]
+
+  @@unique([userId, schoolId, role])
+  @@index([userId, schoolId, isActive])
+  @@index([schoolId, role, isActive])
+}
+
+model RoleScope {
+  id               String   @id @default(cuid())
+  roleAssignmentId String
+  scopeType         String
+  classId           String?
+  sectionId         String?
+  subjectId         String?
+  sessionId         String?
+  examinationId     String?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  roleAssignment     UserSchoolRole @relation(fields: [roleAssignmentId], references: [id], onDelete: Cascade)
+
+  @@index([roleAssignmentId, scopeType])
+  @@index([classId, sectionId, subjectId])
+}
+
+model WorkspaceAuditLog {
+  id               String   @id @default(cuid())
+  userId           String
+  schoolId         String
+  activeRole        Role
+  roleAssignmentId String?
+  action            String
+  entityType        String?
+  entityId          String?
+  oldValue          Json?
+  newValue          Json?
+  reason            String?
+  ipAddress         String?
+  userAgent         String?
+  sessionId         String?
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([userId, roleAssignmentId, createdAt])
+  @@index([action, entityType, entityId])
+}
+
+model SeparationOfDutiesPolicy {
+  id                    String   @id @default(cuid())
+  schoolId              String   @unique
+  mode                  String   @default("STRICT")
+  principalApprovalRequired Boolean @default(false)
+  workflows             Json?
+  updatedById           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  school                School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id               String   @id
+  userId           String
+  schoolId         String?
+  roleAssignmentId String?
+  refreshTokenHash String
+  tokenVersion     Int      @default(1)
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime @default(now())
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
 }
 
 // School Model
@@ -92,6 +195,9 @@ model School {
   theme                      Json?
   config                     Json?
   users                      User[]
+  userSchoolRoles            UserSchoolRole[]
+  workspaceAuditEvents       WorkspaceAuditLog[]
+  separationOfDutiesPolicy   SeparationOfDutiesPolicy?
   classes                    Class[]
   sections                   Section[]
   subjects                   Subject[]
@@ -4600,14 +4706,17 @@ enum Role {
   SCHOOL_OWNER
   PRINCIPAL
   EXAM_COORDINATOR
+  EXAM_CONTROLLER
   ADMIN
   TEACHER
+  CLASS_TEACHER
   PARENT
   STUDENT
   STAFF
   CURRICULUM_MANAGER
   FEE_MANAGER
   HR
+  HR_MANAGER
 }
 
 enum ExaminationStatus {

@@ -28,7 +28,7 @@ export const assertSameSchool = (user, schoolId) => {
 export const isSchoolAdmin = (user) => ['ADMIN', 'SCHOOL_OWNER'].includes(user?.role);
 
 export const getTeacherForUser = async (user) => {
-  if (user?.role !== 'TEACHER' || !user.schoolId) {
+  if (!['TEACHER', 'CLASS_TEACHER'].includes(user?.role) || !user.schoolId) {
     return null;
   }
 
@@ -112,7 +112,7 @@ export const requireSchoolAdminOrClassTeacher = async (user, params) => {
     return { allowed: true, teacher: null, assignment: null, isAdmin: true };
   }
 
-  if (user?.role !== 'TEACHER') {
+  if (!['TEACHER', 'CLASS_TEACHER'].includes(user?.role)) {
     throw new AuthorizationError('Only school admins or class teachers can access attendance.', 403);
   }
 
@@ -125,7 +125,7 @@ export const requireSchoolAdminOrAssignedTeacherForSection = async (user, { scho
     assertSameSchool(user, schoolId);
     return { allowed: true, isAdmin: true, canMark: true };
   }
-  if (user?.role !== 'TEACHER') throw new AuthorizationError('Only school admins or assigned teachers can view this attendance.', 403);
+  if (!['TEACHER', 'CLASS_TEACHER'].includes(user?.role)) throw new AuthorizationError('Only school admins or assigned teachers can view this attendance.', 403);
   assertSameSchool(user, schoolId);
   const teacher = await getTeacherForUser(user);
   if (!teacher) throw new AuthorizationError('Teacher profile not found for this user.', 403);
@@ -145,7 +145,7 @@ export const canManageSectionSubject = async (user, params) => {
 };
 
 export const requireSchoolAdminOrAssignedTeacher = async (user, params) => {
-  if (!isSchoolAdmin(user) && user?.role !== 'TEACHER') {
+  if (!isSchoolAdmin(user) && !['TEACHER', 'CLASS_TEACHER'].includes(user?.role)) {
     throw new AuthorizationError('Only school admins or assigned teachers can manage this data.', 403);
   }
 

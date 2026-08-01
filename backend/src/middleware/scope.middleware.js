@@ -35,7 +35,7 @@ export const requireSelfAccess = ({ param = 'id', allowSchoolScope = true } = {}
   const targetId = req.params?.[param] || req.body?.[param] || req.query?.[param];
   const ownIds = new Set([req.user?.id, req.user?.studentId].filter(Boolean));
   if (ownIds.has(targetId)) return next();
-  if (allowSchoolScope && !['STUDENT', 'PARENT', 'TEACHER', 'STAFF'].includes(req.user?.role)) return next();
+  if (allowSchoolScope && !['STUDENT', 'PARENT', 'TEACHER', 'CLASS_TEACHER', 'STAFF'].includes(req.user?.role)) return next();
   return forbidden(res, 'You can access only your own record.', 'SELF_SCOPE_FORBIDDEN');
 };
 
@@ -90,7 +90,7 @@ export const requireStudentAccess = (permission, { param = 'id' } = {}) => async
     req.authorizedStudent = student;
     return next();
   }
-  if (scopes.includes(SCOPES.ASSIGNED) && req.user.role === 'TEACHER') {
+  if (scopes.includes(SCOPES.ASSIGNED) && ['TEACHER', 'CLASS_TEACHER'].includes(req.user.role)) {
     const teacher = await getTeacherForUser(req.user);
     const assignment = teacher && await prisma.teacherAssignment.findFirst({
       where: {
@@ -113,7 +113,7 @@ export const requireStudentAccess = (permission, { param = 'id' } = {}) => async
 
 export const requireAssignedClass = ({ classParam = 'classId', sectionParam = 'sectionId' } = {}) =>
   async (req, res, next) => {
-    if (req.user?.role !== 'TEACHER') return next();
+    if (!['TEACHER', 'CLASS_TEACHER'].includes(req.user?.role)) return next();
     const teacher = await getTeacherForUser(req.user);
     const classId = req.params?.[classParam] || req.body?.[classParam] || req.query?.[classParam];
     const sectionId = req.params?.[sectionParam] || req.body?.[sectionParam] || req.query?.[sectionParam];
@@ -131,7 +131,7 @@ export const requireAssignedClass = ({ classParam = 'classId', sectionParam = 's
 
 export const requireAssignedSubject = ({ subjectParam = 'subjectId' } = {}) =>
   async (req, res, next) => {
-    if (req.user?.role !== 'TEACHER') return next();
+    if (!['TEACHER', 'CLASS_TEACHER'].includes(req.user?.role)) return next();
     const teacher = await getTeacherForUser(req.user);
     const subjectId = req.params?.[subjectParam] || req.body?.[subjectParam] || req.query?.[subjectParam];
     const assignment = teacher && await prisma.teacherAssignment.findFirst({

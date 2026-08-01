@@ -23,3 +23,12 @@ export const clearPrivateClientState = () => {
   queryClient.cancelQueries();
   queryClient.clear();
 };
+
+export const workspaceQueryKey = (...parts) => {
+  let assignmentId = 'public';
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    assignmentId = user?.activeRoleAssignmentId || user?.activeRole?.assignmentId || user?.role || 'public';
+  } catch { assignmentId = 'unknown'; }
+  return ['workspace', assignmentId, ...parts];
+};

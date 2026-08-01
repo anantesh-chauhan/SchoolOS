@@ -6,14 +6,25 @@ const roleRoutes = {
   SCHOOL_OWNER: '/dashboard/school',
   PRINCIPAL: '/examinations',
   EXAM_COORDINATOR: '/examinations',
+  EXAM_CONTROLLER: '/examinations',
   ADMIN: '/dashboard/admin',
   TEACHER: '/dashboard/teacher',
+  CLASS_TEACHER: '/dashboard/class-teacher',
   PARENT: '/dashboard/parent',
   STUDENT: '/dashboard/student',
   STAFF: '/dashboard/staff',
   CURRICULUM_MANAGER: '/dashboard/curriculum',
   FEE_MANAGER: '/dashboard/fees',
   HR: '/dashboard/hr',
+  HR_MANAGER: '/dashboard/hr',
+};
+
+const persistSession = ({ token, accessToken, refreshToken, user }) => {
+  localStorage.setItem('authToken', accessToken || token);
+  localStorage.setItem('refreshToken', refreshToken);
+  localStorage.setItem('user', JSON.stringify(user));
+  window.dispatchEvent(new CustomEvent('schoolos:workspace-changed', { detail: user }));
+  return { token: accessToken || token, refreshToken, user };
 };
 
 export const authService = {
@@ -31,11 +42,7 @@ export const authService = {
       const { token, accessToken, refreshToken, user } = response.data.data;
       
       // Store token and user in localStorage
-      localStorage.setItem('authToken', accessToken || token);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      return { token: accessToken || token, refreshToken, user };
+      return persistSession({ token, accessToken, refreshToken, user });
     } catch (error) {
       throw error.response?.data || error;
     }
@@ -96,6 +103,22 @@ export const authService = {
     }
   },
 
+  switchRole: async (roleAssignmentId, { setDefault = false } = {}) => {
+    try {
+      const response = await apiClient.post('/auth/switch-role', { roleAssignmentId, setDefault });
+      const session = persistSession(response.data.data);
+      clearPrivateClientState();
+      return { ...session, message: response.data.message };
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  },
+
+  getPostLoginRoute: (user) => {
+    if (user?.requiresWorkspaceSelection && user?.availableRoles?.length > 1) return '/choose-workspace';
+    return roleRoutes[String(user?.role || user?.activeRole?.role || '').trim().toUpperCase()] || '/login';
+  },
+
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     try {
@@ -143,10 +166,7 @@ export const authService = {
     try {
       const response = await apiClient.post('/auth/instant-login', { accountKey });
       const { token, accessToken, refreshToken, user } = response.data.data;
-      localStorage.setItem('authToken', accessToken || token);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-      return { token: accessToken || token, refreshToken, user };
+      return persistSession({ token, accessToken, refreshToken, user });
     } catch (error) {
       throw error.response?.data || error;
     }

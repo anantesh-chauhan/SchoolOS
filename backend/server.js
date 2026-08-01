@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prisma from './src/config/prisma.client.js';
 import authRoutes from './src/routes/auth.js';
+import roleManagementRoutes from './src/routes/roleManagement.js';
 import schoolRoutes from './src/routes/schools.js';
 import classRoutes from './src/routes/classes.js';
 import sectionRoutes from './src/routes/sections.js';
@@ -163,6 +164,7 @@ app.get('/api/health', async (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/role-management', roleManagementRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/school', schoolRoutes);
 app.use('/api/schools', schoolRoutes);

@@ -6,14 +6,17 @@ const VALID_ROLES = new Set([
   'SCHOOL_OWNER',
   'PRINCIPAL',
   'EXAM_COORDINATOR',
+  'EXAM_CONTROLLER',
   'ADMIN',
   'TEACHER',
+  'CLASS_TEACHER',
   'PARENT',
   'STUDENT',
   'STAFF',
   'CURRICULUM_MANAGER',
   'FEE_MANAGER',
   'HR',
+  'HR_MANAGER',
 ]);
 
 // Verify JWT token middleware
@@ -55,7 +58,51 @@ export const authMiddleware = async (req, res, next) => {
     if (decoded.role !== 'PLATFORM_OWNER' && account.school?.status !== 'ACTIVE') {
       return res.status(403).json({ success: false, message: 'School access is inactive', code: 'SCHOOL_INACTIVE' });
     }
+
+    if (decoded.sessionId && decoded.roleAssignmentId) {
+      const session = await prisma.authSession.findFirst({
+        where: {
+          id: decoded.sessionId,
+          userId: decoded.id,
+          roleAssignmentId: decoded.roleAssignmentId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+          tokenVersion: decoded.tokenVersion || 1,
+        },
+        select: { id: true },
+      });
+      if (!session) {
+        return res.status(401).json({ success: false, message: 'Session is no longer valid', code: 'SESSION_REVOKED' });
+      }
+    }
     
+    if (decoded.roleAssignmentId) {
+      const now = new Date();
+      const assignment = await prisma.userSchoolRole.findFirst({
+        where: {
+          id: decoded.roleAssignmentId,
+          userId: decoded.id,
+          schoolId: decoded.schoolId,
+          role: decoded.activeRole || decoded.role,
+          isActive: true,
+          AND: [
+            { OR: [{ validFrom: null }, { validFrom: { lte: now } }] },
+            { OR: [{ validUntil: null }, { validUntil: { gt: now } }] },
+          ],
+        },
+        select: { id: true, role: true },
+      });
+      if (!assignment) {
+        return res.status(401).json({
+          success: false,
+          message: 'This workspace is no longer available',
+          code: 'ROLE_REVOKED',
+        });
+      }
+      decoded.role = assignment.role;
+      decoded.activeRole = assignment.role;
+    }
+
     req.user = decoded;
     next();
   } catch (error) {
@@ -78,7 +125,10 @@ export const requireRole = (...allowedRoles) => {
       });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const compatibleRole = req.user.role === 'EXAM_CONTROLLER'
+      ? 'EXAM_COORDINATOR'
+      : req.user.role === 'HR_MANAGER' ? 'HR' : req.user.role;
+    if (!allowedRoles.includes(req.user.role) && !allowedRoles.includes(compatibleRole)) {
       return res.status(403).json({
         success: false,
         message: `Forbidden for role ${req.user.role}`,

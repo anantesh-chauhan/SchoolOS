@@ -127,7 +127,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
 
 export const markStudentAttendance = async (req, res) => {
   try {
-    if (!['TEACHER', 'ADMIN', 'SCHOOL_OWNER'].includes(req.user.role)) {
+    if (!['TEACHER', 'CLASS_TEACHER', 'ADMIN', 'SCHOOL_OWNER'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Only the class teacher or school administration can mark student attendance' });
     }
 

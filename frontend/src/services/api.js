@@ -74,6 +74,13 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    if (['ROLE_REVOKED', 'SESSION_REVOKED'].includes(error.response?.data?.code)) {
+      const reason = error.response.data.code === 'ROLE_REVOKED' ? '?reason=role-revoked' : '';
+      clearSession();
+      window.location.href = `/session-expired${reason}`;
+      return Promise.reject(error);
+    }
+
     if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
