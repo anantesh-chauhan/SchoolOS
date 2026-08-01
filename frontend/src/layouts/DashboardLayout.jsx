@@ -13,7 +13,6 @@ import {
   Monitor,
   Moon,
   School,
-  Search,
   Settings,
   Shapes,
   Sun,
@@ -29,6 +28,7 @@ import {
   Briefcase,
   WalletCards,
   Activity,
+  Compass,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -40,6 +40,7 @@ import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
 import ReportIssueButton from '../components/issue-report/ReportIssueButton';
 import { filterNavigation } from '../security/permissions';
+import GlobalNavigator from '../components/navigation/GlobalNavigator';
 
 
 const themeOptions = [
@@ -47,6 +48,60 @@ const themeOptions = [
   { value: 'dark', label: 'Dark', icon: Moon },
   { value: 'system', label: 'System', icon: Monitor },
 ];
+
+const navigationSubgroup = (group, label) => {
+  const rules = {
+    'People & Access': [
+      [['Students', 'Student Allocation'], 'Students & parents'],
+      [['Teachers', 'Teacher Summary'], 'Teachers'],
+      [['User Accounts', 'Login Credentials'], 'Accounts & access'],
+    ],
+    'Classes & Timetable': [
+      [['Classes', 'Sections', 'Subjects'], 'Academic structure'],
+      [['Subject Assignment', 'Teacher Assignment', 'Class Teachers'], 'Teaching assignments'],
+      [['Weekly Slots', 'Timetable Builder', 'Timetable Audit'], 'Schedule'],
+    ],
+    'Attendance & Calendar': [
+      [['Attendance Dashboard', 'Student Attendance', 'Teacher Attendance', 'Class Attendance', 'My Attendance'], 'Attendance'],
+      [['Academic Calendar', 'Attendance Rules', 'Request Correction'], 'Calendar & requests'],
+    ],
+    'Learning & Resources': [
+      [['Homework & Resources', 'My Classes & Subjects'], 'Learning'],
+      [['Academic Progress', 'Academic Analytics', 'School Analytics', 'Analytics Settings'], 'Progress & insights'],
+    ],
+    'Teaching & Resources': [
+      [['My Classes & Subjects', 'Homework & Resources'], 'My teaching'],
+      [['Student Performance', 'Academic Analytics'], 'Student insights'],
+    ],
+    'Polls & Feedback': [
+      [['Feedback Dashboard', 'Poll Management', 'Assigned Polls', 'Pending & Drafts', 'Pending Polls'], 'Active workflow'],
+      [['Submitted Feedback', 'Submitted Polls', 'Student Insights', 'School Feedback Analytics'], 'History & insights'],
+    ],
+    'Fees & Finance': [
+      [['Fee Dashboard', 'Children Fees', 'Family Fee Summary'], 'Overview'],
+      [['Fee Masters & Records', 'Create Fee Structure'], 'Setup'],
+      [['Collect Fee', 'Reports & Operations'], 'Collection & reports'],
+    ],
+    System: [
+      [['My Profile'], 'Personal'],
+      [['Gallery Studio', 'Gallery', 'Widget Hub'], 'School tools'],
+    ],
+    Account: [
+      [['My Profile', 'My HR & Payslips'], 'Personal'],
+      [['Gallery', 'Widget Hub'], 'School tools'],
+    ],
+    Academics: [
+      [['My Subjects', 'Homework & Resources'], 'Learning'],
+      [['My Performance', 'Academic Analytics'], 'Progress'],
+    ],
+  };
+  return rules[group]?.find(([labels]) => labels.includes(label))?.[1] || '';
+};
+
+const organizeNavigation = (groups) => groups.map((group) => ({
+  ...group,
+  items: group.items.map((item) => ({ ...item, subgroup: item.subgroup || navigationSubgroup(group.group, item.label) })),
+}));
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -133,7 +188,10 @@ const DashboardLayout = ({ children, role }) => {
       { group:'Support & Quality', icon:MessageSquare, items:[{label:'Issue Reports',icon:MessageSquare,href:'/platform/issues'},{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] },
     ],
     SCHOOL_OWNER: [
-      { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/school' }] },
+      { group: 'Overview', icon: Home, items: [
+        { label: 'Dashboard', icon: Home, href: '/dashboard/school' },
+        { label: 'Browse School', icon: Compass, href: '/dashboard/admin/directory' },
+      ] },
       { group: 'School Identity', icon: Settings, items: [
         { label: 'Theme & Branding', icon: Settings, href: '/dashboard/school/settings' },
       ] },
@@ -196,6 +254,7 @@ const DashboardLayout = ({ children, role }) => {
     ADMIN: [
       { group: 'Overview', icon: Home, items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/admin' },
+          { label: 'Browse School', icon: Compass, href: '/dashboard/admin/directory' },
         ],
       },
       { group: 'People & Access', icon: Users, items: [
@@ -284,6 +343,8 @@ const DashboardLayout = ({ children, role }) => {
     FEE_MANAGER: [
       { group: 'Fee Operations', icon: BadgeIndianRupee, 
         items: [{ label: 'Fee Dashboard', icon: Home, href: '/dashboard/fees' },
+           { label: 'Create Fee Structure', icon: Plus, href: '/dashboard/fees/structures/new' },
+           { label: 'Fee Masters & Transport', icon: Layers, href: '/dashboard/fees/administration' },
            { label: 'Collect Fee', icon: BadgeIndianRupee, href: '/dashboard/fees/collect' },
             { label: 'Closing & Reports', icon: ClipboardCheck, href: '/dashboard/fees/operations' },
              { label: 'My Profile', icon: UserRound, href: '/dashboard/fee-manager/profile' }] },
@@ -304,6 +365,7 @@ const DashboardLayout = ({ children, role }) => {
       },
       { group: 'Class Management', icon: Users, items: [
           { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
+          { label: 'Class Fee Status', icon: BadgeIndianRupee, href: '/teacher/fees' },
         ],
       },
       { group: 'Polls & Feedback', icon: MessageSquare, items: [
@@ -407,7 +469,7 @@ const DashboardLayout = ({ children, role }) => {
     ],
   };
 
-  let groupedItems = (roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] }));
+  let groupedItems = organizeNavigation((roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] })));
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
   if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
   groupedItems = filterNavigation(groupedItems, user);
@@ -522,12 +584,8 @@ const DashboardLayout = ({ children, role }) => {
               ))}
             </div>
 
-            <div className="relative hidden sm:block w-72">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                placeholder="Search classes, sections, subjects..."
-                className="h-10 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-sm transition-colors focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
-              />
+            <div className="hidden sm:block">
+              <GlobalNavigator groups={groupedItems} />
             </div>
 
           </div>
@@ -592,12 +650,8 @@ const DashboardLayout = ({ children, role }) => {
 
             <div className="mb-3 sm:hidden">
               <p className="text-xs text-[var(--text-muted)]">{breadcrumb.join(' / ')}</p>
-              <div className="mt-2 relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  placeholder="Search classes, sections, subjects..."
-                  className="h-10 w-full rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-base)] pl-9 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] shadow-sm transition-colors focus:border-[var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--school-focus-rgb)/0.2)]"
-                />
+              <div className="mt-2">
+                <GlobalNavigator groups={groupedItems} compact />
               </div>
             </div>
 

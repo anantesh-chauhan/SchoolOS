@@ -15,8 +15,16 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed, onNavigate })
 
   const isActiveGroup = group.items.some((item) => {
     if (!item.href) return false;
-    return path === item.href || path.startsWith(item.href);
+    const itemPath = item.href.split(/[?#]/)[0];
+    return path === itemPath || (itemPath !== '/' && path.startsWith(`${itemPath}/`));
   });
+  const subgroupedItems = group.items.reduce((sections, item) => {
+    const label = item.subgroup || '';
+    const last = sections[sections.length - 1];
+    if (!last || last.label !== label) sections.push({ label, items: [item] });
+    else last.items.push(item);
+    return sections;
+  }, []);
   return (
     <div className="rounded-xl">
       <button
@@ -48,9 +56,18 @@ const SidebarGroup = ({ group, isOpen, onToggle, desktopCollapsed, onNavigate })
             transition={{ type: 'tween', duration: 0.22 }}
             className="mt-2 px-1"
           >
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <SidebarItem key={item.href + item.label} item={item} desktopCollapsed={desktopCollapsed} onNavigate={onNavigate} />
+            <div className="space-y-3">
+              {subgroupedItems.map((section) => (
+                <div key={section.label || 'main'} className="space-y-1">
+                  {!desktopCollapsed && section.label && (
+                    <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      {section.label}
+                    </p>
+                  )}
+                  {section.items.map((item) => (
+                    <SidebarItem key={item.href + item.label} item={item} desktopCollapsed={desktopCollapsed} onNavigate={onNavigate} />
+                  ))}
+                </div>
               ))}
             </div>
           </motion.div>

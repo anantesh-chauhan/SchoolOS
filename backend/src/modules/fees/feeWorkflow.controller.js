@@ -67,9 +67,15 @@ export const recalculateLateFees = wrap(async (req, res) =>
 export const transportRoutes = wrap(async (req, res) =>
   send(res, await service.listTransportRoutes(req.user)),
 );
+export const transportAssignments = wrap(async (req, res) =>
+  send(res, await service.listTransportAssignments(req.user, req.query)),
+);
 export const createTransportRoute = wrap(async (req, res) =>
   send(res, await service.createTransportRoute(req, req.body), 201),
 );
 export const assignTransport = wrap(async (req, res) =>
   send(res, await service.assignTransport(req, req.body), 201),
+);
+export const cancelTransport = wrap(async (req, res) =>
+  send(res, await service.cancelTransport(req, req.params.id, req.body)),
 );

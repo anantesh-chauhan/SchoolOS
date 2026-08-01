@@ -8,33 +8,38 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { authService } from '../../services/authService';
 import { API_BASE_URL } from '../../services/api';
+import { useSearchParams } from 'react-router-dom';
 
 export default function TeacherAssignmentSummaryPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [classId, setClassId] = useState('');
   const [sectionId, setSectionId] = useState('');
-  const [teacherId, setTeacherId] = useState('');
+  const [teacherId, setTeacherId] = useState(() => searchParams.get('teacherId') || '');
+  const [subjectId, setSubjectId] = useState(() => searchParams.get('subjectId') || '');
   const academicStructure = useAcademicStructure();
 
   const teachersQuery = useQuery({ queryKey: ['teachers', 'lookup'], queryFn: () => teacherService.list({ page: 1, limit: 1000 }) });
 
   const summaryQuery = useQuery({
-    queryKey: ['teacher-assignment-summary', classId, sectionId, teacherId],
-    queryFn: () => teacherService.summary({ classId, sectionId, teacherId }),
+    queryKey: ['teacher-assignment-summary', classId, sectionId, teacherId, subjectId],
+    queryFn: () => teacherService.summary({ classId, sectionId, teacherId, subjectId }),
   });
 
   const rows = summaryQuery.data?.data || [];
   const classes = academicStructure.classes;
   const sections = academicStructure.getSections(classId);
   const teachers = teachersQuery.data?.data || [];
+  const subjects = academicStructure.subjects;
 
   const exportUrl = useMemo(() => {
     const params = new URLSearchParams();
     if (classId) params.append('classId', classId);
     if (sectionId) params.append('sectionId', sectionId);
     if (teacherId) params.append('teacherId', teacherId);
+    if (subjectId) params.append('subjectId', subjectId);
     params.append('exportFormat', 'csv');
     return `${API_BASE_URL}/teachers/assignments/summary?${params.toString()}`;
-  }, [classId, sectionId, teacherId]);
+  }, [classId, sectionId, teacherId, subjectId]);
 
   const exportCsv = async () => {
     const token = authService.getToken();
@@ -82,7 +87,7 @@ export default function TeacherAssignmentSummaryPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
               <select
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
                 value={classId}
@@ -112,11 +117,34 @@ export default function TeacherAssignmentSummaryPage() {
               <select
                 className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
                 value={teacherId}
-                onChange={(event) => setTeacherId(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setTeacherId(value);
+                  const next = new URLSearchParams(searchParams);
+                  if (value) next.set('teacherId', value); else next.delete('teacherId');
+                  setSearchParams(next, { replace: true });
+                }}
               >
                 <option value="">Filter by teacher</option>
                 {teachers.map((row) => (
                   <option key={row.id} value={row.id}>{row.teacherName}</option>
+                ))}
+              </select>
+
+              <select
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm"
+                value={subjectId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSubjectId(value);
+                  const next = new URLSearchParams(searchParams);
+                  if (value) next.set('subjectId', value); else next.delete('subjectId');
+                  setSearchParams(next, { replace: true });
+                }}
+              >
+                <option value="">Filter by subject</option>
+                {subjects.map((row) => (
+                  <option key={row.id} value={row.id}>{row.subjectName} ({row.subjectCode})</option>
                 ))}
               </select>
             </div>

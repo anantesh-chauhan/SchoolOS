@@ -22,12 +22,13 @@ const Sidebar = ({ groupedItems = [], desktopCollapsed, setDesktopCollapsed, use
     const matched = groupedItems.find((g) =>
       g.items.some((item) => {
         if (!item.href) return false;
+        const itemPath = item.href.split(/[?#]/)[0];
         // Exact match or parent path match
-        if (path === item.href) return true;
+        if (path === itemPath) return true;
         // If the configured href is a prefix of the path
-        if (path.startsWith(item.href)) return true;
+        if (itemPath !== '/' && path.startsWith(`${itemPath}/`)) return true;
         // If the path is a shorter prefix of the href (rare)
-        if (item.href.startsWith(path)) return true;
+        if (itemPath.startsWith(path)) return true;
         return false;
       })
     );

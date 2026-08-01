@@ -716,6 +716,23 @@ export const listTransportRoutes = (user) =>
     orderBy: { name: "asc" },
   });
 
+export const listTransportAssignments = (user, query = {}) =>
+  prisma.transportFeeAssignment.findMany({
+    where: {
+      schoolId: tenant(user),
+      ...(query.academicSession ? { academicSession: String(query.academicSession) } : {}),
+      ...(query.status ? { status: String(query.status) } : {}),
+    },
+    include: {
+      student: { select: { id: true, studentFirstName: true, studentLastName: true, admissionNo: true, className: true, section: true } },
+      route: { select: { id: true, name: true, code: true } },
+      pickupStop: { select: { id: true, name: true } },
+      dropStop: { select: { id: true, name: true } },
+    },
+    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    take: 250,
+  });
+
 export const recalculateLateFees = (req, body) =>
   prisma.$transaction(async (tx) => {
     const schoolId = tenant(req.user);
@@ -933,7 +950,7 @@ export const assignTransport = (req, body) =>
     const structureCode = `TR-${student.id.slice(-8)}-${Date.now().toString(36)}`.toUpperCase();
     const category = await tx.feeCategory.findFirst({ where: { schoolId, code: "TRANSPORT", active: true } });
     const structure = await tx.feeStructure.create({ data: { schoolId, academicSession, name: `${route.name} · ${student.studentFirstName}`, code: structureCode, mode: "COMPONENT_BASED", status: "PUBLISHED", version: 1, publishedAt: new Date(), createdById: req.user.id, approvedById: req.user.id, changeReason: "Effective-dated student transport assignment", components: { create: { schoolId, academicSession, categoryId: category?.id, name: "Transport Fee", code: "TRANSPORT", feeType: "TRANSPORT", amountMinor: monthlyMinor, frequency: "MONTHLY", dueDay: 7, mandatory: false, createdById: req.user.id } } }, include: { components: true } });
-    await tx.feeAssignment.create({ data: { schoolId, academicSession, feeStructureId: structure.id, studentId: student.id, targetType: "STUDENT", priority: 100, effectiveFrom: startDate, effectiveTo: endDate, createdById: req.user.id } });
+    await tx.feeAssignment.create({ data: { schoolId, academicSession, feeStructureId: structure.id, studentId: student.id, targetType: "TRANSPORT", targetValue: route.id, priority: 50, effectiveFrom: startDate, effectiveTo: endDate, createdById: req.user.id } });
     const account = await tx.studentFeeAccount.upsert({ where: { schoolId_studentId_academicSession: { schoolId, studentId: student.id, academicSession } }, create: { schoolId, studentId: student.id, academicSession }, update: {} });
     const sessionStartYear = Number(academicSession.slice(0, 4)); const sessionEnd = Number.isInteger(sessionStartYear) ? new Date(Date.UTC(sessionStartYear + 1, 2, 31)) : new Date(Date.UTC(startDate.getUTCFullYear() + 1, 2, 31)); const billingEnd = endDate && endDate < sessionEnd ? endDate : sessionEnd; const component = structure.components[0]; let cursor = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), 1)); let installments = 0;
     while (cursor <= billingEnd) { const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 0)); const effectiveStart = cursor < startDate ? startDate : cursor; const effectiveEnd = monthEnd > billingEnd ? billingEnd : monthEnd; const totalDays = monthEnd.getUTCDate(); const activeDays = Math.max(0, Math.floor((effectiveEnd - effectiveStart) / 86400000) + 1); const amount = body.prorationRule === "NONE" ? monthlyMinor : (monthlyMinor * BigInt(activeDays)) / BigInt(totalDays); if (amount > 0n) { const dueDate = new Date(effectiveStart); dueDate.setUTCHours(0, 0, 0, 0); const installmentName = `${cursor.toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" })} Transport`; const charge = await tx.studentFeeCharge.create({ data: { schoolId, studentId: student.id, feeAccountId: account.id, feeStructureId: structure.id, feeComponentId: component.id, academicSession, installmentName, dueDate, baseAmountMinor: amount, status: dueDate < new Date() ? "OVERDUE" : "UPCOMING", calculationSnapshot: { routeId: route.id, routeCode: route.code, pickupStopId: body.pickupStopId || null, dropStopId: body.dropStopId || null, tripType: body.tripType || "TWO_WAY", prorationRule: body.prorationRule || "DAILY", activeDays, totalDays } } }); runningBalance += amount; await tx.feeLedgerEntry.create({ data: { schoolId, studentId: student.id, feeAccountId: account.id, academicSession, entryType: "CHARGE", referenceType: "StudentFeeCharge", referenceId: charge.id, referenceNumber: component.code, description: installmentName, debitMinor: amount, balanceMinor: runningBalance, createdById: req.user.id } }); installments += 1; } cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)); }
@@ -946,4 +963,37 @@ export const assignTransport = (req, body) =>
       { ...assignment, installmentsGenerated: installments },
     );
     return { assignment, installmentsGenerated: installments };
-  });
+  }, { isolationLevel: "Serializable", maxWait: 10000, timeout: 120000 });
+
+export const cancelTransport = (req, id, body = {}) =>
+  prisma.$transaction(async (tx) => {
+    const schoolId = tenant(req.user);
+    const reason = required(body.reason, "reason", 500);
+    const effectiveDate = body.effectiveDate ? new Date(body.effectiveDate) : new Date();
+    if (Number.isNaN(effectiveDate.getTime())) throw Object.assign(new Error("effectiveDate is invalid"), { status: 400 });
+    const assignment = await tx.transportFeeAssignment.findFirst({ where: { id, schoolId, status: "ACTIVE" } });
+    if (!assignment) throw Object.assign(new Error("Active transport assignment not found"), { status: 404 });
+    const feeAssignments = await tx.feeAssignment.findMany({
+      where: { schoolId, studentId: assignment.studentId, academicSession: assignment.academicSession, targetType: "TRANSPORT", targetValue: assignment.routeId, active: true },
+      select: { id: true, feeStructureId: true },
+    });
+    const structureIds = feeAssignments.map((row) => row.feeStructureId);
+    const charges = structureIds.length ? await tx.studentFeeCharge.findMany({
+      where: { schoolId, studentId: assignment.studentId, academicSession: assignment.academicSession, feeStructureId: { in: structureIds }, dueDate: { gte: effectiveDate }, paidMinor: 0, status: { in: ["UPCOMING", "DUE", "OVERDUE"] } },
+      orderBy: { dueDate: "asc" },
+    }) : [];
+    let cancelledCharges = 0;
+    for (const charge of charges) {
+      const creditMinor = calculateCharge(charge).payableMinor;
+      await tx.studentFeeCharge.update({ where: { id: charge.id }, data: { status: "CANCELLED" } });
+      if (creditMinor > 0n) {
+        const last = await tx.feeLedgerEntry.findFirst({ where: { feeAccountId: charge.feeAccountId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+        await tx.feeLedgerEntry.create({ data: { schoolId, studentId: assignment.studentId, feeAccountId: charge.feeAccountId, academicSession: assignment.academicSession, entryType: "CREDIT_NOTE", referenceType: "TransportCancellation", referenceId: charge.id, description: `Transport cancelled: ${charge.installmentName}`, creditMinor, balanceMinor: BigInt(last?.balanceMinor || 0) - creditMinor, createdById: req.user.id } });
+      }
+      cancelledCharges += 1;
+    }
+    await tx.feeAssignment.updateMany({ where: { id: { in: feeAssignments.map((row) => row.id) } }, data: { active: false, effectiveTo: effectiveDate } });
+    const result = await tx.transportFeeAssignment.update({ where: { id }, data: { status: "CANCELLED", endDate: effectiveDate, cancelledById: req.user.id, cancellationReason: reason } });
+    await audit(tx, req, "TRANSPORT_CANCELLED", "TransportFeeAssignment", id, { cancelledCharges, effectiveDate }, reason);
+    return { assignment: result, cancelledCharges };
+  }, { isolationLevel: "Serializable", maxWait: 10000, timeout: 120000 });

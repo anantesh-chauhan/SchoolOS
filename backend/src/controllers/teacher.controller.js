@@ -645,13 +645,14 @@ export const bulkUpsertTeacherAssignments = async (req, res) => {
 export const listTeacherAssignmentSummary = async (req, res) => {
   try {
     const schoolId = getScopedSchoolId(req.user, req.query.schoolId);
-    const { classId, sectionId, teacherId, exportFormat } = req.query;
+    const { classId, sectionId, teacherId, subjectId, exportFormat } = req.query;
 
     const where = {
       schoolId,
       ...(classId ? { classId } : {}),
       ...(sectionId ? { sectionId } : {}),
       ...(teacherId ? { teacherId } : {}),
+      ...(subjectId ? { subjectId } : {}),
     };
 
     const rows = await prisma.teacherAssignment.findMany({

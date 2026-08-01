@@ -9,7 +9,10 @@ const handler = (fn) => async (req, res) => { try { await fn(req, res); } catch 
 export const getSettings = handler(async (req, res) => send(res, await service.getSettings(req.user)));
 export const saveSettings = handler(async (req, res) => send(res, await service.saveSettings(req, validateSettings(req.body))));
 export const structures = handler(async (req, res) => send(res, await service.listStructures(req.user, req.query.academicSession)));
+export const structure = handler(async (req, res) => send(res, await service.getStructure(req.user, req.params.id)));
 export const createStructure = handler(async (req, res) => send(res, await service.createStructure(req, validateStructure(req.body)), 201));
+export const updateStructure = handler(async (req, res) => send(res, await service.updateDraftStructure(req, req.params.id, validateStructure(req.body))));
+export const reviseStructure = handler(async (req, res) => send(res, await service.reviseStructure(req, req.params.id, req.body.reason), 201));
 export const publishStructure = handler(async (req, res) => send(res, await service.publishStructure(req, req.params.id)));
 export const students = handler(async (req, res) => send(res, await service.searchStudents(req.user, String(req.query.q || '').trim())));
 export const hierarchy = handler(async (req, res) => send(res, await service.getFeeHierarchy(req.user, req.query.academicSession)));

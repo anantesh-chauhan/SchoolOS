@@ -38,8 +38,58 @@ export const validateSettings = (body = {}) => ({
   ),
 });
 
-export const validateStructure = (body = {}) => ({
-  academicSession: text(body.academicSession, "academicSession", 20),
+const feeFrequencies = new Set([
+  "ONE_TIME", "MONTHLY", "BI_MONTHLY", "QUARTERLY", "FOUR_MONTHLY",
+  "HALF_YEARLY", "ANNUAL", "PER_TERM", "PER_SEMESTER", "PER_EXAMINATION",
+  "PER_ACTIVITY", "PER_TRIP", "PER_SERVICE", "CUSTOM",
+]);
+
+const validateApplicability = (value, index) => {
+  if (!value) return undefined;
+  const months = Array.isArray(value.months)
+    ? [...new Set(value.months.map(Number))]
+    : [];
+  if (months.some((month) => !Number.isInteger(month) || month < 1 || month > 12))
+    throw new Error(`components[${index}].months must contain calendar months from 1 to 12`);
+  if (value.monthAmountsMinor && typeof value.monthAmountsMinor !== "object")
+    throw new Error(`components[${index}].monthAmountsMinor must be an object`);
+  const monthAmountsMinor = Object.fromEntries(Object.entries(value.monthAmountsMinor || {}).map(([month, amount]) => {
+    if (!months.includes(Number(month)) || !Number.isSafeInteger(amount) || amount < 0)
+      throw new Error(`components[${index}] contains an invalid month-specific amount`);
+    return [String(Number(month)), amount];
+  }));
+  return { ...value, months, monthAmountsMinor };
+};
+
+export const validateStructure = (body = {}) => {
+  const academicSession = text(body.academicSession, "academicSession", 20);
+  if (!/^\d{4}-\d{2,4}$/.test(academicSession))
+    throw new Error("academicSession must use a format such as 2026-27");
+  const components = (body.components || []).map((component, index) => {
+    const frequency = component.frequency || "ONE_TIME";
+    if (!feeFrequencies.has(frequency)) throw new Error(`components[${index}].frequency is unsupported`);
+    if (component.dueDay != null && (!Number.isInteger(component.dueDay) || component.dueDay < 1 || component.dueDay > 28))
+      throw new Error(`components[${index}].dueDay must be between 1 and 28`);
+    return {
+      name: text(component.name, `components[${index}].name`),
+      code: text(component.code, `components[${index}].code`, 40).toUpperCase(),
+      description: text(component.description, "description", 1000, false),
+      amountMinor: minor(component.amountMinor),
+      frequency,
+      dueDay: component.dueDay || null,
+      gracePeriodDays: component.gracePeriodDays || 0,
+      lateFeeRule: component.lateFeeRule || undefined,
+      refundable: component.refundable === true,
+      mandatory: component.mandatory !== false,
+      displayOrder: component.displayOrder ?? index,
+      applicability: validateApplicability(component.applicability, index),
+    };
+  });
+  if (!components.length) throw new Error("At least one fee component is required");
+  if (new Set(components.map((component) => component.code)).size !== components.length)
+    throw new Error("Fee component codes must be unique within a plan");
+  return {
+  academicSession,
   name: text(body.name, "name"),
   code: text(body.code, "code", 40).toUpperCase(),
   description: text(body.description, "description", 2000, false),
@@ -47,21 +97,9 @@ export const validateStructure = (body = {}) => ({
     ? body.mode
     : "SIMPLE",
   changeReason: text(body.changeReason, "changeReason", 500, false),
-  components: (body.components || []).map((component, index) => ({
-    name: text(component.name, `components[${index}].name`),
-    code: text(component.code, `components[${index}].code`, 40).toUpperCase(),
-    description: text(component.description, "description", 1000, false),
-    amountMinor: minor(component.amountMinor),
-    frequency: component.frequency || "ONE_TIME",
-    dueDay: component.dueDay || null,
-    gracePeriodDays: component.gracePeriodDays || 0,
-    lateFeeRule: component.lateFeeRule || undefined,
-    refundable: component.refundable === true,
-    mandatory: component.mandatory !== false,
-    displayOrder: component.displayOrder ?? index,
-    applicability: component.applicability || undefined,
-  })),
-});
+  components,
+  };
+};
 
 export const validatePayment = (body = {}) => {
   const methods = [

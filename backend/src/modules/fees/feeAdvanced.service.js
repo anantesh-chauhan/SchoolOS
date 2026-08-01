@@ -1,11 +1,13 @@
 import crypto from "node:crypto";
 import prisma from "../../config/prisma.client.js";
 import { calculateCharge } from "./feeCalculation.service.js";
-import { issuePaymentReceipt } from "./fee.service.js";
+import { getStudentFees, issuePaymentReceipt } from "./fee.service.js";
 import { createSystemNotification } from "../communication/communication.service.js";
+import { annualComponentTotal, buildComponentInstallments } from "./feeSchedule.service.js";
 import {
   assertTeacherIsClassTeacherForSection,
   getTeacherForUser,
+  requireSchoolAdminOrAssignedTeacherForSection,
 } from "../../utils/teacherAuthorization.util.js";
 
 const schoolIdOf = (user) => {
@@ -31,17 +33,6 @@ const priority = {
   TRANSPORT: 50,
   HOSTEL: 50,
   SCHOOL: 10,
-};
-const monthsFor = {
-  ONE_TIME: 1,
-  MONTHLY: 12,
-  BI_MONTHLY: 6,
-  QUARTERLY: 4,
-  FOUR_MONTHLY: 3,
-  HALF_YEARLY: 2,
-  ANNUAL: 1,
-  PER_TERM: 3,
-  PER_SEMESTER: 2,
 };
 const recordAudit = (tx, req, action, entityType, entityId, details, reason) =>
   tx.feeAuditLog.create({
@@ -87,11 +78,57 @@ const assignmentMatches = (assignment, student) => {
     );
   if (assignment.targetType === "CATEGORY")
     return assignment.targetValue === student.category;
+  if (assignment.targetType === "TRANSPORT")
+    return assignment.studentId === student.id;
   return false;
 };
 
+const normalizeAssignmentTarget = async (client, schoolId, data) => {
+  if (!priority[data.targetType])
+    throw Object.assign(new Error("Unsupported fee assignment target"), { status: 400 });
+  if (data.targetType === "SCHOOL") return { ...data, targetValue: null };
+  if (data.targetType === "STUDENT") {
+    const studentId = data.studentId || data.targetValue;
+    const student = await client.student.findFirst({ where: { id: studentId, schoolId, isActive: true } });
+    if (!student) throw Object.assign(new Error("Student target not found"), { status: 404 });
+    return { ...data, studentId: student.id, targetValue: student.id };
+  }
+  if (data.targetType === "CLASS") {
+    const classRow = await client.class.findFirst({
+      where: { schoolId, deletedAt: null, OR: [{ id: data.targetValue }, { className: data.targetValue }] },
+    });
+    if (!classRow) throw Object.assign(new Error("Class target not found"), { status: 404 });
+    return { ...data, targetValue: classRow.className };
+  }
+  if (data.targetType === "SECTION") {
+    const section = await client.section.findFirst({
+      where: { schoolId, deletedAt: null, id: data.targetValue }, include: { class: true },
+    });
+    if (!section) throw Object.assign(new Error("Section target not found"), { status: 404 });
+    return { ...data, targetValue: `${section.class.className}:${section.sectionName}` };
+  }
+  if (!String(data.targetValue || "").trim())
+    throw Object.assign(new Error("Assignment target is required"), { status: 400 });
+  return data;
+};
+
+export const installmentsForStudent = (component, structure, student) => {
+  const rows = buildComponentInstallments(component, { academicSession: structure.academicSession, startMonth: 4 });
+  const sessionStart = new Date(Date.UTC(Number(structure.academicSession.slice(0, 4)), 3, 1));
+  const admissionDate = student.admissionDate ? new Date(student.admissionDate) : null;
+  if (component.applicability?.newAdmissionsOnly && (!admissionDate || admissionDate < sessionStart)) return [];
+  if (!component.applicability?.fromAdmissionMonth || !admissionDate) return rows;
+  const admissionMonth = new Date(Date.UTC(admissionDate.getUTCFullYear(), admissionDate.getUTCMonth(), 1));
+  return rows.filter((row) => row.dueDate >= admissionMonth);
+};
+
+const expectedForStudent = (components, structure, student) => components.reduce(
+  (total, component) => total + installmentsForStudent(component, structure, student).reduce((sum, row) => sum + row.amountMinor, 0n), 0n,
+);
+
 export const previewAssignment = async (user, data) => {
   const schoolId = schoolIdOf(user);
+  const normalized = await normalizeAssignmentTarget(prisma, schoolId, data);
   const structure = await prisma.feeStructure.findFirst({
     where: { id: data.feeStructureId, schoolId },
     include: { components: true },
@@ -103,23 +140,20 @@ export const previewAssignment = async (user, data) => {
   });
   const affected = students.filter((student) =>
     assignmentMatches(
-      { ...data, priority: priority[data.targetType] },
+      { ...normalized, priority: priority[normalized.targetType] },
       student,
     ),
   );
-  const perStudent = structure.components
-    .filter((c) => c.active)
-    .reduce(
-      (sum, c) =>
-        sum + BigInt(c.amountMinor) * BigInt(monthsFor[c.frequency] || 1),
-      0n,
-    );
+  const activeComponents = structure.components.filter((c) => c.active);
+  const perStudent = activeComponents.reduce(
+    (sum, component) => sum + annualComponentTotal(component, { academicSession: structure.academicSession }), 0n,
+  );
   const classImpact = Object.values(
     affected.reduce((map, student) => {
       const key = `${student.className}${student.section ? ` / ${student.section}` : ""}`;
       map[key] ||= { classSection: key, students: 0, expectedMinor: 0n };
       map[key].students += 1;
-      map[key].expectedMinor += perStudent;
+      map[key].expectedMinor += expectedForStudent(activeComponents, structure, student);
       return map;
     }, {}),
   );
@@ -136,7 +170,7 @@ export const previewAssignment = async (user, data) => {
       .filter(
         (a) =>
           assignmentMatches(a, student) &&
-          (a.priority || priority[a.targetType]) >= priority[data.targetType],
+          (a.priority || priority[a.targetType]) >= priority[normalized.targetType],
       )
       .map((a) => ({
         studentId: student.id,
@@ -147,7 +181,7 @@ export const previewAssignment = async (user, data) => {
   );
   return safe({
     affectedStudents: affected.length,
-    projectedRevenueMinor: perStudent * BigInt(affected.length),
+    projectedRevenueMinor: affected.reduce((total, student) => total + expectedForStudent(activeComponents, structure, student), 0n),
     perStudentMinor: perStudent,
     classImpact,
     conflicts,
@@ -165,6 +199,7 @@ export const createAssignmentAndCharges = (req, data) =>
   prisma.$transaction(
     async (tx) => {
       const schoolId = schoolIdOf(req.user);
+      const normalized = await normalizeAssignmentTarget(tx, schoolId, data);
       const structure = await tx.feeStructure.findFirst({
         where: { id: data.feeStructureId, schoolId, status: "PUBLISHED" },
         include: { components: { where: { active: true } } },
@@ -173,18 +208,26 @@ export const createAssignmentAndCharges = (req, data) =>
         throw Object.assign(new Error("Published fee structure not found"), {
           status: 404,
         });
-      const assignment = await tx.feeAssignment.create({
-        data: {
+      const assignment = await tx.feeAssignment.findFirst({
+        where: {
           schoolId,
           academicSession: structure.academicSession,
           feeStructureId: structure.id,
-          studentId: data.targetType === "STUDENT" ? data.studentId : null,
-          targetType: data.targetType,
-          targetValue: data.targetValue,
-          priority: priority[data.targetType],
-          createdById: req.user.id,
+          targetType: normalized.targetType,
+          targetValue: normalized.targetValue,
+          studentId: normalized.targetType === "STUDENT" ? normalized.studentId : null,
+          active: true,
         },
-      });
+      }) || await tx.feeAssignment.create({ data: {
+          schoolId,
+          academicSession: structure.academicSession,
+          feeStructureId: structure.id,
+          studentId: normalized.targetType === "STUDENT" ? normalized.studentId : null,
+          targetType: normalized.targetType,
+          targetValue: normalized.targetValue,
+          priority: priority[normalized.targetType],
+          createdById: req.user.id,
+        } });
       const students = (
         await tx.student.findMany({
           where: {
@@ -194,107 +237,198 @@ export const createAssignmentAndCharges = (req, data) =>
           },
         })
       ).filter((student) => assignmentMatches(assignment, student));
-      let created = 0;
-      for (const student of students) {
-        const superior = await tx.feeAssignment.findFirst({
-          where: {
-            schoolId,
-            studentId: student.id,
-            active: true,
-            priority: { gt: assignment.priority },
-          },
-        });
-        if (superior) continue;
-        const account = await tx.studentFeeAccount.upsert({
-          where: {
-            schoolId_studentId_academicSession: {
-              schoolId,
-              studentId: student.id,
-              academicSession: structure.academicSession,
-            },
-          },
-          create: {
+      const higherPriorityAssignments = await tx.feeAssignment.findMany({
+        where: {
+          schoolId,
+          academicSession: structure.academicSession,
+          active: true,
+          priority: { gt: assignment.priority },
+        },
+        include: { feeStructure: { include: { components: { select: { feeType: true, code: true } } } } },
+      });
+      const academicOverrides = higherPriorityAssignments.filter((candidate) =>
+        !candidate.feeStructure.components.length || candidate.feeStructure.components.some((component) => component.feeType !== "TRANSPORT" && component.code !== "TRANSPORT"),
+      );
+      const previousStructures = await tx.feeStructure.findMany({
+        where: {
+          schoolId,
+          academicSession: structure.academicSession,
+          code: structure.code,
+          version: { lt: structure.version },
+        },
+        select: { id: true },
+      });
+      const previousStructureIds = previousStructures.map((row) => row.id);
+      const previousCharges = previousStructureIds.length && students.length ? await tx.studentFeeCharge.findMany({
+        where: { schoolId, studentId: { in: students.map((student) => student.id) }, feeStructureId: { in: previousStructureIds } },
+        include: { feeComponent: { select: { code: true } } },
+        orderBy: [{ studentId: "asc" }, { dueDate: "asc" }],
+      }) : [];
+      const protectedPriorCharges = new Set(previousCharges.filter((charge) => BigInt(charge.paidMinor) > 0n).map((charge) =>
+        `${charge.studentId}:${charge.feeComponent?.code || ""}:${charge.dueDate.getUTCMonth() + 1}`,
+      ));
+      // Allocation used to perform three or four remote queries per installment.
+      // A normal class plan could therefore exceed Prisma's interactive transaction
+      // lifetime and leave a published structure without an assignment. Build the
+      // complete allocation in memory and persist it in bounded bulk operations.
+      const eligibleStudents = students.filter((student) =>
+        !academicOverrides.some((candidate) => assignmentMatches(candidate, student)),
+      );
+      const eligibleStudentIds = eligibleStudents.map((student) => student.id);
+
+      if (eligibleStudents.length) {
+        await tx.studentFeeAccount.createMany({
+          data: eligibleStudents.map((student) => ({
             schoolId,
             studentId: student.id,
             academicSession: structure.academicSession,
-          },
-          update: {},
+          })),
+          skipDuplicates: true,
         });
+      }
+      const accounts = eligibleStudents.length ? await tx.studentFeeAccount.findMany({
+        where: {
+          schoolId,
+          academicSession: structure.academicSession,
+          studentId: { in: eligibleStudentIds },
+        },
+        select: { id: true, studentId: true },
+      }) : [];
+      const accountByStudent = new Map(accounts.map((account) => [account.studentId, account]));
+
+      const cancellable = previousCharges.filter((charge) =>
+        accountByStudent.has(charge.studentId) &&
+        BigInt(charge.paidMinor) === 0n &&
+        !["CANCELLED", "WAIVED", "REFUNDED"].includes(charge.status),
+      );
+      if (cancellable.length) {
+        await tx.studentFeeCharge.updateMany({
+          where: { id: { in: cancellable.map((charge) => charge.id) } },
+          data: { status: "CANCELLED" },
+        });
+      }
+
+      const chargeRows = [];
+      for (const student of eligibleStudents) {
+        const account = accountByStudent.get(student.id);
         for (const component of structure.components) {
-          const count = monthsFor[component.frequency] || 1;
-          const interval = Math.max(1, Math.floor(12 / count));
-          for (let index = 0; index < count; index += 1) {
-            const dueDate = new Date(
-              data.scheduleStart ||
-                `${structure.academicSession.slice(0, 4)}-04-01T00:00:00.000Z`,
-            );
-            dueDate.setUTCMonth(dueDate.getUTCMonth() + index * interval);
-            if (component.dueDay) dueDate.setUTCDate(component.dueDay);
-            const installmentName =
-              count === 1
-                ? component.name
-                : `${component.name} ${index + 1}/${count}`;
-            const charge = await tx.studentFeeCharge.upsert({
-              where: {
-                schoolId_studentId_feeStructureId_feeComponentId_academicSession_installmentName:
-                  {
-                    schoolId,
-                    studentId: student.id,
-                    feeStructureId: structure.id,
-                    feeComponentId: component.id,
-                    academicSession: structure.academicSession,
-                    installmentName,
-                  },
+          for (const installment of installmentsForStudent(component, structure, student)) {
+            const priorKey = `${student.id}:${component.code}:${installment.month}`;
+            if (protectedPriorCharges.has(priorKey)) continue;
+            chargeRows.push({
+              schoolId,
+              studentId: student.id,
+              feeAccountId: account.id,
+              feeStructureId: structure.id,
+              feeComponentId: component.id,
+              academicSession: structure.academicSession,
+              installmentName: installment.installmentName,
+              dueDate: installment.dueDate,
+              baseAmountMinor: installment.amountMinor,
+              status: installment.dueDate < new Date() ? "OVERDUE" : "UPCOMING",
+              calculationSnapshot: {
+                componentCode: component.code,
+                structureVersion: structure.version,
+                scheduleMonth: installment.month,
               },
-              create: {
-                schoolId,
-                studentId: student.id,
-                feeAccountId: account.id,
-                feeStructureId: structure.id,
-                feeComponentId: component.id,
-                academicSession: structure.academicSession,
-                installmentName,
-                dueDate,
-                baseAmountMinor: component.amountMinor,
-                status: dueDate < new Date() ? "OVERDUE" : "UPCOMING",
-                calculationSnapshot: {
-                  componentCode: component.code,
-                  structureVersion: structure.version,
-                },
-              },
-              update: {},
             });
-            if (charge.createdAt.getTime() === charge.updatedAt.getTime()) {
-              const last = await tx.feeLedgerEntry.findFirst({
-                where: { feeAccountId: account.id },
-                orderBy: { createdAt: "desc" },
-              });
-              await tx.feeLedgerEntry
-                .create({
-                  data: {
-                    schoolId,
-                    studentId: student.id,
-                    feeAccountId: account.id,
-                    academicSession: structure.academicSession,
-                    entryType: "CHARGE",
-                    referenceType: "StudentFeeCharge",
-                    referenceId: charge.id,
-                    referenceNumber: component.code,
-                    description: installmentName,
-                    debitMinor: component.amountMinor,
-                    balanceMinor:
-                      BigInt(last?.balanceMinor || 0) +
-                      BigInt(component.amountMinor),
-                    createdById: req.user.id,
-                  },
-                })
-                .catch((e) => {
-                  if (e.code !== "P2002") throw e;
-                });
-              created += 1;
-            }
           }
         }
+      }
+      const createdResult = chargeRows.length ? await tx.studentFeeCharge.createMany({
+        data: chargeRows,
+        skipDuplicates: true,
+      }) : { count: 0 };
+      const created = createdResult.count;
+
+      const allocatedCharges = eligibleStudents.length ? await tx.studentFeeCharge.findMany({
+        where: {
+          schoolId,
+          feeStructureId: structure.id,
+          studentId: { in: eligibleStudentIds },
+        },
+        select: {
+          id: true,
+          studentId: true,
+          feeAccountId: true,
+          installmentName: true,
+          baseAmountMinor: true,
+          dueDate: true,
+          feeComponent: { select: { code: true } },
+        },
+        orderBy: [{ studentId: "asc" }, { dueDate: "asc" }, { id: "asc" }],
+      }) : [];
+      const referenceIds = [
+        ...cancellable.map((charge) => charge.id),
+        ...allocatedCharges.map((charge) => charge.id),
+      ];
+      const existingLedgerReferences = referenceIds.length ? await tx.feeLedgerEntry.findMany({
+        where: {
+          schoolId,
+          referenceId: { in: referenceIds },
+          entryType: { in: ["CHARGE", "CREDIT_NOTE"] },
+        },
+        select: { referenceType: true, referenceId: true },
+      }) : [];
+      const ledgerKey = (referenceType, referenceId) => `${referenceType}:${referenceId}`;
+      const existingLedgerKeys = new Set(existingLedgerReferences.map((entry) => ledgerKey(entry.referenceType, entry.referenceId)));
+      const balanceRows = accounts.length ? await tx.feeLedgerEntry.groupBy({
+        by: ["feeAccountId"],
+        where: { feeAccountId: { in: accounts.map((account) => account.id) } },
+        _sum: { debitMinor: true, creditMinor: true },
+      }) : [];
+      const runningBalance = new Map(accounts.map((account) => [account.id, 0n]));
+      for (const row of balanceRows) {
+        runningBalance.set(
+          row.feeAccountId,
+          BigInt(row._sum.debitMinor || 0) - BigInt(row._sum.creditMinor || 0),
+        );
+      }
+      const ledgerRows = [];
+      for (const oldCharge of cancellable) {
+        const creditMinor = calculateCharge(oldCharge).payableMinor;
+        const account = accountByStudent.get(oldCharge.studentId);
+        const key = ledgerKey("FeeRevisionCancellation", oldCharge.id);
+        if (!account || creditMinor <= 0n || existingLedgerKeys.has(key)) continue;
+        const balanceMinor = (runningBalance.get(account.id) || 0n) - creditMinor;
+        runningBalance.set(account.id, balanceMinor);
+        ledgerRows.push({
+          schoolId,
+          studentId: oldCharge.studentId,
+          feeAccountId: account.id,
+          academicSession: structure.academicSession,
+          entryType: "CREDIT_NOTE",
+          referenceType: "FeeRevisionCancellation",
+          referenceId: oldCharge.id,
+          referenceNumber: structure.code,
+          description: `Revision cancelled: ${oldCharge.installmentName}`,
+          creditMinor,
+          balanceMinor,
+          createdById: req.user.id,
+        });
+      }
+      for (const charge of allocatedCharges) {
+        const key = ledgerKey("StudentFeeCharge", charge.id);
+        if (existingLedgerKeys.has(key)) continue;
+        const balanceMinor = (runningBalance.get(charge.feeAccountId) || 0n) + BigInt(charge.baseAmountMinor);
+        runningBalance.set(charge.feeAccountId, balanceMinor);
+        ledgerRows.push({
+          schoolId,
+          studentId: charge.studentId,
+          feeAccountId: charge.feeAccountId,
+          academicSession: structure.academicSession,
+          entryType: "CHARGE",
+          referenceType: "StudentFeeCharge",
+          referenceId: charge.id,
+          referenceNumber: charge.feeComponent?.code,
+          description: charge.installmentName,
+          debitMinor: charge.baseAmountMinor,
+          balanceMinor,
+          createdById: req.user.id,
+        });
+      }
+      if (ledgerRows.length) {
+        await tx.feeLedgerEntry.createMany({ data: ledgerRows, skipDuplicates: true });
       }
       await recordAudit(
         tx,
@@ -304,14 +438,60 @@ export const createAssignmentAndCharges = (req, data) =>
         assignment.id,
         { affectedStudents: students.length, chargesCreated: created },
       );
+      if (previousStructureIds.length) {
+        await tx.feeStructure.updateMany({
+          where: { id: { in: previousStructureIds }, schoolId, status: "PUBLISHED" },
+          data: { status: "ARCHIVED" },
+        });
+        await tx.feeAssignment.updateMany({
+          where: {
+            schoolId,
+            academicSession: structure.academicSession,
+            feeStructureId: { in: previousStructureIds },
+            targetType: assignment.targetType,
+            targetValue: assignment.targetValue,
+            active: true,
+          },
+          data: { active: false, effectiveTo: new Date() },
+        });
+      }
       return {
         assignment,
         affectedStudents: students.length,
         chargesCreated: created,
       };
     },
-    { isolationLevel: "Serializable", timeout: 30000 },
+    { isolationLevel: "Serializable", maxWait: 10000, timeout: 120000 },
   );
+
+export const syncNewStudentFeeAssignments = async (req, student) => {
+  const schoolId = schoolIdOf(req.user);
+  if (!student || student.schoolId !== schoolId) throw Object.assign(new Error("Student tenant mismatch"), { status: 403 });
+  const assignments = await prisma.feeAssignment.findMany({
+    where: {
+      schoolId,
+      academicSession: student.session,
+      active: true,
+      feeStructure: { status: "PUBLISHED" },
+    },
+    orderBy: { priority: "desc" },
+  });
+  const applicable = assignments.filter((assignment) => assignmentMatches(assignment, student));
+  if (!applicable.length) return { assignments: 0, chargesCreated: 0 };
+  const highestPriority = applicable[0].priority;
+  const selected = applicable.filter((assignment) => assignment.priority === highestPriority);
+  let chargesCreated = 0;
+  for (const assignment of selected) {
+    const result = await createAssignmentAndCharges(req, {
+      feeStructureId: assignment.feeStructureId,
+      targetType: assignment.targetType,
+      targetValue: assignment.targetValue,
+      studentId: assignment.studentId,
+    });
+    chargesCreated += result.chargesCreated;
+  }
+  return { assignments: selected.length, chargesCreated };
+};
 
 export const changeChequeStatus = (req, paymentId, nextStatus, reason) =>
   prisma.$transaction(async (tx) => {
@@ -1042,17 +1222,24 @@ export const teacherSections = async (user) => {
       schoolId: user.schoolId,
       teacherId: teacher.id,
       isActive: true,
-      roleType: { in: ["CLASS_TEACHER", "BOTH"] },
       OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
     },
     include: { class: true, section: true },
+    orderBy: [{ class: { classOrder: "asc" } }, { section: { sectionOrder: "asc" } }],
   });
-  return assignments.map((a) => ({
-    classId: a.classId,
-    sectionId: a.sectionId,
-    className: a.class.className,
-    sectionName: a.section.sectionName,
-  }));
+  const sections = new Map();
+  for (const assignment of assignments) {
+    const current = sections.get(assignment.sectionId);
+    sections.set(assignment.sectionId, {
+      classId: assignment.classId,
+      sectionId: assignment.sectionId,
+      className: assignment.class.className,
+      sectionName: assignment.section.sectionName,
+      canSendReminders: Boolean(current?.canSendReminders || ["CLASS_TEACHER", "BOTH"].includes(assignment.roleType)),
+      assignmentRoles: [...new Set([...(current?.assignmentRoles || []), assignment.roleType])],
+    });
+  }
+  return [...sections.values()];
 };
 export const teacherSectionFees = async (user, sectionId, academicSession) => {
   const section = await prisma.section.findFirst({
@@ -1060,7 +1247,7 @@ export const teacherSectionFees = async (user, sectionId, academicSession) => {
   });
   if (!section)
     throw Object.assign(new Error("Section not found"), { status: 404 });
-  await assertTeacherIsClassTeacherForSection(user, {
+  await requireSchoolAdminOrAssignedTeacherForSection(user, {
     schoolId: user.schoolId,
     classId: section.classId,
     sectionId,
@@ -1079,19 +1266,24 @@ export const teacherSectionFees = async (user, sectionId, academicSession) => {
     include: {
       feeAccounts: {
         where: academicSession ? { academicSession } : undefined,
-        include: { charges: true },
+        include: { charges: { include: { feeComponent: { select: { name: true, code: true } } } } },
         take: 1,
       },
     },
+    orderBy: [{ rollNumber: "asc" }, { studentFirstName: "asc" }],
   });
-  return safe(
-    students.map((s) => {
+  const rows = students.map((s) => {
       const charges = s.feeAccounts[0]?.charges || [];
-      const due = charges.reduce(
-        (n, c) => n + calculateCharge(c).payableMinor,
-        0n,
-      );
-      const next = charges
+      const activeCharges = charges.filter((charge) => !["CANCELLED", "REFUNDED"].includes(charge.status));
+      const totals = activeCharges.reduce((sum, charge) => {
+        const calculated = calculateCharge(charge);
+        sum.expectedMinor += calculated.netMinor;
+        sum.paidMinor += BigInt(charge.paidMinor);
+        sum.dueMinor += calculated.payableMinor;
+        if (calculated.payableMinor > 0n && charge.dueDate < new Date()) sum.overdueMinor += calculated.payableMinor;
+        return sum;
+      }, { expectedMinor: 0n, paidMinor: 0n, dueMinor: 0n, overdueMinor: 0n });
+      const next = activeCharges
         .filter((c) => calculateCharge(c).payableMinor > 0n)
         .sort((a, b) => a.dueDate - b.dueDate)[0];
       return {
@@ -1100,7 +1292,9 @@ export const teacherSectionFees = async (user, sectionId, academicSession) => {
         parentName: s.fatherName,
         parentMobile: s.parentMobile,
         admissionNo: s.admissionNo,
-        dueMinor: due,
+        rollNumber: s.rollNumber,
+        ...totals,
+        feeStatus: totals.expectedMinor === 0n ? "NOT_ASSIGNED" : totals.dueMinor === 0n ? "PAID" : totals.paidMinor > 0n ? "PARTIALLY_PAID" : totals.overdueMinor > 0n ? "OVERDUE" : "PENDING",
         nextDue: next
           ? {
               installmentName: next.installmentName,
@@ -1109,17 +1303,70 @@ export const teacherSectionFees = async (user, sectionId, academicSession) => {
             }
           : null,
       };
-    }),
-  );
+    });
+  const summary = rows.reduce((sum, row) => ({
+    expectedMinor: sum.expectedMinor + row.expectedMinor,
+    paidMinor: sum.paidMinor + row.paidMinor,
+    dueMinor: sum.dueMinor + row.dueMinor,
+    overdueMinor: sum.overdueMinor + row.overdueMinor,
+    students: sum.students + 1,
+    paidStudents: sum.paidStudents + (row.feeStatus === "PAID" ? 1 : 0),
+    studentsWithDues: sum.studentsWithDues + (row.dueMinor > 0n ? 1 : 0),
+  }), { expectedMinor: 0n, paidMinor: 0n, dueMinor: 0n, overdueMinor: 0n, students: 0, paidStudents: 0, studentsWithDues: 0 });
+  const assignmentRows = await prisma.feeAssignment.findMany({
+    where: {
+      schoolId: user.schoolId,
+      academicSession,
+      active: true,
+      feeStructure: { status: "PUBLISHED" },
+      OR: [
+        { targetType: "SCHOOL" },
+        { targetType: "CLASS", targetValue: classRow.className },
+        { targetType: "SECTION", targetValue: { in: [section.sectionName, `${classRow.className}:${section.sectionName}`] } },
+      ],
+    },
+    include: { feeStructure: { include: { components: { where: { active: true }, orderBy: { displayOrder: "asc" } } } } },
+    orderBy: { priority: "desc" },
+  });
+  return safe({
+    section: { id: section.id, classId: classRow.id, className: classRow.className, sectionName: section.sectionName, academicSession },
+    summary,
+    structures: assignmentRows.map((assignment) => ({
+      ...assignment.feeStructure,
+      assignment: { id: assignment.id, targetType: assignment.targetType, targetValue: assignment.targetValue },
+    })),
+    students: rows,
+  });
+};
+
+export const teacherStudentFees = async (user, studentId, academicSession) => {
+  const student = await prisma.student.findFirst({
+    where: { id: studentId, schoolId: user.schoolId, isActive: true },
+    select: { id: true, className: true, section: true, session: true },
+  });
+  if (!student) throw Object.assign(new Error("Student not found"), { status: 404 });
+  const classRow = await prisma.class.findFirst({ where: { schoolId: user.schoolId, className: student.className, deletedAt: null } });
+  const section = await prisma.section.findFirst({ where: { schoolId: user.schoolId, classId: classRow?.id, sectionName: student.section, deletedAt: null } });
+  if (!classRow || !section) throw Object.assign(new Error("Student section is not configured"), { status: 404 });
+  await requireSchoolAdminOrAssignedTeacherForSection(user, {
+    schoolId: user.schoolId,
+    classId: classRow.id,
+    sectionId: section.id,
+  });
+  return getStudentFees(user, student.id, academicSession || student.session);
 };
 export const teacherSendReminder = async (req, data) => {
-  const rows = await teacherSectionFees(
+  const section = await prisma.section.findFirst({ where: { id: data.sectionId, schoolId: req.user.schoolId, deletedAt: null } });
+  if (!section) throw Object.assign(new Error("Section not found"), { status: 404 });
+  await assertTeacherIsClassTeacherForSection(req.user, { schoolId: req.user.schoolId, classId: section.classId, sectionId: section.id });
+  const overview = await teacherSectionFees(
     req.user,
     data.sectionId,
     data.academicSession,
   );
+  const rows = overview.students;
   const selected = data.studentIds?.length
-    ? rows.filter((s) => data.studentIds.includes(s.id))
+    ? rows.filter((s) => data.studentIds.includes(s.id) && s.dueMinor > 0)
     : rows.filter((s) => s.dueMinor > 0);
   const reminders = selected.map((s) => ({
     schoolId: req.user.schoolId,
@@ -1128,16 +1375,16 @@ export const teacherSendReminder = async (req, data) => {
     type: "TEACHER_FEE_REMINDER",
     title: data.title || "Fee payment reminder",
     message: `Dear ${s.parentName || "Parent"}, a fee amount of ₹${(Number(s.dueMinor) / 100).toFixed(2)} is pending for ${s.name}${s.admissionNo ? ` (${s.admissionNo})` : ""}.${s.nextDue ? ` Due detail: ${s.nextDue.installmentName}, due ${new Date(s.nextDue.dueDate).toLocaleDateString()}.` : ""}${data.message ? ` ${data.message}` : ""}`,
-    channel: "WHATSAPP_PENDING",
-    status: "QUEUED_FOR_WHATSAPP",
+    channel: "IN_APP",
+    status: "SENT",
     sentById: req.user.id,
   }));
   if (reminders.length)
     await prisma.feeReminder.createMany({ data: reminders });
   await Promise.all(reminders.map((row) => createSystemNotification({ schoolId: req.user.schoolId, type: row.type, category: 'FEE', priority: 'HIGH', title: row.title, message: row.message, actionUrl: '/parent/fees', sourceModule: 'FEES', sourceEntityType: 'FEE_REMINDER', sourceEntityId: row.studentId, dedupeKey: `${row.type}:${row.studentId}:${data.academicSession}:${new Date().toISOString().slice(0,10)}`, students: [row.studentId], roles: ['PARENT','STUDENT'], mandatory: true })));
   return {
-    queued: reminders.length,
-    channel: "WHATSAPP_PENDING",
+    sent: reminders.length,
+    channel: "IN_APP",
     recipients: selected.map((s) => ({
       studentId: s.id,
       parentMobile: s.parentMobile,

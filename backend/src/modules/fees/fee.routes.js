@@ -13,7 +13,8 @@ import * as workflow from "./feeWorkflow.controller.js";
 
 const router = express.Router();
 const admin = requireRole("SCHOOL_OWNER", "ADMIN");
-const feeAccess = requirePermission(PERMISSIONS.FEES_VIEW);
+const feeStaff = requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER");
+const configure = requirePermission(PERMISSIONS.FEES_CONFIGURE);
 const sensitive = rateLimit({
   windowMs: 60 * 1000,
   limit: 30,
@@ -32,19 +33,26 @@ router.get(
   requireRole("PLATFORM_OWNER"),
   advanced.platform,
 );
-router.get("/settings", feeAccess, controller.getSettings);
+router.get(
+  "/settings",
+  requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER", "TEACHER", "STUDENT", "PARENT"),
+  controller.getSettings,
+);
 router.put("/settings", admin, controller.saveSettings);
-router.get("/structures", feeAccess, controller.structures);
-router.post("/structures", admin, controller.createStructure);
-router.post("/structures/:id/publish", admin, controller.publishStructure);
-router.get("/categories", feeAccess, workflow.categories);
-router.post("/categories", admin, workflow.createCategory);
-router.patch("/categories/:id", admin, workflow.updateCategory);
-router.get("/components", feeAccess, workflow.components);
-router.post("/components", admin, workflow.createComponent);
-router.get("/invoices", feeAccess, workflow.invoices);
+router.get("/structures", feeStaff, controller.structures);
+router.get("/structures/:id", feeStaff, controller.structure);
+router.post("/structures", configure, controller.createStructure);
+router.patch("/structures/:id", configure, controller.updateStructure);
+router.post("/structures/:id/revise", configure, controller.reviseStructure);
+router.post("/structures/:id/publish", configure, controller.publishStructure);
+router.get("/categories", feeStaff, workflow.categories);
+router.post("/categories", configure, workflow.createCategory);
+router.patch("/categories/:id", configure, workflow.updateCategory);
+router.get("/components", feeStaff, workflow.components);
+router.post("/components", configure, workflow.createComponent);
+router.get("/invoices", feeStaff, workflow.invoices);
 router.post("/invoices/generate", admin, sensitive, workflow.generateInvoices);
-router.get("/refunds", feeAccess, workflow.refunds);
+router.get("/refunds", feeStaff, workflow.refunds);
 router.post("/refunds", admin, sensitive, workflow.processRefund);
 router.post(
   "/late-fees/recalculate",
@@ -57,8 +65,10 @@ router.get(
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
   workflow.transportRoutes,
 );
-router.post("/transport/routes", admin, workflow.createTransportRoute);
-router.post("/transport/assignments", admin, workflow.assignTransport);
+router.get("/transport/assignments", feeStaff, workflow.transportAssignments);
+router.post("/transport/routes", configure, workflow.createTransportRoute);
+router.post("/transport/assignments", configure, workflow.assignTransport);
+router.patch("/transport/assignments/:id/cancel", configure, workflow.cancelTransport);
 router.get(
   "/students/search",
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
@@ -76,7 +86,7 @@ router.get(
   controller.studentFees,
 );
 router.get("/my", requireRole("STUDENT", "PARENT"), controller.myFees);
-router.get("/dashboard", feeAccess, controller.dashboard);
+router.get("/dashboard", feeStaff, controller.dashboard);
 router.post(
   "/payments",
   requirePermission(PERMISSIONS.FEES_COLLECT),
@@ -95,8 +105,8 @@ router.post(
   controller.requestAdjustment,
 );
 router.get("/approvals", admin, controller.approvals);
-router.post("/assignments/preview", admin, advanced.preview);
-router.post("/assignments/publish", admin, advanced.assign);
+router.post("/assignments/preview", configure, advanced.preview);
+router.post("/assignments/publish", configure, advanced.assign);
 router.patch(
   "/cheques/:id/status",
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
@@ -109,7 +119,7 @@ router.post(
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
   advanced.cancelReceipt,
 );
-router.get("/notification-templates", feeAccess, advanced.templates);
+router.get("/notification-templates", feeStaff, advanced.templates);
 router.post("/notification-templates", admin, advanced.saveTemplate);
 router.post(
   "/reminders/send",
@@ -117,7 +127,7 @@ router.post(
   sensitive,
   advanced.reminders,
 );
-router.get("/daily-closing", feeAccess, advanced.closings);
+router.get("/daily-closing", feeStaff, advanced.closings);
 router.post(
   "/daily-closing",
   requireRole("FEE_MANAGER"),
@@ -146,5 +156,9 @@ router.post(
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
   advanced.document,
 );
+router.get("/teacher/sections", requireRole("TEACHER"), advanced.teacherSections);
+router.get("/teacher/sections/:sectionId", requireRole("TEACHER"), advanced.teacherSectionFees);
+router.get("/teacher/students/:studentId", requireRole("TEACHER"), advanced.teacherStudentFees);
+router.post("/teacher/reminders", requireRole("TEACHER"), sensitive, advanced.teacherReminder);
 
 export default router;

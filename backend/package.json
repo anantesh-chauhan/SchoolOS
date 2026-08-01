@@ -22,6 +22,7 @@
     "seed": "node prisma/seed.js",
     "seed:platform-owner": "node prisma/seedPlatformOwner.js",
     "seed:fees": "node prisma/seedFees.js",
+    "verify:fees": "node prisma/verifyFeeSeed.js",
     "seed:fees:realistic": "node prisma/seedRealisticFees.js",
     "seed:tenant-isolation": "node prisma/seedTenantIsolationDemo.js",
     "verify:instant-login": "node prisma/verifyInstantLogin.js",

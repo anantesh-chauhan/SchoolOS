@@ -12,6 +12,7 @@ import {
   softDeleteStudentAdmission,
   updateStudentAdmission,
 } from '../services/studentAdmission.service.js';
+import { syncNewStudentFeeAssignments } from '../modules/fees/feeAdvanced.service.js';
 
 
 // Validation rules for creating a student
@@ -211,6 +212,13 @@ export const createStudent = async (req, res) => {
       schoolId,
       payload: req.body,
     });
+    let feeAllocation = { assignments: 0, chargesCreated: 0 };
+    try {
+      feeAllocation = await syncNewStudentFeeAssignments(req, result.student);
+    } catch (feeError) {
+      console.error('Student created, but automatic fee allocation failed:', feeError);
+      feeAllocation = { assignments: 0, chargesCreated: 0, warning: 'Fee allocation requires retry by fee staff' };
+    }
 
     return res.status(201).json({
       success: true,
@@ -219,6 +227,7 @@ export const createStudent = async (req, res) => {
         id: result.student.id,
         student: result.student,
         credentials: result.credentials,
+        feeAllocation,
         pdfUrl: `/api/students/${result.student.id}/pdf`,
       },
     });

@@ -67,6 +67,7 @@ const TimetableReconciliationPage = lazy(() => import('./pages/admin/TimetableRe
 const GalleryStudioPage = lazy(() => import('./pages/admin/GalleryStudioPage'));
 const AddStudentPage = lazy(() => import('./pages/admin/AddStudentPage'));
 const StudentAllocationPage = lazy(() => import('./pages/admin/StudentAllocationPage'));
+const SchoolDirectoryPage = lazy(() => import('./pages/admin/SchoolDirectoryPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const PlatformOwnerProfilePage = lazy(() => import('./pages/profile/PlatformOwnerProfilePage'));
 const SchoolOwnerProfilePage = lazy(() => import('./pages/profile/SchoolOwnerProfilePage'));
@@ -92,6 +93,7 @@ const FeeAdministrationPage = lazy(() => import('./pages/fees/FeeAdministrationP
 const FamilyFeePage = lazy(() => import('./pages/fees/FamilyFeePage'));
 const PlatformFeeAnalyticsPage = lazy(() => import('./pages/fees/PlatformFeeAnalyticsPage'));
 const ReceiptVerificationPage = lazy(() => import('./pages/fees/ReceiptVerificationPage'));
+const TeacherFeePage = lazy(() => import('./pages/fees/TeacherFeePage'));
 const HomeworkWorkspacePage = lazy(() => import('./pages/homework/HomeworkWorkspacePage'));
 const NotificationCenterPage = lazy(() => import('./pages/communication/NotificationCenterPage'));
 const CommunicationWorkspacePage = lazy(() => import('./pages/communication/CommunicationWorkspacePage'));
@@ -332,6 +334,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/admin/directory"
+          element={
+            <ProtectedRoute allowedRoles={['ADMIN', 'SCHOOL_OWNER']}>
+              <SchoolDirectoryPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard/admin/academic/classes/:classId/sections/:sectionId/subjects/:subjectId"
@@ -411,15 +421,17 @@ export default function App() {
           <Route path="/dashboard/fees" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/dashboard/fees/sections/:sectionId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/dashboard/fees/students/:studentId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeePortalPage /></ProtectedRoute>} />
-          <Route path="/dashboard/fees/structures/new" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><FeeStructureWizardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/fees/structures/new" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeeStructureWizardPage /></ProtectedRoute>} />
+          <Route path="/dashboard/fees/structures/:structureId/edit" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeeStructureWizardPage /></ProtectedRoute>} />
           <Route path="/dashboard/fees/operations" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeeOperationsPage /></ProtectedRoute>} />
-          <Route path="/dashboard/fees/administration" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><FeeAdministrationPage /></ProtectedRoute>} />
+          <Route path="/dashboard/fees/administration" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeeAdministrationPage /></ProtectedRoute>} />
           <Route path="/parent/fees/family" element={<ProtectedRoute allowedRoles={['PARENT']}><FamilyFeePage /></ProtectedRoute>} />
           <Route path="/dashboard/platform/fees" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER']}><PlatformFeeAnalyticsPage /></ProtectedRoute>} />
           <Route path="/dashboard/fee-manager/profile" element={<ProtectedRoute allowedRoles={['FEE_MANAGER']}><FeeManagerProfilePage /></ProtectedRoute>} />
           <Route path="/dashboard/fees/collect" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/student/fees" element={<ProtectedRoute allowedRoles={['STUDENT']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/parent/fees" element={<ProtectedRoute allowedRoles={['PARENT']}><FeePortalPage /></ProtectedRoute>} />
+          <Route path="/teacher/fees" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherFeePage /></ProtectedRoute>} />
           <Route path="/dashboard/calendar" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><AcademicCalendarPage /></ProtectedRoute>} />
           <Route
             path="/dashboard/admin/class-teachers"

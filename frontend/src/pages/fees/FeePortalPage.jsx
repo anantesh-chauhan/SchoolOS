@@ -18,6 +18,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import DashboardLayout from "../../layouts/DashboardLayout";
+import FeeStructurePreviewTable from "../../components/fees/FeeStructurePreviewTable";
 import { authService } from "../../services/authService";
 import { feeService } from "../../services/feeService";
 
@@ -101,13 +102,14 @@ function StructureLibrary({ structures, admin, settings }) {
           </Link>
         )}
       </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 space-y-5">
         {structures.map((s) => (
           <article
             key={s.id}
             className="rounded-2xl border border-slate-200 p-4 dark:border-slate-800"
           >
-            <div className="flex items-start justify-between gap-3">
+            <FeeStructurePreviewTable structure={s} settings={settings} />
+            <div className="hidden items-start justify-between gap-3">
               <div>
                 <p className="font-semibold">{s.name}</p>
                 <p className="text-xs text-slate-500">
@@ -120,7 +122,7 @@ function StructureLibrary({ structures, admin, settings }) {
                 {s.status}
               </span>
             </div>
-            <div className="mt-4 space-y-2">
+            <div className="hidden mt-4 space-y-2">
               {s.components.map((c) => (
                 <div key={c.id} className="flex justify-between text-sm">
                   <span>
@@ -137,6 +139,11 @@ function StructureLibrary({ structures, admin, settings }) {
               {s._count.assignments} assignments · {s._count.charges} generated
               charges
             </div>
+            {admin && ["DRAFT", "PUBLISHED"].includes(s.status) && (
+              <Link to={`/dashboard/fees/structures/${s.id}/edit`} className="mt-3 inline-flex rounded-lg border px-3 py-2 text-xs font-semibold text-blue-600 dark:border-slate-700">
+                {s.status === "DRAFT" ? "Continue editing" : "Create revision"}
+              </Link>
+            )}
           </article>
         ))}
         {!structures.length && (
@@ -231,6 +238,10 @@ function StudentDetail({ student, settings, onBack }) {
             <div className="space-y-5">
               <div className={card}>
                 <h3 className="font-semibold">Assigned fee structure</h3>
+                <div className="mt-3 space-y-4">
+                  {(fees.assignedStructures?.length ? fees.assignedStructures : fees.assignedStructure ? [fees.assignedStructure] : []).map((structure) => <FeeStructurePreviewTable key={structure.id} structure={structure} settings={settings} studentFees={fees} />)}
+                </div>
+                <div className="hidden">
                 {fees.assignedStructure ? (
                   <>
                     <div className="mt-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
@@ -262,6 +273,7 @@ function StudentDetail({ student, settings, onBack }) {
                     visible below.
                   </p>
                 )}
+                </div>
               </div>
               <div className={card}>
                 <h3 className="font-semibold">Installments and charges</h3>
@@ -738,7 +750,7 @@ function FeeHierarchy({ session, settings }) {
   );
 }
 function StaffWorkspace({ role, settings, refresh }) {
-  const admin = ["ADMIN", "SCHOOL_OWNER"].includes(role);
+  const admin = ["ADMIN", "SCHOOL_OWNER", "FEE_MANAGER"].includes(role);
   const [tab, setTab] = useState("students");
   const [session, setSession] = useState("2026-27");
   const [dashboard, setDashboard] = useState();
@@ -886,16 +898,17 @@ function PortalFees({ role, settings }) {
       <Summary totals={fees.totals} settings={settings} />
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={card}>
-          <h2 className="text-lg font-semibold">My fee structure</h2>
-          {fees.assignedStructure ? (
-            <>
-              <div className="mt-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
-                <p className="font-semibold">{fees.assignedStructure.name}</p>
+          <h2 className="text-lg font-semibold">My fee structures</h2>
+          {(fees.assignedStructures?.length ? fees.assignedStructures : fees.assignedStructure ? [fees.assignedStructure] : []).length ? (
+            (fees.assignedStructures?.length ? fees.assignedStructures : [fees.assignedStructure]).map((structure) => <div key={structure.id} className="mt-4">
+              <FeeStructurePreviewTable structure={structure} settings={settings} studentFees={fees} />
+              <div className="hidden mt-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/30">
+                <div className="flex items-center justify-between gap-2"><p className="font-semibold">{structure.name}</p><span className="rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-blue-700 dark:bg-slate-900">{structure.assignment?.targetType || 'ACADEMIC'}</span></div>
                 <p className="text-xs text-slate-500">
-                  {fees.assignedStructure.academicSession}
+                  {structure.academicSession} · Version {structure.version}
                 </p>
               </div>
-              {fees.assignedStructure.components.map((c) => (
+              <div className="hidden">{structure.components.map((c) => (
                 <div
                   key={c.id}
                   className="flex justify-between border-b py-3 text-sm last:border-0 dark:border-slate-800"
@@ -909,8 +922,8 @@ function PortalFees({ role, settings }) {
                   </span>
                   <strong>{money(c.amountMinor, settings)}</strong>
                 </div>
-              ))}
-            </>
+              ))}</div>
+            </div>)
           ) : (
             <p className="mt-4 text-sm text-slate-500">
               The school has not assigned a fee structure yet.

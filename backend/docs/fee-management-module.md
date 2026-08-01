@@ -1,5 +1,54 @@
 # SchoolOS fee management module
 
+## ERP class-plan upgrade (August 2026)
+
+The session fee planner is now class-first: finance staff select one real SchoolOS class and publish one plan that matches every section by class identity. The UI no longer asks staff to type internal target values. The allocation preview displays affected sections, students, expected revenue, and higher-priority conflicts before any dues are created.
+
+Each fee head supports an April-to-March month grid, one-time, monthly, quarterly, half-yearly, annual, or custom recurrence, and optional month-specific values. Due dates are generated for the exact selected calendar months rather than by approximate installment spacing. `FeeComponent.applicability` stores the additive schedule metadata (`months`, `monthAmountsMinor`, `newAdmissionsOnly`, and `fromAdmissionMonth`), so no destructive schema migration was required and legacy components retain their existing frequency behavior.
+
+New admissions are synchronized with the highest-priority published school/class/section/student assignment immediately after the student admission transaction. Unique charge and ledger constraints keep this retry-safe. A fee head can be limited to new admissions, and recurring heads can begin at a mid-session student's admission month.
+
+### Operational permissions
+
+| Role | Plan setup | Publish class plan | Collect | Adjust | Approve/reverse | Reports/reminders |
+| --- | --- | --- | --- | --- | --- | --- |
+| School Owner | Yes | Yes | Existing policy | Request | Yes | Yes |
+| Admin | Yes | Yes | Yes | Request/manage | Yes | Yes |
+| Fee Manager | Yes | Yes | Yes | Request | No | Yes |
+| Class Teacher | No | No | No | No | No | Assigned section status and in-app reminders only |
+| Student / Parent | No | No | No | No | No | Own/linked-child ledger and receipts only |
+
+Staff-wide settings, structures, invoices, refunds, dashboards, templates, and cash closing routes are explicitly limited to School Owner, Admin, and Fee Manager. Student and parent `fees.view` permission cannot be used to enter a school-wide endpoint. Teacher endpoints independently verify the active class-teacher assignment for every requested section.
+
+### Class-plan API behavior
+
+- `POST /api/fees/structures` accepts validated month schedules in each component's `applicability` snapshot.
+- `POST /api/fees/assignments/preview` accepts a tenant-owned class or section ID and returns the allocation impact.
+- `POST /api/fees/assignments/publish` resolves that ID to the canonical class-wide target and generates idempotent charges.
+- `GET/PATCH /api/fees/structures/:id` loads a plan and updates drafts only.
+- `POST /api/fees/structures/:id/revise` clones a published plan into a new auditable draft version. Applying it cancels unpaid superseded charges with credit notes while preserving paid and partially paid history.
+- `GET /api/fees/teacher/sections` lists only actively assigned class-teacher sections.
+- `GET /api/fees/teacher/sections/:sectionId` returns reminder-safe fee status only after assignment verification.
+- `POST /api/fees/teacher/reminders` creates real, auditable in-app reminders. It does not claim SMS or WhatsApp delivery without a provider.
+- `GET/POST /api/fees/transport/assignments` lists or creates selected-student transport service; `PATCH /api/fees/transport/assignments/:id/cancel` stops it without deleting history.
+
+Publication is retry-safe. If allocation is interrupted after the draft becomes published, retrying the final action reuses the published version and the existing assignment/charge uniqueness guards. The prior published version is archived only after the revised allocation succeeds, so students do not temporarily lose their visible academic plan.
+
+The student and parent fee response includes `assignedStructures`, not only one highest-priority plan. Academic, optional transport, and other student-specific published structures therefore appear together while remaining tenant- and child-scoped.
+
+### Manual class-plan check
+
+1. Sign in as the seeded Fee Manager and open **Create Fee Structure**.
+2. Select `2026-27`, choose a class, and confirm its section/student impact.
+3. Add Tuition Fee, select all months, and enter `800`.
+4. Add Examination Fee, select September and February, and enter `500` (or enable different month amounts).
+5. Add Annual Charge, select April, and enter `1500`.
+6. Review due-day and grace-period rules, then open the final month-wise preview.
+7. Publish once and confirm charges across every section; publish the same allocation again and confirm no duplicate charges or ledger entries.
+8. Admit a student into the class and confirm the admission response reports automatic fee allocation.
+9. Sign in as the assigned class teacher, open **Class Fee Status**, and send an in-app reminder to selected students with dues.
+10. Sign in as an unrelated teacher, student, and parent and confirm school-wide fee endpoints remain forbidden.
+
 ## Audit and compatibility summary
 
 The repository already had a tenant-scoped charge/account ledger, versioned fee structures, class/section/student assignments, partial and advance payments, receipt PDFs, scholarships, reminders, daily closing, period locks, carry-forward, role permissions, fee portals, and deterministic fee seeds. Those records and APIs remain supported.
