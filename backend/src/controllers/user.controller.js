@@ -240,3 +240,20 @@ export const createFeeManagerUser = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to create Fee Manager account', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
   }
 };
+
+export const createExaminationRoleUser = async (req, res) => {
+  try {
+    const role = String(req.body.role || '').toUpperCase();
+    if (!['PRINCIPAL', 'EXAM_COORDINATOR'].includes(role)) return res.status(422).json({ success: false, message: 'Role must be PRINCIPAL or EXAM_COORDINATOR' });
+    const { firstName, lastName, employeeId, email, phone } = req.body;
+    if (!firstName || !employeeId || !email || !phone) return res.status(400).json({ success: false, message: 'firstName, employeeId, email and phone are required' });
+    const school = await resolveSchool(req);
+    const login = await buildUserPayload({ role, firstName, lastName: lastName || '', employeeId: normalize(employeeId).toUpperCase(), joiningYear: null, contactEmail: String(email).trim().toLowerCase(), phone: String(phone).trim(), schoolCode: school.schoolCode, schoolId: school.id });
+    const user = await prisma.user.create({ data: login.userData });
+    return res.status(201).json({ success: true, message: `${role.replaceAll('_', ' ')} account created successfully`, data: { user, loginId: user.email, password: login.plainPassword, mustChangePassword: true } });
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
+    if (error.code === 'P2002') return res.status(409).json({ success: false, message: 'Login ID, employee ID, or contact email already exists' });
+    return res.status(500).json({ success: false, message: 'Failed to create examination role account', error: process.env.NODE_ENV === 'development' ? error.message : undefined });
+  }
+};

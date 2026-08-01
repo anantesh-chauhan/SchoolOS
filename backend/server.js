@@ -36,6 +36,7 @@ import homeworkRoutes from './src/modules/homework/homework.routes.js';
 import communicationRoutes from './src/modules/communication/communication.routes.js';
 import hrRoutes from './src/modules/hr/hr.routes.js';
 import analyticsRoutes from './src/modules/analytics/analytics.routes.js';
+import examinationRoutes from './src/modules/examinations/examination.routes.js';
 import { analyticsInvalidationMiddleware } from './src/modules/analytics/analytics.invalidation.js';
 import { processScheduled, processQueuedDeliveries } from './src/modules/communication/communication.service.js';
 
@@ -191,6 +192,7 @@ app.use('/api', homeworkRoutes);
 app.use('/api', communicationRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/examinations', examinationRoutes);
 
 // Serve the compiled Vite application in the single-service deployment.
 if (existsSync(frontendIndex)) {

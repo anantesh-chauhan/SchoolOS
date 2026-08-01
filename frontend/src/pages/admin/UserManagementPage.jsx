@@ -45,6 +45,8 @@ export default function UserManagementPage() {
   const [teacherResult, setTeacherResult] = useState(null);
   const [staffResult, setStaffResult] = useState(null);
   const [curriculumResult, setCurriculumResult] = useState(null);
+  const [examRoleForm, setExamRoleForm] = useState({ ...emptyStaffForm, lastName: '', role: 'EXAM_COORDINATOR' });
+  const [examRoleResult, setExamRoleResult] = useState(null);
 
   const teacherMutation = useMutation({
     mutationFn: userService.createTeacher,
@@ -74,6 +76,16 @@ export default function UserManagementPage() {
       setCurriculumForm({ ...emptyStaffForm, lastName: '' });
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to create Curriculum Manager'),
+  });
+
+  const examRoleMutation = useMutation({
+    mutationFn: userService.createExaminationRole,
+    onSuccess: (response) => {
+      toast.success(`${examRoleForm.role.replaceAll('_', ' ')} account created`);
+      setExamRoleResult(response.data);
+      setExamRoleForm({ ...emptyStaffForm, lastName: '', role: 'EXAM_COORDINATOR' });
+    },
+    onError: (error) => toast.error(error.response?.data?.message || 'Failed to create examination role account'),
   });
 
   const submitTeacher = (event) => {
@@ -145,6 +157,23 @@ export default function UserManagementPage() {
                 <div className="flex justify-end sm:col-span-2"><Button type="submit" disabled={curriculumMutation.isPending}>{curriculumMutation.isPending ? 'Creating...' : 'Create Curriculum Manager'}</Button></div>
               </form>
               <CredentialBlock title="Curriculum Manager Credentials" data={curriculumResult} />
+            </section>
+
+            <section className="space-y-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Create Examination Leadership Account</h2>
+                <p className="text-sm text-slate-500">Creates a Principal approval account or an Exam Coordinator operations account with explicit examination permissions.</p>
+              </div>
+              <form className="grid grid-cols-1 gap-3 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); examRoleMutation.mutate(examRoleForm); }}>
+                <select className="h-10 rounded-md border border-slate-200 bg-white px-3 dark:border-slate-700 dark:bg-slate-950" value={examRoleForm.role} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, role: event.target.value }))}><option value="EXAM_COORDINATOR">Exam Coordinator</option><option value="PRINCIPAL">Principal</option></select>
+                <Input required placeholder="Employee ID" value={examRoleForm.employeeId} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, employeeId: event.target.value }))} />
+                <Input required placeholder="First Name" value={examRoleForm.firstName} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, firstName: event.target.value }))} />
+                <Input placeholder="Last Name" value={examRoleForm.lastName} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, lastName: event.target.value }))} />
+                <Input required type="email" placeholder="Contact Email" value={examRoleForm.email} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, email: event.target.value }))} />
+                <Input required placeholder="Phone" value={examRoleForm.phone} onChange={(event) => setExamRoleForm((prev) => ({ ...prev, phone: event.target.value }))} />
+                <div className="flex justify-end sm:col-span-2"><Button type="submit" disabled={examRoleMutation.isPending}>{examRoleMutation.isPending ? 'Creating...' : `Create ${examRoleForm.role === 'PRINCIPAL' ? 'Principal' : 'Exam Coordinator'}`}</Button></div>
+              </form>
+              <CredentialBlock title="Examination Role Credentials" data={examRoleResult} />
             </section>
           </CardContent>
         </Card>

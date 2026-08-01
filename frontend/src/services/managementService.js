@@ -238,6 +238,10 @@ export const userService = {
     const response = await apiClient.post('/users/create-curriculum-manager', payload);
     return response.data;
   },
+  createExaminationRole: async (payload) => {
+    const response = await apiClient.post('/users/create-examination-role', payload);
+    return response.data;
+  },
 };
 
 export const timetableService = {

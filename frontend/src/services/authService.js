@@ -4,6 +4,8 @@ import { clearPrivateClientState } from '../lib/queryClient';
 const roleRoutes = {
   PLATFORM_OWNER: '/dashboard/platform',
   SCHOOL_OWNER: '/dashboard/school',
+  PRINCIPAL: '/examinations',
+  EXAM_COORDINATOR: '/examinations',
   ADMIN: '/dashboard/admin',
   TEACHER: '/dashboard/teacher',
   PARENT: '/dashboard/parent',

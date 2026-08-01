@@ -29,6 +29,8 @@ import {
   WalletCards,
   Activity,
   Compass,
+  GraduationCap,
+  ShieldCheck,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -95,6 +97,7 @@ const navigationSubgroup = (group, label) => {
       [['My Performance', 'Academic Analytics'], 'Progress'],
     ],
   };
+
   return rules[group]?.find(([labels]) => labels.includes(label))?.[1] || '';
 };
 
@@ -157,6 +160,27 @@ const DashboardLayout = ({ children, role }) => {
       return next;
     });
   };
+
+  roleMenuConfig.PRINCIPAL = [
+    { group: 'Examinations', icon: GraduationCap, items: [
+      { label: 'Approval Dashboard', icon: ShieldCheck, href: '/examinations?view=approvals' },
+      { label: 'Published Results', icon: ClipboardCheck, href: '/examinations?view=results' },
+      { label: 'Examination Analytics', icon: Activity, href: '/examinations?view=analytics' },
+    ] },
+  ];
+  roleMenuConfig.EXAM_COORDINATOR = [
+    { group: 'Examinations', icon: GraduationCap, items: [
+      { label: 'Exam Control Centre', icon: GraduationCap, href: '/examinations' },
+      { label: 'Approval Queue', icon: ClipboardCheck, href: '/examinations?view=approvals' },
+      { label: 'Grade & Rule Setup', icon: Settings, href: '/examinations?view=configuration' },
+      { label: 'Result Registers', icon: BookOpenCheck, href: '/examinations?view=results' },
+      { label: 'Examination Audit', icon: ShieldCheck, href: '/examinations?view=audit' },
+    ] },
+    { group: 'Academic setup', icon: BookOpen, items: [
+      { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
+      { label: 'Teacher Summary', icon: UsersRound, href: '/dashboard/admin/teacher-assignment-summary' },
+    ] },
+  ];
   const [profileOpen, setProfileOpen] = useState(false);
   const user = authService.getCurrentUser();
   const { branding } = useBranding();
@@ -168,6 +192,7 @@ const DashboardLayout = ({ children, role }) => {
         icon: Home,
         items: [
           { label: 'Dashboard', icon: Home, href: '/dashboard/platform' },
+          { label: 'Examination Oversight', icon: GraduationCap, href: '/examinations' },
         ],
       },
       {
@@ -222,6 +247,7 @@ const DashboardLayout = ({ children, role }) => {
         { label: 'Attendance Rules', icon: Settings, href: '/attendance/settings' },
       ] },
       { group: 'Learning & Resources', icon: BookOpen, items: [
+        { label: 'Examinations & Results', icon: GraduationCap, href: '/examinations' },
         { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
         { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
         { label: 'School Analytics', icon: Activity, href: '/analytics/school' },
@@ -257,6 +283,7 @@ const DashboardLayout = ({ children, role }) => {
           { label: 'Browse School', icon: Compass, href: '/dashboard/admin/directory' },
         ],
       },
+      { group: 'Examinations', icon: GraduationCap, items: [{ label: 'Examinations & Results', icon: GraduationCap, href: '/examinations' }] },
       { group: 'People & Access', icon: Users, items: [
         { label: 'Students', icon: Users, href: '/dashboard/admin/students/add' },
         { label: 'Student Allocation', icon: UsersRound, href: '/dashboard/admin/students/allocation' },
@@ -314,6 +341,7 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     CURRICULUM_MANAGER: [
+      { group: 'Examinations', icon: GraduationCap, items: [{ label: 'Examinations & Results', icon: GraduationCap, href: '/examinations' }] },
       { group: 'Overview', icon: Home, items: [
         { label: 'Curriculum Dashboard', icon: Home, href: '/dashboard/curriculum' },
         { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
@@ -350,6 +378,7 @@ const DashboardLayout = ({ children, role }) => {
              { label: 'My Profile', icon: UserRound, href: '/dashboard/fee-manager/profile' }] },
     ],
     TEACHER: [
+      { group: 'Examinations', icon: GraduationCap, items: [{ label: 'Examinations & Results', icon: GraduationCap, href: '/examinations' }] },
       {
         group: 'Overview', icon: Home,
         items: [
@@ -390,6 +419,7 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     PARENT: [
+      { group: 'Examinations', icon: GraduationCap, items: [{ label: 'Results & Report Cards', icon: GraduationCap, href: '/examinations' }] },
       { group: 'Overview', icon: Home, items: [{ label: 'Dashboard', icon: Home, href: '/dashboard/parent' }] },
       { group: 'Learning & Resources', icon: BookOpen, items: [
           { label: 'Homework & Resources', icon: BookOpenCheck, href: '/homework' },
@@ -418,6 +448,7 @@ const DashboardLayout = ({ children, role }) => {
       },
     ],
     STUDENT: [
+      { group: 'Examinations', icon: GraduationCap, items: [{ label: 'Results & Report Cards', icon: GraduationCap, href: '/examinations' }] },
       {
         group: 'Overview',
         icon: Home,
@@ -476,6 +507,8 @@ const DashboardLayout = ({ children, role }) => {
   const profileRouteByRole = {
     PLATFORM_OWNER: '/dashboard/platform/profile',
     SCHOOL_OWNER: '/dashboard/school/profile',
+    PRINCIPAL: '/examinations',
+    EXAM_COORDINATOR: '/examinations',
     ADMIN: '/dashboard/admin/profile',
     TEACHER: '/dashboard/teacher/profile',
     PARENT: '/dashboard/parent/profile',

@@ -323,7 +323,7 @@ export const adminUpdateUser = async (req, res) => {
 
     // If role is being set, ensure it's valid according to enum
     if (data.role) {
-      const validRoles = ['PLATFORM_OWNER','SCHOOL_OWNER','ADMIN','TEACHER','PARENT','STUDENT','STAFF'];
+      const validRoles = ['PLATFORM_OWNER','SCHOOL_OWNER','PRINCIPAL','EXAM_COORDINATOR','ADMIN','TEACHER','PARENT','STUDENT','STAFF'];
       if (!validRoles.includes(data.role)) {
         return res.status(400).json({ success: false, message: 'Invalid role value' });
       }

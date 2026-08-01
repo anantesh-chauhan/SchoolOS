@@ -4,6 +4,8 @@ import prisma from '../config/prisma.client.js';
 const VALID_ROLES = new Set([
   'PLATFORM_OWNER',
   'SCHOOL_OWNER',
+  'PRINCIPAL',
+  'EXAM_COORDINATOR',
   'ADMIN',
   'TEACHER',
   'PARENT',

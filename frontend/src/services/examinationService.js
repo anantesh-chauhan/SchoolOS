@@ -1,0 +1,25 @@
+import api from './api';
+
+export const examinationService = {
+  metadata: () => api.get('/examinations/metadata').then((r) => r.data.data),
+  dashboard: () => api.get('/examinations/dashboard').then((r) => r.data.data),
+  list: (params) => api.get('/examinations', { params }).then((r) => r.data.data),
+  detail: (id) => api.get(`/examinations/${id}`).then((r) => r.data.data),
+  create: (body) => api.post('/examinations', body).then((r) => r.data.data),
+  update: (id, body) => api.patch(`/examinations/${id}`, body).then((r) => r.data.data),
+  transition: (id, status, reason) => api.post(`/examinations/${id}/transition`, { status, reason }).then((r) => r.data.data),
+  markSheet: (id, examSubjectId) => api.get(`/examinations/${id}/mark-sheet`, { params: { examSubjectId } }).then((r) => r.data.data),
+  saveMarks: (id, examSubjectId, entries) => api.put(`/examinations/${id}/marks`, { examSubjectId, entries }).then((r) => r.data.data),
+  submitMarks: (id, examSubjectId) => api.post(`/examinations/${id}/subjects/${examSubjectId}/submit`).then((r) => r.data.data),
+  review: (id, body) => api.post(`/examinations/${id}/review`, body).then((r) => r.data.data),
+  calculate: (id) => api.post(`/examinations/${id}/calculate`).then((r) => r.data.data),
+  publish: (id, reason) => api.post(`/examinations/${id}/publish`, { reason }).then((r) => r.data.data),
+  requestCorrection: (id, examSubjectId, reason) => api.post(`/examinations/${id}/corrections`, { examSubjectId, reason }).then((r) => r.data.data),
+  analytics: (id) => api.get(`/examinations/${id}/analytics`).then((r) => r.data.data),
+  resultRegister: (id, params) => api.get(`/examinations/${id}/result-register`, { params }).then((r) => r.data.data),
+  auditLogs: (params) => api.get('/examinations/audit-logs', { params }).then((r) => r.data.data),
+  saveGradeScale: (body, id) => (id ? api.patch(`/examinations/configuration/grade-scales/${id}`, body) : api.post('/examinations/configuration/grade-scales', body)).then((r) => r.data.data),
+  saveRuleSet: (body, id) => (id ? api.patch(`/examinations/configuration/rule-sets/${id}`, body) : api.post('/examinations/configuration/rule-sets', body)).then((r) => r.data.data),
+  myResults: () => api.get('/examinations/my-results').then((r) => r.data.data),
+  downloadReportCard: (examId, studentId) => api.get(`/examinations/${examId}/report-cards/${studentId}.pdf`, { responseType: 'blob' }).then((r) => r.data),
+};

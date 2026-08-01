@@ -106,6 +106,7 @@ const ChapterAnalyticsPage = lazy(() => import('./features/analytics/pages/Chapt
 const AnalyticsConfigurationPage = lazy(() => import('./features/analytics/pages/AnalyticsConfigurationPage'));
 const SchoolAnalyticsPage = lazy(() => import('./features/analytics/pages/SchoolAnalyticsPage'));
 const ClassAnalyticsPage = lazy(() => import('./features/analytics/pages/ClassAnalyticsPage'));
+const ExaminationWorkspacePage = lazy(() => import('./pages/examinations/ExaminationHubPage'));
 const OfflinePage = lazy(() => import('./pages/OfflinePage'));
 const PermissionDeniedPage = lazy(() => import('./pages/PermissionDeniedPage'));
 
@@ -151,6 +152,7 @@ export default function App() {
           <Route path="/analytics/school" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER']}><SchoolAnalyticsPage /></ProtectedRoute>} />
           <Route path="/analytics/classes/:classId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER']}><ClassAnalyticsPage /></ProtectedRoute>} />
           <Route path="/analytics/sections/:sectionId" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER']}><ClassAnalyticsPage sectionMode /></ProtectedRoute>} />
+          <Route path="/examinations" element={<ProtectedRoute allowedRoles={['PLATFORM_OWNER','SCHOOL_OWNER','PRINCIPAL','EXAM_COORDINATOR','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']}><ExaminationWorkspacePage /></ProtectedRoute>} />
           <Route path="/dashboard/hr" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','HR']}><HRWorkspacePage /></ProtectedRoute>} />
           <Route path="/my/hr" element={<ProtectedRoute allowedRoles={['HR','TEACHER','STAFF']}><EmployeeSelfServicePage /></ProtectedRoute>} />
           <Route path="/attendance" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN']}><AttendanceDashboardPage /></ProtectedRoute>} />

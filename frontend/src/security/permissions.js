@@ -31,6 +31,7 @@ const PATH_PERMISSIONS = [
   [/\/curriculum/, 'curriculum.view'],
   [/\/homework/, 'homework.view'],
   [/\/analytics/, 'analytics.view'],
+  [/\/examinations/, 'exams.view'],
   [/\/calendar/, 'academicCalendar.view'],
   [/\/communication/, 'communication.view'],
   [/\/notifications/, 'notification.view'],
