@@ -1,11 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
-const feeService = read('../src/modules/fees/fee.service.js');
-const advanced = read('../src/modules/fees/feeAdvanced.service.js');
-const workflow = read('../src/modules/fees/feeWorkflow.service.js');
+const advancedDirectory = new URL('../src/modules/fees/', import.meta.url);
+const advanced = readdirSync(advancedDirectory)
+  .filter((file) => file.startsWith('fee') && file.endsWith('.service.js'))
+  .sort()
+  .map((file) => readFileSync(new URL(file, advancedDirectory), 'utf8'))
+  .join('\n');
+const feeService = advanced;
+const workflow = advanced;
 const routes = read('../src/modules/fees/fee.routes.js');
 const seed = read('../prisma/seedFees.js');
 const wizard = read('../../frontend/src/pages/fees/FeeStructureWizard.jsx');

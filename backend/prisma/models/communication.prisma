@@ -1,0 +1,332 @@
+// communication domain
+
+model Notification {
+  id                      String                     @id @default(cuid())
+  schoolId                String?
+  academicSessionId       String?
+  type                    String
+  category                CommunicationCategory      @default(GENERAL)
+  priority                NotificationPriority       @default(NORMAL)
+  title                   String
+  message                 String
+  shortMessage            String?
+  actionUrl               String?
+  actionLabel             String?
+  icon                    String?
+  imageUrl                String?
+  sourceModule            String
+  sourceEntityType        String?
+  sourceEntityId          String?
+  createdByUserId         String?
+  createdByRole           Role?
+  status                  NotificationStatus         @default(DRAFT)
+  scheduledAt             DateTime?
+  publishedAt             DateTime?
+  expiresAt               DateTime?
+  acknowledgementDeadline DateTime?
+  requiresAcknowledgement Boolean                    @default(false)
+  allowReply              Boolean                    @default(false)
+  isSystemGenerated       Boolean                    @default(false)
+  isMandatory             Boolean                    @default(false)
+  resolvedRecipientCount  Int                        @default(0)
+  dedupeKey               String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  deletedAt               DateTime?
+  recipients              NotificationRecipient[]
+  audienceRules           NotificationAudienceRule[]
+  announcement            Announcement?
+  attachments             CommunicationAttachment[]
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, status, publishedAt])
+  @@index([schoolId, category, createdAt])
+  @@index([scheduledAt, status])
+  @@index([sourceModule, sourceEntityType, sourceEntityId])
+}
+
+model NotificationAudienceRule {
+  id             String       @id @default(cuid())
+  notificationId String
+  kind           AudienceKind
+  role           Role?
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId, kind])
+}
+
+model NotificationRecipient {
+  id                  String                 @id @default(cuid())
+  notificationId      String
+  schoolId            String?
+  recipientKey        String
+  userId              String?
+  studentId           String?
+  parentId            String?
+  recipientRole       Role
+  deliveryContext     AudienceKind
+  context             Json?
+  seenAt              DateTime?
+  readAt              DateTime?
+  acknowledgedAt      DateTime?
+  acknowledgementNote String?
+  dismissedAt         DateTime?
+  archivedAt          DateTime?
+  isMuted             Boolean                @default(false)
+  createdAt           DateTime               @default(now())
+  notification        Notification           @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  deliveries          NotificationDelivery[]
+
+  @@unique([notificationId, recipientKey])
+  @@index([schoolId, recipientKey, readAt, createdAt])
+  @@index([notificationId, acknowledgedAt])
+}
+
+model NotificationDelivery {
+  id                      String                @id @default(cuid())
+  notificationRecipientId String
+  channel                 DeliveryChannel
+  status                  DeliveryStatus        @default(QUEUED)
+  attemptCount            Int                   @default(0)
+  provider                String
+  providerMessageId       String?
+  sentAt                  DateTime?
+  deliveredAt             DateTime?
+  failedAt                DateTime?
+  failureReason           String?
+  nextRetryAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  recipient               NotificationRecipient @relation(fields: [notificationRecipientId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationRecipientId, channel])
+  @@index([status, nextRetryAt])
+  @@index([channel, status, createdAt])
+}
+
+model Announcement {
+  id                      String                    @id @default(cuid())
+  schoolId                String
+  academicSessionId       String?
+  notificationId          String                    @unique
+  title                   String
+  content                 String
+  summary                 String?
+  category                CommunicationCategory     @default(GENERAL)
+  priority                NotificationPriority      @default(NORMAL)
+  status                  NotificationStatus        @default(DRAFT)
+  publishAt               DateTime?
+  expiresAt               DateTime?
+  acknowledgementDeadline DateTime?
+  requiresAcknowledgement Boolean                   @default(false)
+  allowComments           Boolean                   @default(false)
+  allowReplies            Boolean                   @default(false)
+  createdByUserId         String
+  updatedByUserId         String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  archivedAt              DateTime?
+  deletedAt               DateTime?
+  notification            Notification              @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  attachments             CommunicationAttachment[]
+
+  @@index([schoolId, status, publishAt])
+  @@index([schoolId, category, createdAt])
+}
+
+model Conversation {
+  id            String                    @id @default(cuid())
+  schoolId      String
+  type          ConversationType
+  subject       String?
+  classId       String?
+  sectionId     String?
+  studentId     String?
+  createdByKey  String
+  status        ConversationStatus        @default(OPEN)
+  lastMessageAt DateTime                  @default(now())
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  closedAt      DateTime?
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@index([schoolId, status, lastMessageAt])
+  @@index([schoolId, classId, sectionId])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  participantKey String
+  userId         String?
+  studentId      String?
+  role           Role
+  joinedAt       DateTime     @default(now())
+  leftAt         DateTime?
+  lastReadAt     DateTime?
+  mutedUntil     DateTime?
+  canReply       Boolean      @default(true)
+  canManage      Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, participantKey])
+  @@index([participantKey, leftAt, conversationId])
+}
+
+model Message {
+  id               String                    @id @default(cuid())
+  conversationId   String
+  schoolId         String
+  senderKey        String
+  senderUserId     String?
+  senderRole       Role
+  messageType      MessageType               @default(TEXT)
+  content          String
+  replyToMessageId String?
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime                  @default(now())
+  conversation     Conversation              @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo          Message?                  @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[]                 @relation("MessageReplies")
+  attachments      CommunicationAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@index([schoolId, senderKey, createdAt])
+}
+
+model CommunicationAttachment {
+  id             String        @id @default(cuid())
+  schoolId       String
+  uploadedByKey  String
+  notificationId String?
+  announcementId String?
+  messageId      String?
+  fileName       String
+  originalName   String
+  fileUrl        String
+  publicId       String?
+  mimeType       String
+  fileSize       Int
+  createdAt      DateTime      @default(now())
+  notification   Notification? @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  announcement   Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, notificationId])
+  @@index([schoolId, announcementId])
+  @@index([schoolId, messageId])
+}
+
+model NotificationPreference {
+  id              String                @id @default(cuid())
+  schoolId        String
+  recipientKey    String
+  userId          String?
+  category        CommunicationCategory
+  inAppEnabled    Boolean               @default(true)
+  emailEnabled    Boolean               @default(true)
+  smsEnabled      Boolean               @default(false)
+  pushEnabled     Boolean               @default(false)
+  whatsAppEnabled Boolean               @default(false)
+  digestMode      DigestMode            @default(IMMEDIATE)
+  quietHoursStart String?
+  quietHoursEnd   String?
+  timezone        String                @default("UTC")
+  language        String                @default("en")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([schoolId, recipientKey, category])
+  @@index([schoolId, recipientKey])
+}
+
+model CommunicationPolicy {
+  id                           String   @id @default(cuid())
+  schoolId                     String   @unique
+  directMessagingEnabled       Boolean  @default(true)
+  studentToTeacherEnabled      Boolean  @default(true)
+  parentToTeacherEnabled       Boolean  @default(true)
+  teacherToParentEnabled       Boolean  @default(true)
+  studentRepliesEnabled        Boolean  @default(true)
+  parentRepliesEnabled         Boolean  @default(true)
+  groupCreationEnabled         Boolean  @default(false)
+  allowedAttachmentTypes       String[] @default(["application/pdf", "image/jpeg", "image/png", "image/webp"])
+  maximumAttachmentBytes       Int      @default(10485760)
+  maximumAttachmentCount       Int      @default(5)
+  messageEditingWindowMinutes  Int      @default(15)
+  messageDeletionWindowMinutes Int      @default(15)
+  communicationRetentionDays   Int      @default(730)
+  quietHoursStart              String?
+  quietHoursEnd                String?
+  emergencyBypassesQuietHours  Boolean  @default(true)
+  readReceiptsEnabled          Boolean  @default(true)
+  acknowledgementEnabled       Boolean  @default(true)
+  emailDeliveryEnabled         Boolean  @default(false)
+  smsDeliveryEnabled           Boolean  @default(false)
+  pushDeliveryEnabled          Boolean  @default(false)
+  whatsAppDeliveryEnabled      Boolean  @default(false)
+  moderationEnabled            Boolean  @default(false)
+  blockedWords                 String[] @default([])
+  maximumRecipientsPerMessage  Int      @default(5000)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+model NotificationTemplate {
+  id                String                @id @default(cuid())
+  schoolId          String?
+  name              String
+  code              String
+  category          CommunicationCategory
+  channel           DeliveryChannel
+  titleTemplate     String
+  bodyTemplate      String
+  shortBodyTemplate String?
+  allowedVariables  String[]              @default([])
+  isSystemTemplate  Boolean               @default(false)
+  isActive          Boolean               @default(true)
+  createdByUserId   String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([schoolId, code, channel])
+  @@index([schoolId, category, isActive])
+}
+
+model DeviceToken {
+  id           String         @id @default(cuid())
+  schoolId     String
+  recipientKey String
+  token        String         @unique
+  platform     DevicePlatform
+  isActive     Boolean        @default(true)
+  lastUsedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([schoolId, recipientKey, isActive])
+}
+
+model CommunicationAudit {
+  id         String   @id @default(cuid())
+  schoolId   String?
+  actorKey   String?
+  action     String
+  entityType String
+  entityId   String?
+  previous   Json?
+  current    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+// Fee and financial management. Monetary values are stored in minor units.

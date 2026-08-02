@@ -9,7 +9,7 @@
   },
   "scripts": {
     "seed:multi-role": "node prisma/seedMultiRoleWorkspaces.js",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate --schema prisma",
     "frontend:install": "node scripts/frontendInstall.js",
     "frontend:build": "node scripts/frontendBuild.js",
     "frontend:copy": "node scripts/build.js",
@@ -21,8 +21,12 @@
     "benchmark": "node scripts/performanceBenchmark.js",
     "verify:performance-migration": "node prisma/verifyPerformanceMigration.js",
     "profile:database": "node prisma/profilePerformanceQueries.js",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format --schema prisma",
+    "prisma:validate": "prisma validate --schema prisma",
+    "prisma:generate": "prisma generate --schema prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma",
+    "prisma:migrate:status": "prisma migrate status --schema prisma",
+    "prisma:studio": "prisma studio --schema prisma",
     "seed": "node prisma/seed.js",
     "seed:platform-owner": "node prisma/seedPlatformOwner.js",
     "seed:fees": "node prisma/seedFees.js",
@@ -49,6 +53,9 @@
     "seed:analytics": "node prisma/seedAnalytics.js",
     "seed:examinations:gvs": "node prisma/seedGvsExaminations.js",
     "smoke:examinations": "node prisma/smokeExaminationRoleApis.js"
+  },
+  "prisma": {
+    "schema": "prisma"
   },
   "keywords": [
     "schoolos",

@@ -1,0 +1,203 @@
+// analytics domain
+
+model AnalyticsConfiguration {
+  id                       String   @id @default(cuid())
+  schoolId                 String   @unique
+  examWeight               Float    @default(30)
+  chapterQuizWeight        Float    @default(20)
+  attendanceWeight         Float    @default(15)
+  homeworkWeight           Float    @default(15)
+  teacherEvaluationWeight  Float    @default(10)
+  studentFeedbackWeight    Float    @default(5)
+  resourceEngagementWeight Float    @default(5)
+  chapterAssessmentWeight  Float    @default(30)
+  chapterHomeworkWeight    Float    @default(20)
+  chapterTeacherWeight     Float    @default(15)
+  chapterFeedbackWeight    Float    @default(15)
+  chapterAttendanceWeight  Float    @default(10)
+  chapterResourceWeight    Float    @default(10)
+  lowRiskThreshold         Float    @default(70)
+  mediumRiskThreshold      Float    @default(50)
+  minimumAttendanceTarget  Float    @default(75)
+  minimumHomeworkTarget    Float    @default(70)
+  minimumChapterTarget     Float    @default(60)
+  rankingEnabled           Boolean  @default(false)
+  formulaVersion           String   @default("1.0")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  school                   School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, updatedAt])
+}
+
+model AnalyticsRiskRule {
+  id            String       @id @default(cuid())
+  schoolId      String
+  code          String
+  title         String
+  description   String?
+  isEnabled     Boolean      @default(true)
+  severity      RiskSeverity
+  threshold     Float?
+  configuration Json?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, isEnabled])
+}
+
+model LearningOutcome {
+  id                   String                @id @default(cuid())
+  schoolId             String
+  chapterId            String
+  title                String
+  description          String?
+  order                Int                   @default(0)
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  chapter              Chapter               @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  assessmentComponents AssessmentComponent[]
+
+  @@unique([schoolId, chapterId, title])
+  @@index([schoolId, chapterId, isActive])
+}
+
+model AssessmentComponent {
+  id                String                            @id @default(cuid())
+  schoolId          String
+  assessmentId      String
+  subjectId         String
+  chapterId         String?
+  learningOutcomeId String?
+  title             String
+  maximumMarks      Float
+  difficulty        AssessmentDifficulty?
+  order             Int                               @default(0)
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+  assessment        ChapterAssessment                 @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  learningOutcome   LearningOutcome?                  @relation(fields: [learningOutcomeId], references: [id], onDelete: SetNull)
+  scores            StudentAssessmentComponentScore[]
+
+  @@unique([schoolId, assessmentId, order])
+  @@index([schoolId, assessmentId])
+  @@index([schoolId, chapterId])
+  @@index([schoolId, learningOutcomeId])
+}
+
+model StudentAssessmentComponentScore {
+  id                    String              @id @default(cuid())
+  schoolId              String
+  studentId             String
+  assessmentComponentId String
+  marksObtained         Float?
+  absent                Boolean             @default(false)
+  remarks               String?
+  recordedAt            DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  assessmentComponent   AssessmentComponent @relation(fields: [assessmentComponentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentComponentId, studentId])
+  @@index([schoolId, studentId, recordedAt])
+  @@index([schoolId, assessmentComponentId])
+}
+
+model ResourceEngagementEvent {
+  id          String                      @id @default(cuid())
+  schoolId    String
+  resourceId  String
+  studentId   String
+  eventType   ResourceEngagementEventType
+  progress    Float?
+  durationSec Int?
+  occurredAt  DateTime                    @default(now())
+  dedupeKey   String?                     @unique
+  resource    SectionResource             @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, studentId, occurredAt])
+  @@index([schoolId, resourceId, studentId])
+}
+
+model AnalyticsRecommendation {
+  id                String                          @id @default(cuid())
+  schoolId          String
+  studentId         String?
+  subjectId         String?
+  chapterId         String?
+  title             String
+  explanation       String
+  recommendedRole   Role
+  priority          AnalyticsRecommendationPriority @default(MEDIUM)
+  status            AnalyticsRecommendationStatus   @default(OPEN)
+  suggestedDeadline DateTime?
+  completionNote    String?
+  sourceCode        String
+  dedupeKey         String?
+  parentVisible     Boolean                         @default(false)
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+
+  @@unique([schoolId, dedupeKey])
+  @@index([schoolId, studentId, status])
+  @@index([schoolId, recommendedRole, status])
+}
+
+model StudentAnalyticsSnapshot {
+  id                String                @id @default(cuid())
+  schoolId          String
+  studentId         String
+  academicSessionId String
+  snapshotType      AnalyticsSnapshotType
+  periodStart       DateTime?
+  periodEnd         DateTime?
+  score             Float?
+  riskLevel         AnalyticsRiskLevel?
+  dataCoverage      Float?
+  payload           Json
+  formulaVersion    String
+  createdAt         DateTime              @default(now())
+  createdById       String?
+
+  @@index([schoolId, studentId, createdAt])
+  @@index([schoolId, academicSessionId, snapshotType])
+}
+
+model AnalyticsAuditLog {
+  id         String   @id @default(cuid())
+  schoolId   String
+  userId     String?
+  userRole   String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  reason     String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+model AnalyticsStatusOverride {
+  id               String    @id @default(cuid())
+  schoolId         String
+  entityType       String
+  entityId         String
+  calculatedStatus String
+  overriddenStatus String
+  reason           String
+  createdById      String
+  createdAt        DateTime  @default(now())
+  revokedAt        DateTime?
+
+  @@index([schoolId, entityType, entityId, createdAt])
+  @@index([schoolId, createdById])
+}
+
+// Examination and result management

@@ -1,0 +1,127 @@
+// curriculum domain
+
+model Curriculum {
+  id              String              @id @default(cuid())
+  schoolId        String
+  name            String
+  curriculumType  String
+  academicSession String
+  description     String?
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  school          School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  versions        CurriculumVersion[]
+
+  @@unique([schoolId, name, academicSession])
+  @@index([schoolId, academicSession, isActive])
+}
+
+model CurriculumVersion {
+  id            String           @id @default(cuid())
+  schoolId      String
+  curriculumId  String
+  versionNumber Int
+  status        String           @default("DRAFT")
+  changeSummary String?
+  snapshot      Json?
+  publishedAt   DateTime?
+  archivedAt    DateTime?
+  createdById   String?
+  publishedById String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  school        School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculum    Curriculum       @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  chapters      Chapter[]
+  books         Book[]
+  units         CurriculumUnit[]
+
+  @@unique([curriculumId, versionNumber])
+  @@index([schoolId, status])
+}
+
+model Publisher {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  website   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  books     Book[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive])
+}
+
+model Book {
+  id                  String             @id @default(cuid())
+  schoolId            String
+  curriculumVersionId String?
+  publisherId         String?
+  classId             String
+  subjectId           String
+  title               String
+  author              String?
+  edition             String?
+  isbn                String?
+  academicSession     String
+  coverImageUrl       String?
+  board               String?
+  resourceSource      String?
+  resourcePreference  String?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  school              School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculumVersion   CurriculumVersion? @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
+  publisher           Publisher?         @relation(fields: [publisherId], references: [id], onDelete: SetNull)
+  class               Class              @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subject             Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapters            Chapter[]
+
+  @@unique([schoolId, academicSession, classId, subjectId, title])
+  @@index([schoolId, classId, subjectId])
+  @@index([publisherId])
+}
+
+model CurriculumUnit {
+  id                  String             @id @default(cuid())
+  schoolId            String
+  curriculumVersionId String?
+  subjectId           String
+  classId             String?
+  name                String
+  displayOrder        Int                @default(0)
+  description         String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  school              School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculumVersion   CurriculumVersion? @relation(fields: [curriculumVersionId], references: [id], onDelete: SetNull)
+  subject             Subject            @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  class               Class?             @relation(fields: [classId], references: [id], onDelete: SetNull)
+  chapters            Chapter[]
+
+  @@unique([schoolId, curriculumVersionId, subjectId, classId, name])
+  @@index([schoolId, subjectId, classId])
+}
+
+model CurriculumAuditLog {
+  id          String   @id @default(cuid())
+  schoolId    String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, entityType, entityId])
+}
+
+// Homework and learning resources extend the existing curriculum graph. Academic
+// sessions remain strings to match Student.session and the rest of SchoolOS.

@@ -1,0 +1,260 @@
+/* ============================= */
+/* 🛠 UTILITIES */
+/* ============================= */
+
+@layer utilities {
+
+  .animate-fadeIn {
+    animation: fadeIn 0.25s ease-in-out;
+  }
+
+  .animate-slideIn {
+    animation: slideIn 0.25s ease-out;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.6s linear infinite;
+  }
+
+  .animate-ripple {
+    animation: ripple 0.45s ease-out;
+  }
+
+  /* Surface Levels */
+
+  .surface-base {
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+  }
+
+  .surface-muted {
+    background-color: var(--surface-muted);
+    color: var(--text-primary);
+  }
+
+  /* Brand Colors */
+
+  .brand-bg-primary {
+    background-color: var(--school-primary);
+  }
+
+  .brand-bg-secondary {
+    background-color: var(--school-secondary);
+  }
+
+  .brand-text-primary {
+    color: var(--school-primary);
+  }
+
+  /* Layout container */
+
+  .container-page {
+    @apply
+      max-w-7xl
+      mx-auto
+      px-4
+      sm:px-6
+      lg:px-8;
+  }
+
+  @media (max-width: 639px) {
+    main :where(.overflow-auto, .overflow-x-auto) {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-inline: contain;
+    }
+
+    main :where(table) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    main :where(.fixed.inset-0) {
+      padding: 0.75rem;
+    }
+
+    main :where([class*='max-w-']) {
+      max-width: 100%;
+    }
+  }
+
+  /* Calm surface fallbacks for legacy feature components. Shared UI components
+     use these same tokens directly; these selectors keep older feature tables
+     and one-off panels visually consistent while they are migrated. */
+  :where(.bg-white) {
+    background-color: var(--surface-base);
+  }
+
+  :where(.bg-white\/95) {
+    background-color: color-mix(in srgb, var(--surface-base) 95%, transparent);
+  }
+
+  :where(.bg-white\/90) {
+    background-color: color-mix(in srgb, var(--surface-base) 90%, transparent);
+  }
+
+  :where(.bg-white\/80) {
+    background-color: color-mix(in srgb, var(--surface-base) 80%, transparent);
+  }
+
+  :where(.bg-white\/70) {
+    background-color: color-mix(in srgb, var(--surface-base) 70%, transparent);
+  }
+
+  :where(.bg-slate-50) {
+    background-color: var(--surface-muted);
+  }
+
+  :where(.bg-slate-100) {
+    background-color: var(--surface-hover);
+  }
+
+  :where(.border-slate-100, .border-slate-200) {
+    border-color: var(--border-soft);
+  }
+
+  :where(.text-slate-950, .text-slate-900) {
+    color: var(--text-primary);
+  }
+
+  :where(.text-slate-600, .text-slate-500) {
+    color: var(--text-muted);
+  }
+
+  :where(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+    background-color: var(--surface-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+  }
+
+  :where(table) {
+    color: var(--text-primary);
+  }
+
+  :where(thead) {
+    background-color: var(--surface-muted);
+  }
+
+  :where(tbody tr) {
+    border-color: var(--border-soft);
+  }
+
+  :where(tbody tr:hover) {
+    background-color: color-mix(in srgb, var(--surface-hover) 62%, transparent);
+  }
+
+  /* Dark-mode fallbacks for legacy components that still use light-only utilities. */
+  .dark :where(.bg-white) {
+    background-color: var(--surface-base);
+  }
+
+  .dark :where(.bg-white\/95) {
+    background-color: color-mix(in srgb, var(--surface-base) 95%, transparent);
+  }
+
+  .dark :where(.bg-white\/90) {
+    background-color: color-mix(in srgb, var(--surface-base) 90%, transparent);
+  }
+
+  .dark :where(.bg-white\/80) {
+    background-color: color-mix(in srgb, var(--surface-base) 80%, transparent);
+  }
+
+  .dark :where(.bg-white\/70) {
+    background-color: color-mix(in srgb, var(--surface-base) 70%, transparent);
+  }
+
+  .dark :where(.bg-slate-50) {
+    background-color: var(--surface-muted);
+  }
+
+  .dark :where(.bg-slate-100) {
+    background-color: var(--surface-hover);
+  }
+
+  .dark :where(.bg-slate-200) {
+    background-color: color-mix(in srgb, var(--surface-hover) 72%, var(--border-soft));
+  }
+
+  .dark :where(.bg-slate-300) {
+    background-color: rgb(55 76 105);
+  }
+
+  .dark :where(.bg-slate-900) {
+    background-color: var(--surface-base);
+  }
+
+  .dark :where(.bg-slate-950) {
+    background-color: var(--background);
+  }
+
+  .dark :where(.hover\:bg-white:hover) {
+    background-color: var(--surface-elevated);
+  }
+
+  .dark :where(.hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover) {
+    background-color: var(--surface-hover);
+  }
+
+  .dark :where(.hover\:bg-slate-200:hover, .hover\:bg-slate-300:hover) {
+    background-color: color-mix(in srgb, var(--surface-hover) 72%, var(--border-soft));
+  }
+
+  .dark :where(.border-slate-100) {
+    border-color: var(--border-soft);
+  }
+
+  .dark :where(.border-slate-200) {
+    border-color: var(--border-soft);
+  }
+
+  .dark :where(.border-slate-300) {
+    border-color: color-mix(in srgb, var(--border-soft) 76%, var(--text-muted));
+  }
+
+  .dark :where(.border-gray-100, .border-gray-200) {
+    border-color: var(--border-soft);
+  }
+
+  .dark :where(.border-gray-300) {
+    border-color: color-mix(in srgb, var(--border-soft) 76%, var(--text-muted));
+  }
+
+  .dark :where(.text-black, .text-slate-950, .text-slate-900, .text-gray-950, .text-gray-900) {
+    color: var(--text-primary);
+  }
+
+  .dark :where(.text-slate-800, .text-slate-700, .text-gray-800, .text-gray-700) {
+    color: color-mix(in srgb, var(--text-primary) 90%, var(--text-muted));
+  }
+
+  .dark :where(.text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500) {
+    color: var(--text-muted);
+  }
+
+  .dark :where(.text-slate-400, .text-gray-400) {
+    color: color-mix(in srgb, var(--text-muted) 82%, var(--background));
+  }
+
+  .dark :where(.placeholder\:text-slate-400::placeholder, .placeholder\:text-gray-400::placeholder) {
+    color: color-mix(in srgb, var(--text-muted) 82%, var(--background));
+  }
+
+  .dark :where(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+    background-color: var(--surface-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+  }
+
+  .dark :where(input:disabled, select:disabled, textarea:disabled) {
+    background-color: var(--surface-muted);
+    color: var(--text-muted);
+  }
+
+  .dark :where(table) {
+    color: var(--text-primary);
+  }
+
+  .dark :where(thead, tr):where(.bg-slate-100) {
+    background-color: var(--surface-muted);
+    color: var(--text-primary);
+  }
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { buildChapterAnalysisSummary } from '../src/services/chapterAnalysis.service.js';
 
 const poll = { id: 'poll-1', schoolId: 'school-1', classId: 'class-1', sectionId: 'section-1', subjectId: 'subject-1', chapterId: 'chapter-1', teacherId: 'teacher-1' };
@@ -47,7 +47,13 @@ test('legacy ten-point responses normalize to the five-point analytics scale', (
 });
 
 test('submission contracts use valid audit actors, five-point ratings, and conflict-free teacher saves', async () => {
-  const controller = await readFile(new URL('../src/controllers/chapterFeedback.controller.js', import.meta.url), 'utf8');
+  const controllerDirectory = new URL('../src/controllers/', import.meta.url);
+  const controllerFiles = (await readdir(controllerDirectory))
+    .filter((file) => file.startsWith('chapterFeedback') && file.endsWith('.js'))
+    .sort();
+  const controller = (await Promise.all(
+    controllerFiles.map((file) => readFile(new URL(file, controllerDirectory), 'utf8')),
+  )).join('\n');
   const portal = await readFile(new URL('../src/modules/student/studentPortal.service.js', import.meta.url), 'utf8');
   assert.match(controller, /actorId: \['STUDENT', 'PARENT'\]\.includes\(req\.user\.role\) \? null : req\.user\.id/);
   assert.match(controller, /number >= 1 && number <= 5/);
@@ -58,7 +64,13 @@ test('submission contracts use valid audit actors, five-point ratings, and confl
 });
 
 test('schema contains immutable response state, snapshots, tenancy and feedback audit log', async () => {
-  const schema = await readFile(new URL('../prisma/schema.prisma', import.meta.url), 'utf8');
+  const schemaDirectory = new URL('../prisma/', import.meta.url);
+  const modelDirectory = new URL('../prisma/models/', import.meta.url);
+  const modelFiles = (await readdir(modelDirectory)).filter((file) => file.endsWith('.prisma')).sort();
+  const schema = [
+    await readFile(new URL('schema.prisma', schemaDirectory), 'utf8'),
+    ...await Promise.all(modelFiles.map((file) => readFile(new URL(file, modelDirectory), 'utf8'))),
+  ].join('\n');
   assert.match(schema, /enum FeedbackResponseState[\s\S]*SUBMITTED[\s\S]*LOCKED[\s\S]*COMPILED/);
   assert.match(schema, /model StudentChapterVote[\s\S]*schoolId[\s\S]*snapshot\s+Json\?/);
   assert.match(schema, /model TeacherStudentEvaluation[\s\S]*version\s+Int[\s\S]*snapshot\s+Json\?/);

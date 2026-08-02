@@ -1,0 +1,294 @@
+// examinations domain
+
+model Examination {
+  id                String            @id @default(cuid())
+  schoolId          String
+  academicSessionId String
+  name              String
+  code              String
+  description       String?
+  startDate         DateTime
+  endDate           DateTime
+  resultDate        DateTime?
+  publicationDate   DateTime?
+  status            ExaminationStatus @default(DRAFT)
+  calculationConfig Json?
+  rankingConfig     Json?
+  createdById       String
+  approvedById      String?
+  approvedAt        DateTime?
+  publishedById     String?
+  publishedAt       DateTime?
+  archivedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  school             School                     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicSession    AcademicSession            @relation(fields: [academicSessionId], references: [id], onDelete: Restrict)
+  cohorts            ExaminationCohort[]
+  reviews            ExaminationReview[]
+  results            ExaminationStudentResult[]
+  versions           ExaminationResultVersion[]
+  reportCards        ExaminationReportCard[]
+  auditLogs          ExaminationAuditLog[]
+  ExaminationSubject ExaminationSubject[]
+
+  @@unique([schoolId, academicSessionId, code])
+  @@index([schoolId, status, startDate])
+  @@index([academicSessionId])
+}
+
+model ExaminationCohort {
+  id                      String                  @id @default(cuid())
+  examinationId           String
+  schoolId                String
+  classId                 String
+  sectionId               String
+  status                  ExaminationCohortStatus @default(PENDING)
+  classTeacherRemarks     String?
+  principalRemarks        String?
+  promotionRecommendation String?
+  forwardedById           String?
+  forwardedAt             DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  examination Examination          @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  class       Class                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section     Section              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subjects    ExaminationSubject[]
+  reviews     ExaminationReview[]
+  School      School               @relation(fields: [schoolId], references: [id])
+
+  @@unique([examinationId, sectionId])
+  @@index([schoolId, classId, sectionId])
+  @@index([examinationId, status])
+}
+
+model ExaminationSubject {
+  id            String                   @id @default(cuid())
+  examinationId String
+  cohortId      String
+  subjectId     String
+  teacherId     String?
+  displayOrder  Int                      @default(0)
+  isOptional    Boolean                  @default(false)
+  status        ExaminationSubjectStatus @default(PENDING)
+  submittedById String?
+  submittedAt   DateTime?
+  lockedAt      DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  examination    Examination                @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  cohort         ExaminationCohort          @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  subject        Subject                    @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  components     ExaminationComponent[]
+  subjectResults ExaminationSubjectResult[]
+
+  @@unique([cohortId, subjectId])
+  @@index([examinationId, teacherId, status])
+}
+
+model ExaminationComponent {
+  id            String   @id @default(cuid())
+  examSubjectId String
+  name          String
+  code          String
+  maximumMarks  Decimal  @db.Decimal(7, 2)
+  passingMarks  Decimal  @db.Decimal(7, 2)
+  weightage     Decimal  @default(100) @db.Decimal(7, 2)
+  isMandatory   Boolean  @default(true)
+  allowDecimal  Boolean  @default(false)
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  examSubject ExaminationSubject @relation(fields: [examSubjectId], references: [id], onDelete: Cascade)
+  marks       ExaminationMark[]
+
+  @@unique([examSubjectId, code])
+  @@index([examSubjectId, displayOrder])
+}
+
+model ExaminationMark {
+  id               String                      @id @default(cuid())
+  schoolId         String
+  examinationId    String
+  componentId      String
+  studentId        String
+  marks            Decimal?                    @db.Decimal(7, 2)
+  attendanceStatus ExaminationAttendanceStatus @default(PRESENT)
+  teacherRemark    String?
+  state            ExaminationMarkState        @default(DRAFT)
+  enteredById      String
+  submittedAt      DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  component ExaminationComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  student   Student              @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([componentId, studentId])
+  @@index([schoolId, examinationId, studentId])
+  @@index([examinationId, state])
+}
+
+model ExaminationGradeScale {
+  id          String   @id @default(cuid())
+  schoolId    String
+  name        String
+  code        String
+  rules       Json
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, isActive])
+}
+
+model ExaminationRuleSet {
+  id          String              @id @default(cuid())
+  schoolId    String
+  name        String
+  type        ExaminationRuleType
+  config      Json
+  isDefault   Boolean             @default(false)
+  isActive    Boolean             @default(true)
+  createdById String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, type, name])
+  @@index([schoolId, type, isActive])
+}
+
+model ExaminationReview {
+  id            String                   @id @default(cuid())
+  examinationId String
+  cohortId      String?
+  level         ExaminationApprovalLevel
+  decision      ExaminationDecision
+  reason        String?
+  actorId       String
+  createdAt     DateTime                 @default(now())
+
+  examination Examination        @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  cohort      ExaminationCohort? @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  @@index([examinationId, level, createdAt])
+  @@index([cohortId])
+}
+
+model ExaminationStudentResult {
+  id                String                      @id @default(cuid())
+  schoolId          String
+  examinationId     String
+  studentId         String
+  version           Int                         @default(1)
+  totalObtained     Decimal                     @db.Decimal(10, 2)
+  totalMaximum      Decimal                     @db.Decimal(10, 2)
+  percentage        Decimal                     @db.Decimal(7, 2)
+  grade             String?
+  gradePoint        Decimal?                    @db.Decimal(5, 2)
+  rank              Int?
+  sectionRank       Int?
+  resultStatus      ExaminationResultStatus
+  promotionStatus   ExaminationPromotionStatus?
+  graceMarks        Decimal                     @default(0) @db.Decimal(7, 2)
+  attendanceSummary Json?
+  calculatedAt      DateTime                    @default(now())
+
+  examination Examination                @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  student     Student                    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  subjects    ExaminationSubjectResult[]
+
+  @@unique([examinationId, studentId, version])
+  @@index([schoolId, studentId, calculatedAt])
+  @@index([examinationId, rank])
+}
+
+model ExaminationSubjectResult {
+  id                 String                      @id @default(cuid())
+  studentResultId    String
+  examSubjectId      String
+  studentId          String
+  obtainedMarks      Decimal                     @db.Decimal(7, 2)
+  maximumMarks       Decimal                     @db.Decimal(7, 2)
+  percentage         Decimal                     @db.Decimal(7, 2)
+  grade              String?
+  passed             Boolean
+  graceMarks         Decimal                     @default(0) @db.Decimal(7, 2)
+  attendanceStatus   ExaminationAttendanceStatus @default(PRESENT)
+  componentBreakdown Json
+
+  studentResult ExaminationStudentResult @relation(fields: [studentResultId], references: [id], onDelete: Cascade)
+  examSubject   ExaminationSubject       @relation(fields: [examSubjectId], references: [id], onDelete: Restrict)
+  student       Student                  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentResultId, examSubjectId])
+  @@index([studentId, examSubjectId])
+}
+
+model ExaminationResultVersion {
+  id            String   @id @default(cuid())
+  examinationId String
+  version       Int
+  snapshot      Json
+  reason        String?
+  createdById   String
+  createdAt     DateTime @default(now())
+
+  examination Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+
+  @@unique([examinationId, version])
+}
+
+model ExaminationReportCard {
+  id             String   @id @default(cuid())
+  examinationId  String
+  studentId      String
+  resultVersion  Int
+  verificationId String   @unique @default(uuid())
+  issuedAt       DateTime @default(now())
+  generatedById  String
+  metadata       Json?
+
+  examination Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([examinationId, studentId, resultVersion])
+  @@index([studentId, issuedAt])
+}
+
+model ExaminationAuditLog {
+  id            String   @id @default(cuid())
+  schoolId      String
+  examinationId String?
+  actorId       String
+  action        String
+  entityType    String
+  entityId      String
+  oldValue      Json?
+  newValue      Json?
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  examination Examination? @relation(fields: [examinationId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, createdAt])
+  @@index([examinationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Enums

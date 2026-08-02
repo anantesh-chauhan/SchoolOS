@@ -27,11 +27,14 @@ test('router exposes role dashboards, governance, registers and configuration en
 });
 
 test('frontend route uses the role-specific examination hub', async () => {
-  const [app, hub, layout] = await Promise.all([
+  const [appShell, lazyPages, coreRoutes, hub, layout] = await Promise.all([
     readFile(new URL('../../frontend/src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../../frontend/src/routes/lazyPages.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../../frontend/src/routes/CoreRoutes.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../../frontend/src/pages/examinations/ExaminationHubPage.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../../frontend/src/layouts/DashboardLayout.jsx', import.meta.url), 'utf8'),
   ]);
+  const app = [appShell, lazyPages, coreRoutes].join('\n');
   assert.match(app, /ExaminationHubPage/);
   for (const role of ['PLATFORM_OWNER','SCHOOL_OWNER','PRINCIPAL','EXAM_COORDINATOR','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT']) assert.match(hub, new RegExp(role));
   assert.doesNotMatch(layout.slice(0, layout.indexOf('const DashboardLayout')), /roleMenuConfig\.PRINCIPAL/);

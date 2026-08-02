@@ -1,0 +1,118 @@
+/* ============================= */
+/* 🧱 COMPONENT UTILITIES */
+/* ============================= */
+
+@layer components {
+
+  /* Glass Surface */
+
+  .glass-panel {
+    @apply
+      bg-white/70
+      dark:bg-slate-900/80
+      backdrop-blur-xl
+      border
+      border-white/60
+      dark:border-slate-700/80
+      shadow-xl
+      rounded-2xl;
+  }
+
+  /* Modern Card */
+
+  .card {
+    @apply
+      bg-white
+      dark:bg-slate-900
+      border
+      border-slate-200
+      dark:border-slate-700
+      rounded-2xl
+      shadow-sm
+      transition-all
+      duration-200;
+  }
+
+  .card-hover {
+    @apply hover:shadow-md hover:-translate-y-[2px] dark:hover:border-slate-600;
+  }
+
+  /* Page Titles */
+
+  .page-title {
+    @apply
+      text-3xl
+      lg:text-4xl
+      font-semibold
+      tracking-tight
+      text-slate-900
+      dark:text-white;
+  }
+
+  .page-subtitle {
+    @apply
+      text-sm
+      lg:text-base
+      text-slate-600
+      dark:text-slate-300;
+  }
+
+  /* Section spacing */
+
+  .section {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  /* Mobile-first building blocks for dense legacy screens. */
+  .mobile-stack {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center;
+  }
+
+  .mobile-actions {
+    @apply grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap;
+  }
+
+  .scroll-table {
+    @apply -mx-1 overflow-x-auto overscroll-x-contain px-1;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mobile-card-list {
+    @apply grid gap-3 md:hidden;
+  }
+
+  .desktop-table {
+    @apply hidden md:block;
+  }
+
+  /* Buttons */
+
+  .btn-primary {
+    @apply
+      px-5
+      py-2.5
+      rounded-xl
+      font-medium
+      text-white
+      transition-all
+      duration-200
+      shadow-sm
+      hover:shadow-md
+      active:scale-[0.98];
+    background-color: var(--school-primary);
+    box-shadow: 0 6px 14px rgb(37 99 235 / 0.18);
+  }
+
+  .btn-secondary {
+    @apply
+      px-5
+      py-2.5
+      rounded-xl
+      font-medium
+      border
+      border-slate-200
+      dark:border-slate-700
+      hover:bg-slate-50
+      dark:hover:bg-slate-800;
+  }
+}

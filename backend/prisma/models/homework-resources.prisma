@@ -1,0 +1,414 @@
+// homework resources domain
+
+model HomeworkModuleSetting {
+  id                           String   @id @default(cuid())
+  schoolId                     String   @unique
+  enabled                      Boolean  @default(true)
+  parentVisibility             Boolean  @default(true)
+  parentSubmissionAllowed      Boolean  @default(false)
+  defaultLateSubmissionAllowed Boolean  @default(false)
+  defaultReminderHours         Int[]    @default([24, 3])
+  maximumUploadBytes           Int      @default(10485760)
+  maximumAttachmentCount       Int      @default(5)
+  allowedMimeTypes             String[] @default(["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/jpeg", "image/png", "image/webp", "text/plain"])
+  studentResubmissionAllowed   Boolean  @default(true)
+  teacherEditAfterPublication  Boolean  @default(true)
+  marksVisible                 Boolean  @default(true)
+  feedbackVisible              Boolean  @default(true)
+  resourceDownloadAllowed      Boolean  @default(true)
+  moderationMode               String   @default("DIRECT")
+  classTeacherPublication      Boolean  @default(false)
+  zipUploadsEnabled            Boolean  @default(false)
+  defaultParentVisibility      Boolean  @default(true)
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+  school                       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model Homework {
+  id                     String                @id @default(cuid())
+  schoolId               String
+  academicSession        String
+  createdByUserId        String?
+  createdByRole          Role
+  classId                String?
+  sectionId              String?
+  subjectId              String?
+  chapterId              String?
+  teacherAssignmentId    String?
+  categoryId             String?
+  contentTypeCode        String?
+  title                  String
+  description            String?
+  instructions           String?
+  homeworkType           HomeworkType          @default(PRACTICE)
+  priority               HomeworkPriority      @default(NORMAL)
+  estimatedMinutes       Int?
+  maximumMarks           Int?
+  passingMarks           Int?
+  allowSubmission        Boolean               @default(true)
+  allowLateSubmission    Boolean               @default(false)
+  requiresAttachment     Boolean               @default(false)
+  textResponseEnabled    Boolean               @default(true)
+  resubmissionAllowed    Boolean               @default(true)
+  maximumAttempts        Int                   @default(1)
+  maximumAttachments     Int                   @default(5)
+  allowedSubmissionTypes String[]              @default([])
+  submissionInstructions String?
+  learningObjective      String?
+  assignedAt             DateTime              @default(now())
+  dueAt                  DateTime?
+  scheduledAt            DateTime?
+  publishedAt            DateTime?
+  closedAt               DateTime?
+  status                 AcademicContentStatus @default(DRAFT)
+  audienceMode           HomeworkAudienceMode  @default(ENTIRE_SECTION)
+  audienceScope          AcademicAudienceScope @default(SELECTED_SECTIONS)
+  parentVisibility       Boolean               @default(true)
+  expiresAt              DateTime?
+  updatedAfterPublish    Boolean               @default(false)
+  archivedAt             DateTime?
+  deletedAt              DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  school         School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  creator        User?                   @relation("HomeworkCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  class          Class?                  @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section        Section?                @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject        Subject?                @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapter        Chapter?                @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  audiences      HomeworkAudience[]
+  submissions    HomeworkSubmission[]
+  attachments    AcademicAttachment[]
+  externalLinks  AcademicExternalLink[]
+  targets        ResourceTarget[]
+  versions       ResourceVersion[]
+  activities     ResourceActivity[]
+  comments       ResourceComment[]
+  moderation     ResourceModeration[]
+  tagAssignments ResourceTagAssignment[]
+  category       ResourceCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, academicSession, status, publishedAt])
+  @@index([schoolId, classId, sectionId, subjectId])
+  @@index([schoolId, chapterId])
+  @@index([schoolId, createdByUserId])
+  @@index([schoolId, dueAt])
+  @@index([schoolId, audienceScope, status])
+  @@index([schoolId, expiresAt])
+}
+
+model HomeworkAudience {
+  id         String               @id @default(cuid())
+  schoolId   String
+  homeworkId String
+  studentId  String
+  kind       HomeworkAudienceKind @default(INCLUDE)
+  createdAt  DateTime             @default(now())
+  school     School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework   Homework             @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId, kind])
+  @@index([schoolId, studentId, kind])
+}
+
+model HomeworkSubmission {
+  id                      String                   @id @default(cuid())
+  schoolId                String
+  homeworkId              String
+  studentId               String
+  attemptNumber           Int                      @default(1)
+  textResponse            String?
+  submittedAt             DateTime?
+  status                  HomeworkSubmissionStatus @default(IN_PROGRESS)
+  isLate                  Boolean                  @default(false)
+  reviewedAt              DateTime?
+  reviewedByUserId        String?
+  marksAwarded            Int?
+  feedback                String?
+  privateTeacherNote      String?
+  marksReleasedAt         DateTime?
+  returnedAt              DateTime?
+  resubmissionRequestedAt DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  school                  School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework                Homework                 @relation(fields: [homeworkId], references: [id], onDelete: Restrict)
+  student                 Student                  @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  reviewer                User?                    @relation("SubmissionReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  attachments             AcademicAttachment[]
+
+  @@unique([homeworkId, studentId, attemptNumber])
+  @@index([schoolId, homeworkId, status, submittedAt])
+  @@index([schoolId, studentId, submittedAt])
+}
+
+model AcademicAttachment {
+  id               String              @id @default(cuid())
+  schoolId         String
+  homeworkId       String?
+  resourceId       String?
+  submissionId     String?
+  fileName         String
+  originalName     String
+  fileUrl          String
+  publicId         String?
+  mimeType         String
+  fileSize         Int
+  attachmentType   String
+  uploadedByUserId String?
+  createdAt        DateTime            @default(now())
+  school           School              @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework         Homework?           @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource         SectionResource?    @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  submission       HomeworkSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  uploadedBy       User?               @relation("AcademicAttachmentUploader", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
+  @@index([schoolId, submissionId])
+}
+
+model AcademicExternalLink {
+  id         String           @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  label      String?
+  url        String
+  domain     String
+  createdAt  DateTime         @default(now())
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  homework   Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
+}
+
+model AcademicNotification {
+  id                 String    @id @default(cuid())
+  schoolId           String
+  recipientStudentId String?
+  recipientRole      Role?
+  recipientUserId    String?
+  type               String
+  title              String
+  body               String
+  entityType         String
+  entityId           String
+  dedupeKey          String    @unique
+  readAt             DateTime?
+  createdAt          DateTime  @default(now())
+  school             School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  recipientStudent   Student?  @relation(fields: [recipientStudentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, recipientStudentId, createdAt])
+  @@index([schoolId, recipientUserId, createdAt])
+}
+
+model AcademicContentAudit {
+  id          String   @id @default(cuid())
+  schoolId    String
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  actor       User?    @relation("AcademicContentAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, entityType, entityId, createdAt])
+  @@index([schoolId, actorUserId, createdAt])
+}
+
+// One normalized target represents one audience rule. A content item has one
+// or more rows; whole-school content uses a row without a narrower target.
+
+model ResourceTarget {
+  id         String                @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  scope      AcademicAudienceScope
+  classId    String?
+  sectionId  String?
+  subjectId  String?
+  chapterId  String?
+  studentId  String?
+  createdAt  DateTime              @default(now())
+  homework   Homework?             @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource?      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  class      Class?                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  section    Section?              @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  subject    Subject?              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  chapter    Chapter?              @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  student    Student?              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, scope])
+  @@index([schoolId, classId, sectionId])
+  @@index([schoolId, subjectId, chapterId])
+  @@index([schoolId, studentId])
+  @@index([homeworkId])
+  @@index([resourceId])
+}
+
+model ResourceVersion {
+  id              String           @id @default(cuid())
+  schoolId        String
+  homeworkId      String?
+  resourceId      String?
+  version         Int
+  snapshot        Json
+  reason          String?
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+  homework        Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource        SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school          School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, version])
+  @@unique([resourceId, version])
+  @@index([schoolId, createdAt])
+}
+
+model ResourceActivity {
+  id         String               @id @default(cuid())
+  schoolId   String
+  homeworkId String?
+  resourceId String?
+  studentId  String
+  kind       ResourceActivityKind
+  count      Int                  @default(1)
+  firstAt    DateTime             @default(now())
+  lastAt     DateTime             @default(now())
+  metadata   Json?
+  homework   Homework?            @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource?     @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student    Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([homeworkId, studentId, kind])
+  @@unique([resourceId, studentId, kind])
+  @@index([schoolId, kind, lastAt])
+}
+
+model ResourceComment {
+  id           String            @id @default(cuid())
+  schoolId     String
+  homeworkId   String?
+  resourceId   String?
+  studentId    String?
+  authorUserId String?
+  parentId     String?
+  body         String
+  isPrivate    Boolean           @default(true)
+  status       String            @default("OPEN")
+  replyToId    String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  homework     Homework?         @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource     SectionResource?  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  replyTo      ResourceComment?  @relation("ResourceCommentThread", fields: [replyToId], references: [id], onDelete: Cascade)
+  replies      ResourceComment[] @relation("ResourceCommentThread")
+  school       School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt])
+}
+
+model ResourceModeration {
+  id                String                   @id @default(cuid())
+  schoolId          String
+  homeworkId        String?
+  resourceId        String?
+  status            ResourceModerationStatus
+  submittedByUserId String?
+  reviewedByUserId  String?
+  reviewComment     String?
+  createdAt         DateTime                 @default(now())
+  reviewedAt        DateTime?
+  homework          Homework?                @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource          SectionResource?         @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school            School                   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, status, createdAt])
+}
+
+model AcademicContentType {
+  id                 String   @id @default(cuid())
+  schoolId           String
+  displayName        String
+  code               String
+  icon               String?
+  supportsSubmission Boolean  @default(false)
+  supportsDueDate    Boolean  @default(false)
+  supportsMarks      Boolean  @default(false)
+  supportsChapter    Boolean  @default(true)
+  canBeSchoolWide    Boolean  @default(false)
+  maximumFileBytes   Int      @default(10485760)
+  allowedMimeTypes   String[] @default([])
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  school             School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId, active, displayName])
+}
+
+model ResourceCategory {
+  id        String            @id @default(cuid())
+  schoolId  String
+  name      String
+  slug      String
+  active    Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  homework  Homework[]
+  resources SectionResource[]
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, slug])
+  @@index([schoolId, active, name])
+}
+
+model ResourceTag {
+  id             String                  @id @default(cuid())
+  schoolId       String
+  name           String
+  normalizedName String
+  active         Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  assignments    ResourceTagAssignment[]
+  school         School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, normalizedName])
+  @@index([schoolId, active, name])
+}
+
+model ResourceTagAssignment {
+  id         String           @id @default(cuid())
+  schoolId   String
+  tagId      String
+  homeworkId String?
+  resourceId String?
+  createdAt  DateTime         @default(now())
+  tag        ResourceTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  homework   Homework?        @relation(fields: [homeworkId], references: [id], onDelete: Cascade)
+  resource   SectionResource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  school     School           @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, homeworkId])
+  @@unique([tagId, resourceId])
+  @@index([schoolId, homeworkId])
+  @@index([schoolId, resourceId])
+}
+
+// Unified communication module. recipientKey/participantKey deliberately support
+// both User accounts (user:<id>) and portal identities (student:<studentId> or
+// parent:<parentUserId>) without weakening tenant checks.

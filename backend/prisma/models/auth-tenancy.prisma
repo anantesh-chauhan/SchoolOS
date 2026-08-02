@@ -1,0 +1,332 @@
+// auth tenancy domain
+
+model User {
+  id                       String                     @id @default(cuid())
+  email                    String                     @unique
+  password                 String
+  name                     String
+  contactEmail             String?
+  role                     Role                       @default(STUDENT)
+  schoolId                 String?
+  classId                  String?
+  sectionId                String?
+  employeeId               String?
+  joiningYear              Int?
+  school                   School?                    @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  class                    Class?                     @relation("ClassUsers", fields: [classId], references: [id], onDelete: SetNull)
+  section                  Section?                   @relation("SectionUsers", fields: [sectionId], references: [id], onDelete: SetNull)
+  activityEnrollments      ActivityEnrollment[]
+  widgetPreferences        UserWidgetPreference[]
+  widgetTodos              UserWidgetTodo[]
+  widgetNotes              UserWidgetNote[]
+  widgetBookmarks          UserWidgetBookmark[]
+  widgetNotifications      UserWidgetNotification[]
+  widgetActivities         UserWidgetActivity[]
+  loginStreaks             UserLoginStreak[]
+  createdSystemContents    SystemContent[]
+  createdChapterPolls      ChapterPoll[]              @relation("ChapterPollCreatedByAdmin")
+  compiledChapterSummaries ChapterAnalysisSummary[]   @relation("ChapterAnalysisCompiledByAdmin")
+  createdFeedbackTemplates FeedbackTemplate[]         @relation("FeedbackTemplateCreatedBy")
+  feedbackAuditActions     FeedbackAuditLog[]         @relation("FeedbackAuditActor")
+  markedStudentAttendances StudentAttendance[]        @relation("StudentAttendanceMarkedBy")
+  markedTeacherAttendances TeacherAttendance[]        @relation("TeacherAttendanceMarkedBy")
+  reportedIssues           IssueReport[]              @relation("IssueReporter")
+  assignedIssues           IssueReport[]              @relation("IssueAssignee")
+  issueMessages            IssueReportMessage[]
+  issueAuditActions        IssueReportAudit[]         @relation("IssueAuditActor")
+  createdHomework          Homework[]                 @relation("HomeworkCreator")
+  reviewedSubmissions      HomeworkSubmission[]       @relation("SubmissionReviewer")
+  uploadedAcademicFiles    AcademicAttachment[]       @relation("AcademicAttachmentUploader")
+  academicAuditActions     AcademicContentAudit[]     @relation("AcademicContentAuditActor")
+  staffingAuditActions     AcademicStaffingAuditLog[] @relation("AcademicStaffingAuditActor")
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime                   @updatedAt
+
+  // Optional profile fields (backwards-compatible additions)
+  profileImage                String?
+  alternateMobile             String?
+  isActive                    Boolean             @default(true)
+  mustChangePassword          Boolean             @default(false)
+  passwordChangedAt           DateTime?
+  lastLoginAt                 DateTime?
+  failedLoginAttempts         Int                 @default(0)
+  lockedUntil                 DateTime?
+  securityQuestionsConfigured Boolean             @default(false)
+  securitySetupCompletedAt    DateTime?
+  recoveryEnabled             Boolean             @default(false)
+  sessionVersion              Int                 @default(0)
+  lastActiveRoleId            String?
+  roleAssignments             UserSchoolRole[]
+  workspaceAuditEvents        WorkspaceAuditLog[]
+  authSessions                AuthSession[]
+
+  @@unique([schoolId, employeeId])
+  @@index([email])
+  @@index([role])
+  @@index([schoolId, role])
+  @@index([classId])
+  @@index([sectionId])
+}
+
+// A user's responsibilities are independent workspaces. User.role remains
+// temporarily for repeat-safe migration and compatibility with old clients.
+
+model UserSchoolRole {
+  id              String      @id @default(cuid())
+  userId          String
+  schoolId        String
+  role            Role
+  isActive        Boolean     @default(true)
+  isDefault       Boolean     @default(false)
+  validFrom       DateTime?
+  validUntil      DateTime?
+  assignmentNotes String?
+  assignedById    String?
+  updatedById     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school          School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  scopes          RoleScope[]
+
+  @@unique([userId, schoolId, role])
+  @@index([userId, schoolId, isActive])
+  @@index([schoolId, role, isActive])
+}
+
+model RoleScope {
+  id               String         @id @default(cuid())
+  roleAssignmentId String
+  scopeType        String
+  classId          String?
+  sectionId        String?
+  subjectId        String?
+  sessionId        String?
+  examinationId    String?
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  roleAssignment   UserSchoolRole @relation(fields: [roleAssignmentId], references: [id], onDelete: Cascade)
+
+  @@index([roleAssignmentId, scopeType])
+  @@index([classId, sectionId, subjectId])
+}
+
+model WorkspaceAuditLog {
+  id               String   @id @default(cuid())
+  userId           String
+  schoolId         String
+  activeRole       Role
+  roleAssignmentId String?
+  action           String
+  entityType       String?
+  entityId         String?
+  oldValue         Json?
+  newValue         Json?
+  reason           String?
+  ipAddress        String?
+  userAgent        String?
+  sessionId        String?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, createdAt])
+  @@index([userId, roleAssignmentId, createdAt])
+  @@index([action, entityType, entityId])
+}
+
+model SeparationOfDutiesPolicy {
+  id                        String   @id @default(cuid())
+  schoolId                  String   @unique
+  mode                      String   @default("STRICT")
+  principalApprovalRequired Boolean  @default(false)
+  workflows                 Json?
+  updatedById               String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  school                    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+}
+
+model AuthSession {
+  id               String    @id
+  userId           String
+  schoolId         String?
+  roleAssignmentId String?
+  refreshTokenHash String
+  tokenVersion     Int       @default(1)
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastUsedAt       DateTime  @default(now())
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+}
+
+// School Model
+
+model School {
+  id                         String                          @id @default(cuid())
+  schoolName                 String
+  schoolCode                 String                          @unique
+  slug                       String                          @unique
+  address                    String
+  logoUrl                    String?
+  city                       String
+  state                      String
+  phone                      String
+  email                      String
+  status                     SchoolStatus                    @default(ACTIVE)
+  theme                      Json?
+  config                     Json?
+  publicationVersion         Int                             @default(1)
+  users                      User[]
+  userSchoolRoles            UserSchoolRole[]
+  workspaceAuditEvents       WorkspaceAuditLog[]
+  separationOfDutiesPolicy   SeparationOfDutiesPolicy?
+  classes                    Class[]
+  sections                   Section[]
+  subjects                   Subject[]
+  chapters                   Chapter[]
+  chapterProgress            ChapterProgress[]
+  sectionResources           SectionResource[]
+  subjectWeeklyRequirements  SubjectWeeklyRequirement[]
+  academicSessions           AcademicSession[]
+  academicConfigurations     AcademicConfiguration[]
+  weeklySubjectSlotTemplates WeeklySubjectSlotTemplate[]
+  sectionSubjectAllocations  SectionSubjectAllocation[]
+  sectionClassTeachers       SectionClassTeacherAssignment[]
+  teacherQualifications      TeacherQualification[]
+  staffingAuditLogs          AcademicStaffingAuditLog[]
+  teachers                   Teacher[]
+  teacherAssignments         TeacherAssignment[]
+  timetables                 Timetable[]
+  timetableSlots             TimetableSlot[]
+  galleryGroups              GalleryGroup[]
+  galleryPhotos              GalleryPhoto[]
+  settings                   SchoolSettings?
+  academicLevels             AcademicLevel[]
+  streams                    Stream[]
+  streamSubjects             StreamSubject[]
+  classStreams               ClassStream[]
+  subjectComponents          SubjectComponent[]
+  activities                 Activity[]
+  activityEnrollments        ActivityEnrollment[]
+  periodDefinitions          PeriodDefinition[]
+  teacherSubjects            TeacherSubject[]
+  labRooms                   LabRoom[]
+  labSubjectRules            LabSubjectRule[]
+  widgetPreferences          UserWidgetPreference[]
+  widgetTodos                UserWidgetTodo[]
+  widgetNotes                UserWidgetNote[]
+  widgetBookmarks            UserWidgetBookmark[]
+  widgetNotifications        UserWidgetNotification[]
+  widgetActivities           UserWidgetActivity[]
+  loginStreaks               UserLoginStreak[]
+  systemContents             SystemContent[]
+  students                   Student[]
+  chapterPolls               ChapterPoll[]
+  feedbackTemplates          FeedbackTemplate[]
+  feedbackAuditLogs          FeedbackAuditLog[]
+  studentChapterVotes        StudentChapterVote[]
+  teacherStudentEvaluations  TeacherStudentEvaluation[]
+  chapterAnalysisSummaries   ChapterAnalysisSummary[]
+  chapterAssessments         ChapterAssessment[]
+  chapterAssessmentResults   ChapterAssessmentResult[]
+  studentChapterMasteries    StudentChapterMastery[]
+  learningGaps               LearningGap[]
+  learningInterventions      LearningIntervention[]
+  examinationCohorts         ExaminationCohort[]
+  studentAttendances         StudentAttendance[]
+  teacherAttendances         TeacherAttendance[]
+  academicCalendarDays       AcademicCalendarDay[]
+  issueReports               IssueReport[]
+  securityQuestions          UserSecurityQuestion[]
+  passwordResetTokens        PasswordResetToken[]
+  securityAuditLogs          SecurityAuditLog[]
+  curricula                  Curriculum[]
+  curriculumVersions         CurriculumVersion[]
+  publishers                 Publisher[]
+  books                      Book[]
+  curriculumUnits            CurriculumUnit[]
+  curriculumAuditLogs        CurriculumAuditLog[]
+  feeModuleSetting           FeeModuleSetting?
+  feeStructures              FeeStructure[]
+  feeComponents              FeeComponent[]
+  feeAssignments             FeeAssignment[]
+  studentFeeAccounts         StudentFeeAccount[]
+  feeCharges                 StudentFeeCharge[]
+  feePayments                FeePayment[]
+  feeReceipts                FeeReceipt[]
+  feeLedgerEntries           FeeLedgerEntry[]
+  feeAdjustments             FeeAdjustment[]
+  feeApprovalRequests        FeeApprovalRequest[]
+  feeReminders               FeeReminder[]
+  feeAuditLogs               FeeAuditLog[]
+  feeScholarships            FeeScholarship[]
+  feeNotificationTemplates   FeeNotificationTemplate[]
+  feeDailyCashClosings       FeeDailyCashClosing[]
+  feeFinancialPeriods        FeeFinancialPeriod[]
+  feeDocuments               FeeDocument[]
+  feeFamilyLinks             FeeFamilyLink[]
+  feeCategories              FeeCategory[]
+  feeInvoices                FeeInvoice[]
+  examinations               Examination[]
+  examinationGradeScales     ExaminationGradeScale[]
+  examinationRules           ExaminationRuleSet[]
+  examinationAuditLogs       ExaminationAuditLog[]
+  feeInvoiceItems            FeeInvoiceItem[]
+  feeRefunds                 FeeRefund[]
+  feeRefundAllocations       FeeRefundAllocation[]
+  transportFeeRoutes         TransportFeeRoute[]
+  transportFeeStops          TransportFeeStop[]
+  transportFeeAssignments    TransportFeeAssignment[]
+  homework                   Homework[]
+  studentSubjectEnrollments  StudentSubjectEnrollment[]
+  homeworkAudiences          HomeworkAudience[]
+  homeworkSubmissions        HomeworkSubmission[]
+  academicAttachments        AcademicAttachment[]
+  academicLinks              AcademicExternalLink[]
+  academicNotifications      AcademicNotification[]
+  academicContentAudits      AcademicContentAudit[]
+  resourceTargets            ResourceTarget[]
+  resourceVersions           ResourceVersion[]
+  resourceActivities         ResourceActivity[]
+  resourceComments           ResourceComment[]
+  resourceModerations        ResourceModeration[]
+  academicContentTypes       AcademicContentType[]
+  resourceCategories         ResourceCategory[]
+  resourceTags               ResourceTag[]
+  resourceTagAssignments     ResourceTagAssignment[]
+  homeworkModuleSetting      HomeworkModuleSetting?
+  employees                  Employee[]
+  hrLeavePolicy              HrLeavePolicy?
+  employeeAttendances        EmployeeAttendance[]
+  employeeLeaveApplications  EmployeeLeaveApplication[]
+  employeePayrolls           EmployeePayroll[]
+  hrAuditLogs                HrAuditLog[]
+  attendanceStatuses         AttendanceStatusDefinition[]
+  attendanceRule             AttendanceRule?
+  attendanceDailyRegisters   AttendanceDailyRegister[]
+  attendanceRevisions        AttendanceRevision[]
+  attendanceRevisionChanges  AttendanceRevisionChange[]
+  attendanceCorrections      AttendanceCorrectionRequest[]
+  attendanceAuditLogs        AttendanceAuditLog[]
+  attendanceLocks            AttendanceLock[]
+  attendanceMonthlySnapshots AttendanceMonthlySnapshot[]
+  attendanceNotificationLogs AttendanceNotificationLog[]
+  schoolWorkingDays          SchoolWorkingDay[]
+  studentEnrollmentHistory   StudentEnrollmentHistory[]
+  analyticsConfiguration     AnalyticsConfiguration?
+  analyticsRiskRules         AnalyticsRiskRule[]
+  createdAt                  DateTime                        @default(now())
+  updatedAt                  DateTime                        @updatedAt
+
+  @@index([schoolName])
+  @@index([city, state])
+}
