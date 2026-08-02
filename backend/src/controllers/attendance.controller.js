@@ -86,7 +86,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
       }),
       prisma.attendanceDailyRegister.findUnique({
         where: { schoolId_classId_sectionId_attendanceDate: { schoolId, classId, sectionId, attendanceDate } },
-        select: { id: true, state: true, markedCount: true, submittedAt: true, version: true, lockedAt: true },
+        select: { id: true, state: true, markedCount: true, submittedAt: true, version: true, lockedAt: true, isLocked: true, currentRevisionNumber: true, markedByType: true, markedById: true, assignedClassTeacherId: true, overrideReasonCode: true, overrideReasonNote: true },
       }),
     ]);
 
@@ -96,7 +96,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
       success: true,
       data: {
         date: attendanceDate,
-        canMark: access.canMark,
+        canMark: Boolean(access.canMark && req.user.role !== 'SCHOOL_OWNER' && !register?.isLocked && !['LOCKED', 'CORRECTED', 'CANCELLED', 'NOT_APPLICABLE'].includes(register?.state)),
         class: section.class,
         section: { id: section.id, sectionName: section.sectionName, sectionOrder: section.sectionOrder },
         classTeacher: classTeacher?.teacher || null,

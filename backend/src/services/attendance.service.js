@@ -25,6 +25,11 @@ export const EMPLOYEE_STATUS_DEFAULTS = Object.freeze([
 
 export const DEFAULT_RULES = Object.freeze({
   timezone: 'Asia/Kolkata', weeklyOffDays: [0], correctionWindowHours: 48,
+  attendanceOpenTime: '07:30', classTeacherDeadline: '09:30', adminAlertTime: '09:45',
+  finalSubmissionTime: '12:00', autoLockTime: '23:59', allowBackdatedAttendance: false,
+  maximumBackdatedDays: 7, prohibitFutureAttendance: true, allowDraft: true,
+  defaultAttendanceStatus: 'NOT_MARKED', requireAdminOverrideReason: true,
+  notifyClassTeacherOnCorrection: true,
   studentMinimumPercentage: 75, employeeMinimumPercentage: 85,
   halfDayWeight: 0.5, lateWeight: 1, approvedLeaveWeight: 0, medicalLeaveWeight: 0,
   consecutiveAbsenceAlertDays: 3, requiresFinalSubmission: true,
@@ -108,10 +113,37 @@ export const summarizeAttendance = ({ rows = [], workingDays = [], enrollment = 
 };
 
 export const attendancePermission = (role, action) => {
-  const admin = ['SCHOOL_OWNER', 'ADMIN'].includes(role);
-  if (action === 'configure' || action === 'lock' || action === 'approve' || action === 'audit' || action === 'export') return admin || role === 'HR';
-  if (action === 'markEmployee') return admin || role === 'HR';
-  if (action === 'markStudent') return admin || role === 'TEACHER';
-  if (action === 'viewOwn') return ['STUDENT', 'PARENT', 'TEACHER', 'STAFF', 'HR'].includes(role) || admin;
+  const attendanceAdmin = role === 'ADMIN';
+  const ownerOrAdmin = ['SCHOOL_OWNER', 'ADMIN'].includes(role);
+  if (action === 'configure') return ownerOrAdmin;
+  if (action === 'lock' || action === 'approve') return attendanceAdmin || role === 'HR';
+  if (action === 'audit' || action === 'export') return ownerOrAdmin || role === 'HR';
+  if (action === 'markEmployee') return attendanceAdmin || role === 'HR';
+  if (action === 'markStudent') return attendanceAdmin || ['TEACHER', 'CLASS_TEACHER'].includes(role);
+  if (action === 'viewOwn') return ['STUDENT', 'PARENT', 'TEACHER', 'CLASS_TEACHER', 'STAFF', 'HR'].includes(role) || ownerOrAdmin;
   return false;
 };
+
+export const ATTENDANCE_SESSION_STATES = Object.freeze([
+  'NOT_STARTED', 'DRAFT', 'SUBMITTED', 'LOCKED', 'CORRECTED', 'CANCELLED', 'NOT_APPLICABLE',
+]);
+
+const STATE_TRANSITIONS = Object.freeze({
+  NOT_STARTED: ['DRAFT', 'SUBMITTED', 'LOCKED', 'NOT_APPLICABLE'],
+  DRAFT: ['DRAFT', 'SUBMITTED', 'LOCKED', 'NOT_APPLICABLE'],
+  SUBMITTED: ['LOCKED'], LOCKED: ['CORRECTED', 'CANCELLED'],
+  CORRECTED: ['CORRECTED', 'CANCELLED'], CANCELLED: [], NOT_APPLICABLE: [],
+});
+
+export const canTransitionAttendance = (from, to) => (STATE_TRANSITIONS[from || 'NOT_STARTED'] || []).includes(to);
+
+export const assertAttendanceTransition = (from, to) => {
+  if (!canTransitionAttendance(from, to)) throw Object.assign(new Error(`Attendance cannot transition from ${from || 'NOT_STARTED'} to ${to}`), { statusCode: 409 });
+  return true;
+};
+
+export const ADMIN_OVERRIDE_REASON_CODES = Object.freeze([
+  'CLASS_TEACHER_ABSENT', 'CLASS_TEACHER_APPROVED_LEAVE', 'CLASS_TEACHER_UNAVAILABLE',
+  'ATTENDANCE_DEADLINE_MISSED', 'CLASS_TEACHER_TECHNICAL_ISSUE', 'CLASS_TEACHER_ASSIGNMENT_VACANT',
+  'EMERGENCY_ADMIN_ACTION', 'PHYSICAL_REGISTER_ENTRY', 'OTHER',
+]);

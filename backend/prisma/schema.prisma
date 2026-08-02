@@ -57,16 +57,16 @@ model User {
   // Optional profile fields (backwards-compatible additions)
   profileImage                String?
   alternateMobile             String?
-  isActive                    Boolean   @default(true)
-  mustChangePassword          Boolean   @default(false)
+  isActive                    Boolean             @default(true)
+  mustChangePassword          Boolean             @default(false)
   passwordChangedAt           DateTime?
   lastLoginAt                 DateTime?
-  failedLoginAttempts         Int       @default(0)
+  failedLoginAttempts         Int                 @default(0)
   lockedUntil                 DateTime?
-  securityQuestionsConfigured Boolean   @default(false)
+  securityQuestionsConfigured Boolean             @default(false)
   securitySetupCompletedAt    DateTime?
-  recoveryEnabled             Boolean   @default(false)
-  sessionVersion              Int       @default(0)
+  recoveryEnabled             Boolean             @default(false)
+  sessionVersion              Int                 @default(0)
   lastActiveRoleId            String?
   roleAssignments             UserSchoolRole[]
   workspaceAuditEvents        WorkspaceAuditLog[]
@@ -83,22 +83,22 @@ model User {
 // A user's responsibilities are independent workspaces. User.role remains
 // temporarily for repeat-safe migration and compatibility with old clients.
 model UserSchoolRole {
-  id            String      @id @default(cuid())
-  userId        String
-  schoolId      String
-  role          Role
-  isActive      Boolean     @default(true)
-  isDefault     Boolean     @default(false)
-  validFrom     DateTime?
-  validUntil    DateTime?
+  id              String      @id @default(cuid())
+  userId          String
+  schoolId        String
+  role            Role
+  isActive        Boolean     @default(true)
+  isDefault       Boolean     @default(false)
+  validFrom       DateTime?
+  validUntil      DateTime?
   assignmentNotes String?
-  assignedById  String?
-  updatedById   String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school        School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  scopes        RoleScope[]
+  assignedById    String?
+  updatedById     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school          School      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  scopes          RoleScope[]
 
   @@unique([userId, schoolId, role])
   @@index([userId, schoolId, isActive])
@@ -106,18 +106,18 @@ model UserSchoolRole {
 }
 
 model RoleScope {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   roleAssignmentId String
-  scopeType         String
-  classId           String?
-  sectionId         String?
-  subjectId         String?
-  sessionId         String?
-  examinationId     String?
-  metadata           Json?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-  roleAssignment     UserSchoolRole @relation(fields: [roleAssignmentId], references: [id], onDelete: Cascade)
+  scopeType        String
+  classId          String?
+  sectionId        String?
+  subjectId        String?
+  sessionId        String?
+  examinationId    String?
+  metadata         Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  roleAssignment   UserSchoolRole @relation(fields: [roleAssignmentId], references: [id], onDelete: Cascade)
 
   @@index([roleAssignmentId, scopeType])
   @@index([classId, sectionId, subjectId])
@@ -127,20 +127,20 @@ model WorkspaceAuditLog {
   id               String   @id @default(cuid())
   userId           String
   schoolId         String
-  activeRole        Role
+  activeRole       Role
   roleAssignmentId String?
-  action            String
-  entityType        String?
-  entityId          String?
-  oldValue          Json?
-  newValue          Json?
-  reason            String?
-  ipAddress         String?
-  userAgent         String?
-  sessionId         String?
-  createdAt         DateTime @default(now())
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  action           String
+  entityType       String?
+  entityId         String?
+  oldValue         Json?
+  newValue         Json?
+  reason           String?
+  ipAddress        String?
+  userAgent        String?
+  sessionId        String?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@index([schoolId, createdAt])
   @@index([userId, roleAssignmentId, createdAt])
@@ -148,32 +148,32 @@ model WorkspaceAuditLog {
 }
 
 model SeparationOfDutiesPolicy {
-  id                    String   @id @default(cuid())
-  schoolId              String   @unique
-  mode                  String   @default("STRICT")
-  principalApprovalRequired Boolean @default(false)
-  workflows             Json?
-  updatedById           String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  school                School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                        String   @id @default(cuid())
+  schoolId                  String   @unique
+  mode                      String   @default("STRICT")
+  principalApprovalRequired Boolean  @default(false)
+  workflows                 Json?
+  updatedById               String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  school                    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model AuthSession {
-  id               String   @id
+  id               String    @id
   userId           String
   schoolId         String?
   roleAssignmentId String?
   refreshTokenHash String
-  tokenVersion     Int      @default(1)
+  tokenVersion     Int       @default(1)
   expiresAt        DateTime
   revokedAt        DateTime?
-  lastUsedAt       DateTime @default(now())
+  lastUsedAt       DateTime  @default(now())
   ipAddress        String?
   userAgent        String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
@@ -323,6 +323,8 @@ model School {
   attendanceStatuses         AttendanceStatusDefinition[]
   attendanceRule             AttendanceRule?
   attendanceDailyRegisters   AttendanceDailyRegister[]
+  attendanceRevisions        AttendanceRevision[]
+  attendanceRevisionChanges  AttendanceRevisionChange[]
   attendanceCorrections      AttendanceCorrectionRequest[]
   attendanceAuditLogs        AttendanceAuditLog[]
   attendanceLocks            AttendanceLock[]
@@ -2376,6 +2378,18 @@ model AttendanceRule {
   academicSessionEnd              DateTime?
   weeklyOffDays                   Int[]     @default([0])
   markingDeadline                 String    @default("10:30")
+  attendanceOpenTime              String    @default("07:30")
+  classTeacherDeadline            String    @default("09:30")
+  adminAlertTime                  String    @default("09:45")
+  finalSubmissionTime             String    @default("12:00")
+  autoLockTime                    String    @default("23:59")
+  allowBackdatedAttendance        Boolean   @default(false)
+  maximumBackdatedDays            Int       @default(7)
+  prohibitFutureAttendance        Boolean   @default(true)
+  allowDraft                      Boolean   @default(true)
+  defaultAttendanceStatus         String    @default("NOT_MARKED")
+  requireAdminOverrideReason      Boolean   @default(true)
+  notifyClassTeacherOnCorrection  Boolean   @default(true)
   correctionWindowHours           Int       @default(48)
   studentMinimumPercentage        Decimal   @default(75) @db.Decimal(5, 2)
   employeeMinimumPercentage       Decimal   @default(85) @db.Decimal(5, 2)
@@ -2396,26 +2410,86 @@ model AttendanceRule {
 }
 
 model AttendanceDailyRegister {
-  id              String    @id @default(cuid())
-  schoolId        String
-  academicSession String
-  classId         String
-  sectionId       String
-  attendanceDate  DateTime
-  state           String    @default("DRAFT")
-  markedCount     Int       @default(0)
-  submittedById   String?
-  submittedAt     DateTime?
-  lockedById      String?
-  lockedAt        DateTime?
-  lockReason      String?
-  version         Int       @default(1)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  school          School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                     String               @id @default(cuid())
+  schoolId               String
+  academicSession        String
+  classId                String
+  sectionId              String
+  attendanceDate         DateTime
+  state                  String               @default("DRAFT")
+  assignedClassTeacherId String?
+  createdById            String?
+  markedById             String?
+  markedByRole           String?
+  markedByType           String?
+  overrideReasonCode     String?
+  overrideReasonNote     String?
+  administrativeNote     String?
+  markedCount            Int                  @default(0)
+  submittedById          String?
+  submittedAt            DateTime?
+  lockedById             String?
+  lockedAt               DateTime?
+  lockReason             String?
+  isLocked               Boolean              @default(false)
+  draftSavedAt           DateTime?
+  correctedAt            DateTime?
+  cancelledAt            DateTime?
+  notApplicableAt        DateTime?
+  currentRevisionNumber  Int                  @default(0)
+  version                Int                  @default(1)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  school                 School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  revisions              AttendanceRevision[]
 
   @@unique([schoolId, classId, sectionId, attendanceDate])
   @@index([schoolId, academicSession, attendanceDate, state])
+  @@index([schoolId, sectionId, attendanceDate])
+  @@index([schoolId, assignedClassTeacherId, attendanceDate])
+  @@index([schoolId, markedById, attendanceDate])
+}
+
+model AttendanceRevision {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  attendanceSessionId String
+  revisionNumber      Int
+  actionType          String
+  createdByUserId     String
+  createdByRole       String
+  reasonCode          String?
+  reasonNote          String?
+  summarySnapshot     Json
+  recordSnapshot      Json?
+  createdAt           DateTime @default(now())
+
+  school            School                     @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  attendanceSession AttendanceDailyRegister    @relation(fields: [attendanceSessionId], references: [id], onDelete: Restrict)
+  changes           AttendanceRevisionChange[]
+
+  @@unique([attendanceSessionId, revisionNumber])
+  @@index([schoolId, attendanceSessionId, revisionNumber])
+  @@index([schoolId, createdAt])
+}
+
+model AttendanceRevisionChange {
+  id                   String   @id @default(cuid())
+  schoolId             String
+  attendanceRevisionId String
+  studentAttendanceId  String?
+  studentId            String
+  previousStatus       String?
+  newStatus            String?
+  previousRemark       String?
+  newRemark            String?
+  createdAt            DateTime @default(now())
+
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Restrict)
+  attendanceRevision AttendanceRevision @relation(fields: [attendanceRevisionId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId, studentId, createdAt])
+  @@index([attendanceRevisionId, studentId])
 }
 
 model AttendanceCorrectionRequest {
@@ -2444,24 +2518,38 @@ model AttendanceCorrectionRequest {
 }
 
 model AttendanceAuditLog {
-  id                String   @id @default(cuid())
-  schoolId          String
-  actorId           String?
-  actorRole         String?
-  action            String
-  entityType        String
-  entityId          String?
-  oldValue          Json?
-  newValue          Json?
-  reason            String?
-  approvalReference String?
-  ipAddress         String?
-  userAgent         String?
-  createdAt         DateTime @default(now())
-  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                     String    @id @default(cuid())
+  schoolId               String
+  actorId                String?
+  actorRole              String?
+  action                 String
+  entityType             String
+  entityId               String?
+  oldValue               Json?
+  newValue               Json?
+  reason                 String?
+  approvalReference      String?
+  ipAddress              String?
+  userAgent              String?
+  academicSessionId      String?
+  attendanceSessionId    String?
+  classId                String?
+  sectionId              String?
+  attendanceDate         DateTime?
+  assignedClassTeacherId String?
+  reasonCode             String?
+  previousRevisionNumber Int?
+  newRevisionNumber      Int?
+  changedStudentCount    Int       @default(0)
+  changedFields          Json?
+  requestId              String?
+  createdAt              DateTime  @default(now())
+  school                 School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@index([schoolId, createdAt])
   @@index([schoolId, entityType, entityId])
+  @@index([schoolId, action, createdAt])
+  @@index([schoolId, attendanceSessionId, createdAt])
 }
 
 model AttendanceLock {

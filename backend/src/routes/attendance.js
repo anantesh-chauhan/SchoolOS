@@ -36,6 +36,9 @@ import {
   unlockAttendance,
   updateAttendanceSettings,
 } from '../controllers/attendanceManagement.controller.js';
+import {
+  attendanceHistory, getSectionAttendance, saveAttendanceDraft, submitAttendance,
+} from '../controllers/attendanceWorkflow.controller.js';
 
 const router = express.Router();
 
@@ -43,7 +46,7 @@ router.get('/public/calendar', listPublicCalendarDays);
 router.use(authMiddleware);
 
 router.get('/students', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireAssignedClass(), getStudentAttendanceRoster);
-router.post('/students', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), markStudentAttendance);
+router.post('/students', requireRole('ADMIN', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), submitAttendance);
 router.get('/teachers', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getTeacherAttendanceRoster);
 router.post('/teachers', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_EMPLOYEE), markTeacherAttendance);
 router.get('/class-month', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireAssignedClass(), getClassAttendanceMonth);
@@ -70,5 +73,11 @@ router.post('/locks/:id/unlock', requirePermission(PERMISSIONS.ATTENDANCE_LOCK),
 router.get('/dashboard', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getAttendanceDashboard);
 router.get('/audit', requirePermission(PERMISSIONS.ATTENDANCE_AUDIT), getAttendanceAudit);
 router.get('/export.csv', requirePermission(PERMISSIONS.ATTENDANCE_EXPORT), exportAttendanceCsv);
+
+// Versioned accountability workflow. schoolId always comes from req.user.
+router.get('/sections/:sectionId/dates/:date', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getSectionAttendance);
+router.post('/sections/:sectionId/dates/:date/draft', requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), saveAttendanceDraft);
+router.post('/sections/:sectionId/dates/:date/submit', requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), submitAttendance);
+router.get('/sessions/:attendanceSessionId/history', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), attendanceHistory);
 
 export default router;

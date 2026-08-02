@@ -238,6 +238,13 @@ export const userService = {
     const response = await apiClient.post('/users/create-curriculum-manager', payload);
     return response.data;
   },
+  saveAttendanceDraft: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/draft`, payload)).data,
+  submitAttendance: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/submit`, payload)).data,
+  correctAttendance: async (sessionId, payload) => (await apiClient.post(`/admin/attendance/sessions/${sessionId}/corrections`, payload)).data,
+  attendanceHistory: async (sessionId) => (await apiClient.get(`/attendance/sessions/${sessionId}/history`)).data,
+  attendanceOverview: async (date) => (await apiClient.get('/admin/attendance/overview', { params: { date } })).data,
+  pendingAttendance: async (date) => (await apiClient.get('/admin/attendance/pending', { params: { date } })).data,
+  markNotApplicable: async (sectionId, date, payload) => (await apiClient.post(`/admin/attendance/sections/${sectionId}/dates/${date}/not-applicable`, payload)).data,
   createExaminationRole: async (payload) => {
     const response = await apiClient.post('/users/create-examination-role', payload);
     return response.data;
