@@ -5,11 +5,12 @@ import { Building2, CheckCircle2, Settings, ShieldCheck, TrendingUp, Users } fro
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { dashboardService } from '../../services/dashboardService';
+import { queryKeys } from '../../lib/queryClient';
 import { schoolService } from '../../services/managementService';
 import { Empty, ErrorState, Loading, Panel } from '../../components/student/StudentUI';
 
 export default function PlatformOwnerDashboard() {
-  const summary = useQuery({ queryKey: ['dashboard-summary', 'platform'], queryFn: dashboardService.summary });
+  const summary = useQuery({ queryKey: queryKeys.dashboard(), queryFn: dashboardService.summary, staleTime: 30_000 });
   const schools = useQuery({ queryKey: ['schools', 1, 'dashboard'], queryFn: () => schoolService.list({ page: 1, limit: 5, search: '' }) });
   if (summary.isLoading || schools.isLoading) return <DashboardLayout role="PLATFORM_OWNER"><Loading /></DashboardLayout>;
   if (summary.isError || schools.isError) return <DashboardLayout role="PLATFORM_OWNER"><ErrorState error={summary.error || schools.error} retry={() => { summary.refetch(); schools.refetch(); }} /></DashboardLayout>;

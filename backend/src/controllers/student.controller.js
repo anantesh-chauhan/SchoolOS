@@ -13,6 +13,7 @@ import {
   updateStudentAdmission,
 } from '../services/studentAdmission.service.js';
 import { syncNewStudentFeeAssignments } from '../modules/fees/feeAdvanced.service.js';
+import { paginationMeta, parsePagination } from '../utils/pagination.util.js';
 
 
 // Validation rules for creating a student
@@ -244,7 +245,9 @@ export const createStudent = async (req, res) => {
 // Get all students (paginated)
 export const getStudents = async (req, res) => {
   try {
-    const { page = 1, limit = 10, session, includeInactive = 'false' } = req.query;
+    const { session, includeInactive = 'false' } = req.query;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
     const schoolId = req.user?.schoolId;
 
     if (!schoolId) {
@@ -254,7 +257,7 @@ export const getStudents = async (req, res) => {
       });
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
 
     const where = { schoolId };
     if (session) {
@@ -268,14 +271,19 @@ export const getStudents = async (req, res) => {
     const students = await prisma.student.findMany({
       where,
       skip,
-      take: parseInt(limit),
-      include: {
-        school: {
-          select: {
-            id: true,
-            schoolName: true,
-          },
-        },
+      take: limit,
+      select: {
+        id: true,
+        admissionNo: true,
+        studentFirstName: true,
+        studentLastName: true,
+        rollNumber: true,
+        className: true,
+        section: true,
+        session: true,
+        isActive: true,
+        createdAt: true,
+        school: { select: { id: true, schoolName: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -286,10 +294,13 @@ export const getStudents = async (req, res) => {
       success: true,
       data: students,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
       },
     });
   } catch (error) {
@@ -309,8 +320,28 @@ export const getStudentAllocationRoster = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Only school administrators can manage allocations' });
     }
 
-    const students = await prisma.student.findMany({
-      where: { schoolId, isActive: true },
+    const paging = parsePagination(req.query);
+    const status = String(req.query.status || 'ALL').toUpperCase();
+    const search = String(req.query.search || '').trim().slice(0, 100);
+    const where = {
+      schoolId,
+      isActive: true,
+      ...(req.query.session ? { session: String(req.query.session) } : {}),
+      ...(status === 'PENDING' ? { OR: [{ section: null }, { rollNumber: null }] } : {}),
+      ...(status === 'ALLOCATED' ? { section: { not: null }, rollNumber: { not: null } } : {}),
+      ...(search ? {
+        AND: [{ OR: [
+          { studentFirstName: { contains: search, mode: 'insensitive' } },
+          { studentLastName: { contains: search, mode: 'insensitive' } },
+          { admissionNo: { contains: search, mode: 'insensitive' } },
+          { studentUserId: { contains: search, mode: 'insensitive' } },
+        ] }],
+      } : {}),
+    };
+
+    const [students, total, pending, allocated] = await Promise.all([
+      prisma.student.findMany({
+      where,
       select: {
         id: true,
         admissionNo: true,
@@ -325,9 +356,20 @@ export const getStudentAllocationRoster = async (req, res) => {
         createdAt: true,
       },
       orderBy: [{ className: 'asc' }, { section: 'asc' }, { createdAt: 'asc' }],
-    });
+      skip: paging.skip,
+      take: paging.take,
+    }),
+      prisma.student.count({ where }),
+      prisma.student.count({ where: { schoolId, isActive: true, OR: [{ section: null }, { rollNumber: null }] } }),
+      prisma.student.count({ where: { schoolId, isActive: true, section: { not: null }, rollNumber: { not: null } } }),
+    ]);
 
-    return res.json({ success: true, data: students });
+    return res.json({
+      success: true,
+      data: students,
+      pagination: paginationMeta({ ...paging, total }),
+      summary: { pending, allocated, total: pending + allocated },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to load student allocation roster', error: error.message });
   }

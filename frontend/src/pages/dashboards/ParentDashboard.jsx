@@ -6,6 +6,7 @@ import { Activity, ArrowRight, BarChart3, Bell, BookOpenCheck, CalendarCheck, Gr
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { authService } from '../../services/authService';
 import { dashboardService } from '../../services/dashboardService';
+import { queryKeys } from '../../lib/queryClient';
 import { useBranding } from '../../contexts/BrandingContext';
 
 const Panel = ({ children, className = '' }) => <section className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>{children}</section>;
@@ -13,7 +14,7 @@ const Panel = ({ children, className = '' }) => <section className={`rounded-3xl
 export default function ParentDashboard() {
   const user = authService.getCurrentUser();
   const branding = useBranding();
-  const { data, isLoading, isError } = useQuery({ queryKey: ['dashboard-summary', 'parent'], queryFn: dashboardService.summary });
+  const { data, isLoading, isError } = useQuery({ queryKey: queryKeys.dashboard(), queryFn: dashboardService.summary, staleTime: 30_000 });
   const student = data?.student;
   const stats = data?.stats || {};
   const mastery = data?.mastery || [];

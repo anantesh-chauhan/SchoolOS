@@ -79,15 +79,29 @@ const assignmentWhereOr = (assignments) => assignments.map((item) => ({
   subjectId: item.subjectId,
 }));
 
-const countChaptersForAssignment = async (assignment) => prisma.chapter.count({
-  where: {
-    schoolId: assignment.schoolId,
-    classId: assignment.classId,
-    subjectId: assignment.subjectId,
-    deletedAt: null,
-    OR: [{ sectionId: assignment.sectionId }, { sectionId: null }],
-  },
-});
+const assignmentScopeKey = ({ classId, sectionId, subjectId }) => `${classId}:${sectionId}:${subjectId}`;
+
+const chapterTotalsForAssignments = async (assignments) => {
+  if (!assignments.length) return new Map();
+  const chapters = await prisma.chapter.findMany({
+    where: {
+      schoolId: assignments[0].schoolId,
+      deletedAt: null,
+      OR: assignments.map((assignment) => ({
+        classId: assignment.classId,
+        subjectId: assignment.subjectId,
+        OR: [{ sectionId: assignment.sectionId }, { sectionId: null }],
+      })),
+    },
+    select: { classId: true, sectionId: true, subjectId: true },
+  });
+  return new Map(assignments.map((assignment) => [
+    assignmentScopeKey(assignment),
+    chapters.filter((chapter) => chapter.classId === assignment.classId
+      && chapter.subjectId === assignment.subjectId
+      && (chapter.sectionId === null || chapter.sectionId === assignment.sectionId)).length,
+  ]));
+};
 
 const mapProgressCounts = (progressRows) => {
   const counts = { NOT_STARTED: 0, ONGOING: 0, COMPLETED: 0 };
@@ -110,7 +124,7 @@ export const getTeacherDashboard = async (req, res) => {
 
     const [school, chapterTotals] = await Promise.all([
       schoolHeader(req.user.schoolId),
-      Promise.all(assignments.map((assignment) => countChaptersForAssignment(assignment))),
+      chapterTotalsForAssignments(assignments),
     ]);
 
     const progressRows = filters.length
@@ -121,7 +135,7 @@ export const getTeacherDashboard = async (req, res) => {
       : 0;
 
     const counts = mapProgressCounts(progressRows);
-    const totalChapters = chapterTotals.reduce((sum, value) => sum + value, 0);
+    const totalChapters = [...chapterTotals.values()].reduce((sum, value) => sum + value, 0);
     const started = counts.COMPLETED + counts.ONGOING + counts.NOT_STARTED;
     const pendingChapters = Math.max(0, totalChapters - counts.COMPLETED - counts.ONGOING);
 
@@ -185,17 +199,19 @@ export const getTeacherAssignments = async (req, res) => {
   try {
     const { rows: assignments } = await getAccessibleAssignments(req.user);
     const grouped = new Map();
+    const filters = assignmentWhereOr(assignments);
+    const [chapterTotals, allProgressRows] = await Promise.all([
+      chapterTotalsForAssignments(assignments),
+      filters.length
+        ? prisma.chapterProgress.findMany({ where: { schoolId: req.user.schoolId, OR: filters } })
+        : [],
+    ]);
 
     for (const assignment of assignments) {
-      const totalChapters = await countChaptersForAssignment(assignment);
-      const progressRows = await prisma.chapterProgress.findMany({
-        where: {
-          schoolId: assignment.schoolId,
-          classId: assignment.classId,
-          sectionId: assignment.sectionId,
-          subjectId: assignment.subjectId,
-        },
-      });
+      const totalChapters = chapterTotals.get(assignmentScopeKey(assignment)) || 0;
+      const progressRows = allProgressRows.filter((row) => row.classId === assignment.classId
+        && row.sectionId === assignment.sectionId
+        && row.subjectId === assignment.subjectId);
       const counts = mapProgressCounts(progressRows);
       const pendingChapters = Math.max(0, totalChapters - counts.COMPLETED - counts.ONGOING);
       const progressPercentage = totalChapters === 0 ? 0 : Math.round((counts.COMPLETED / totalChapters) * 100);

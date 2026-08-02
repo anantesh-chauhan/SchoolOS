@@ -124,7 +124,7 @@ export const getAuditLog = async (req, res) => {
   const rows = await prisma.workspaceAuditLog.findMany({
     where: { schoolId: req.user.schoolId },
     orderBy: { createdAt: 'desc' },
-    take: Math.min(Number(req.query.limit) || 100, 250),
+    take: Math.min(Number(req.query.limit) || 100, 100),
     include: { user: { select: { name: true, email: true } } },
   });
   return res.json({ success: true, data: rows });

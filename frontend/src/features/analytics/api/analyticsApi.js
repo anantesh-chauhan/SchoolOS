@@ -13,9 +13,9 @@ export const saveReport = (blob, filename) => {
 
 export const analyticsApi = {
   students: (params) => api.get('/analytics/students', { params: query(params) }).then(data),
-  student: (studentId, params) => api.get(`/analytics/students/${studentId}/overview`, { params: query(params) }).then(data),
-  subject: (studentId, subjectId, params) => api.get(`/analytics/students/${studentId}/subjects/${subjectId}`, { params: query(params) }).then(data),
-  chapter: (studentId, subjectId, chapterId, params) => api.get(`/analytics/students/${studentId}/subjects/${subjectId}/chapters/${chapterId}`, { params: query(params) }).then(data),
+  student: (studentId, params, signal) => api.get(`/analytics/students/${studentId}/overview`, { params: query(params), signal }).then(data),
+  subject: (studentId, subjectId, params, signal) => api.get(`/analytics/students/${studentId}/subjects/${subjectId}`, { params: query(params), signal }).then(data),
+  chapter: (studentId, subjectId, chapterId, params, signal) => api.get(`/analytics/students/${studentId}/subjects/${subjectId}/chapters/${chapterId}`, { params: query(params), signal }).then(data),
   configuration: () => api.get('/analytics/configuration').then(data),
   updateConfiguration: (payload) => api.patch('/analytics/configuration', payload).then(data),
   createIntervention: (payload) => api.post('/analytics/interventions', payload).then(data),

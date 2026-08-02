@@ -1,5 +1,8 @@
 import prisma from '../config/prisma.client.js';
 import { normalizeSchoolPayload } from '../utils/publicSchool.util.js';
+import cache from '../infrastructure/cache/cache.service.js';
+import { cacheKeys } from '../infrastructure/cache/cache-key-builder.js';
+import { paginationMeta, parsePagination } from '../utils/pagination.util.js';
 
 
 const SCHOOL_ALIASES = {
@@ -13,32 +16,42 @@ const SCHOOL_ALIASES = {
 };
 
 const getAvailableSchoolColumns = async () => {
-  const rows = await prisma.$queryRawUnsafe(
-    "SELECT column_name FROM information_schema.columns WHERE table_name = 'School' AND table_schema = 'public'"
+  return cache.getOrSet(
+    cacheKeys.platformResource({ resource: 'school-public-columns' }),
+    async () => {
+      const rows = await prisma.$queryRawUnsafe(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'School' AND table_schema = 'public'"
+      );
+      return rows.map((row) => String(row.column_name));
+    },
+    3600,
   );
-  return rows.map((row) => String(row.column_name));
 };
 
 const pickColumns = (availableColumns) => {
-  const desiredColumns = ['id', 'schoolName', 'schoolCode', 'address', 'logoUrl', 'city', 'state', 'phone', 'email', 'slug', 'theme', 'config'];
+  const desiredColumns = ['id', 'schoolName', 'schoolCode', 'address', 'logoUrl', 'city', 'state', 'phone', 'email', 'slug', 'theme', 'config', 'publicationVersion'];
   const availableSet = new Set(availableColumns.map((column) => String(column).toLowerCase()));
   return desiredColumns.filter((column) => availableSet.has(String(column).toLowerCase()));
 };
 
 const loadPublicSchoolRow = async (identifier) => {
   const slug = String(identifier || '').trim().toLowerCase();
+  if (!slug) return null;
   const lookupCode = SCHOOL_ALIASES[slug] || slug.toUpperCase();
-
-  const availableColumns = await getAvailableSchoolColumns();
-  const selectedColumns = pickColumns(availableColumns);
-  const selectSql = selectedColumns.map((column) => `"${column}"`).join(', ');
-
-  const schoolRows = await prisma.$queryRawUnsafe(
-    `SELECT ${selectSql} FROM "School" WHERE lower("schoolCode") = $1 OR lower("schoolName") = $1 LIMIT 1`,
-    String(lookupCode).toLowerCase()
+  return cache.getOrSet(
+    cacheKeys.publicResource({ schoolIdentity: slug, resource: 'school-bootstrap-source' }),
+    async () => {
+      const availableColumns = await getAvailableSchoolColumns();
+      const selectedColumns = pickColumns(availableColumns);
+      const selectSql = selectedColumns.map((column) => `"${column}"`).join(', ');
+      const schoolRows = await prisma.$queryRawUnsafe(
+        `SELECT ${selectSql} FROM "School" WHERE lower("schoolCode") = $1 OR lower("schoolName") = $1 LIMIT 1`,
+        String(lookupCode).toLowerCase()
+      );
+      return Array.isArray(schoolRows) ? schoolRows[0] : null;
+    },
+    900,
   );
-
-  return Array.isArray(schoolRows) ? schoolRows[0] : null;
 };
 
 const titleCase = (value) => String(value || '')
@@ -131,6 +144,14 @@ const buildPublicCollection = (school, kind) => {
   return [];
 };
 
+const pagedCollection = (req, rows, defaultLimit = 10) => {
+  const paging = parsePagination(req.query, { defaultLimit });
+  return {
+    data: rows.slice(paging.skip, paging.skip + paging.take),
+    pagination: paginationMeta({ ...paging, total: rows.length }),
+  };
+};
+
 export const getPublicSchoolBySlug = async (req, res) => {
   try {
     const slug = String(req.params.slug || '').trim().toLowerCase();
@@ -206,7 +227,7 @@ export const listPublicEvents = async (req, res) => {
       return res.status(404).json({ success: false, message: 'School not found' });
     }
 
-    return res.json({ success: true, data: buildPublicCollection(school, 'events') });
+    return res.json({ success: true, ...pagedCollection(req, buildPublicCollection(school, 'events')) });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -225,7 +246,7 @@ export const listPublicNotices = async (req, res) => {
       return res.status(404).json({ success: false, message: 'School not found' });
     }
 
-    return res.json({ success: true, data: buildPublicCollection(school, 'notices') });
+    return res.json({ success: true, ...pagedCollection(req, buildPublicCollection(school, 'notices')) });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -244,11 +265,48 @@ export const listPublicTestimonials = async (req, res) => {
       return res.status(404).json({ success: false, message: 'School not found' });
     }
 
-    return res.json({ success: true, data: buildPublicCollection(school, 'testimonials') });
+    return res.json({ success: true, ...pagedCollection(req, buildPublicCollection(school, 'testimonials')) });
   } catch (error) {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch public testimonials',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};
+
+export const getPublicBootstrap = async (req, res) => {
+  try {
+    const schoolSlug = String(req.params.schoolSlug || '').trim().toLowerCase();
+    const school = await loadPublicSchoolRow(schoolSlug);
+    if (!school) return res.status(404).json({ success: false, message: 'School not found' });
+
+    const normalized = normalizeSchoolPayload(school);
+    const config = normalized.config || {};
+    const { config: _fullConfig, ...schoolSummary } = normalized;
+    const navigation = Array.isArray(config.navigation)
+      ? config.navigation
+      : Array.isArray(config.navigation?.links) ? config.navigation.links : [];
+    const payload = await cache.getOrSet(
+      cacheKeys.publicResource({ schoolIdentity: school.id, version: String(school.publicationVersion || 1), resource: 'bootstrap' }),
+      async () => ({
+        school: schoolSummary,
+        branding: {
+          logoUrl: school.logoUrl || null,
+          theme: normalized.theme || config.theme || null,
+        },
+        navigation,
+        homepage: config.homepage || {},
+        latestNotices: buildPublicCollection(school, 'notices').slice(0, 5),
+        upcomingEvents: buildPublicCollection(school, 'events').slice(0, 5),
+      }),
+      900,
+    );
+    return res.json({ success: true, data: payload });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch public bootstrap data',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }

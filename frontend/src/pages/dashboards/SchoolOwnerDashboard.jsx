@@ -5,11 +5,12 @@ import { BookOpen, CalendarCheck, GraduationCap, Palette, Settings, UserPlus, Us
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { dashboardService } from '../../services/dashboardService';
+import { queryKeys } from '../../lib/queryClient';
 import { useBranding } from '../../contexts/BrandingContext';
 import { ErrorState, Loading, Panel } from '../../components/student/StudentUI';
 
 export default function SchoolOwnerDashboard() {
-  const query = useQuery({ queryKey: ['dashboard-summary', 'school-owner'], queryFn: dashboardService.summary }); const { branding } = useBranding();
+  const query = useQuery({ queryKey: queryKeys.dashboard(), queryFn: dashboardService.summary, staleTime: 30_000 }); const { branding } = useBranding();
   if (query.isLoading) return <DashboardLayout role="SCHOOL_OWNER"><Loading /></DashboardLayout>;
   if (query.isError) return <DashboardLayout role="SCHOOL_OWNER"><ErrorState error={query.error} retry={query.refetch} /></DashboardLayout>;
   const stats=query.data?.stats||{}; const school=query.data?.school||{};

@@ -1,20 +1,20 @@
 import jwt from 'jsonwebtoken';
 
 export const generateToken = (payload) => {
-  return jwt.sign({ ...payload, tokenType: 'access' }, process.env.JWT_SECRET, {
+  return jwt.sign({ ...payload, tokenType: 'access' }, process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRY || '30m',
   });
 };
 
 export const generateRefreshToken = (payload) => {
-  return jwt.sign({ ...payload, tokenType: 'refresh' }, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
+  return jwt.sign({ ...payload, tokenType: 'refresh' }, process.env.REFRESH_TOKEN_SECRET || process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d',
   });
 };
 
 export const verifyToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET);
     if (decoded.tokenType && decoded.tokenType !== 'access') {
       throw new Error('Invalid access token');
     }
@@ -26,7 +26,7 @@ export const verifyToken = (token) => {
 
 export const verifyRefreshToken = (token) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET || process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
     if (decoded.tokenType && decoded.tokenType !== 'refresh') {
       throw new Error('Invalid refresh token');
     }

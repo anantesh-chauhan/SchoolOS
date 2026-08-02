@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { hashKey, QueryClient } from '@tanstack/react-query';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,6 +12,11 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true,
       staleTime: 60 * 1000,
       gcTime: 10 * 60 * 1000,
+      // Legacy feature queries are automatically isolated even before their
+      // visible key is migrated to the factory below.
+      queryKeyHashFn: (queryKey) => hashKey(
+        queryKey?.[0] === 'schoolos' ? queryKey : workspaceQueryKey(...queryKey),
+      ),
     },
     mutations: {
       retry: 0,
@@ -25,10 +30,24 @@ export const clearPrivateClientState = () => {
 };
 
 export const workspaceQueryKey = (...parts) => {
-  let assignmentId = 'public';
+  let scope = ['public', 'anonymous', 'PUBLIC', 'public'];
   try {
     const user = JSON.parse(localStorage.getItem('user') || 'null');
-    assignmentId = user?.activeRoleAssignmentId || user?.activeRole?.assignmentId || user?.role || 'public';
-  } catch { assignmentId = 'unknown'; }
-  return ['workspace', assignmentId, ...parts];
+    scope = [
+      user?.schoolId || 'platform',
+      user?.id || user?.studentId || user?.email || 'anonymous',
+      user?.activeRole?.role || user?.activeRole || user?.role || 'PUBLIC',
+      user?.activeRoleAssignmentId || user?.activeRole?.assignmentId || 'default',
+    ];
+  } catch { scope = ['unknown', 'unknown', 'UNKNOWN', 'unknown']; }
+  return ['schoolos', ...scope, ...parts];
+};
+
+export const queryKeys = {
+  dashboard: () => workspaceQueryKey('dashboard', 'summary'),
+  notifications: (filters = {}) => workspaceQueryKey('communication', 'notifications', filters),
+  unreadNotifications: () => workspaceQueryKey('communication', 'notifications', 'unread-count'),
+  conversations: (filters = {}) => workspaceQueryKey('communication', 'conversations', filters),
+  analytics: (...parts) => workspaceQueryKey('analytics', ...parts),
+  reference: (resource, params = {}) => workspaceQueryKey('reference', resource, params),
 };

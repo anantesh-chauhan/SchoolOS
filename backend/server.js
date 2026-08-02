@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,8 +42,15 @@ import analyticsRoutes from './src/modules/analytics/analytics.routes.js';
 import examinationRoutes from './src/modules/examinations/examination.routes.js';
 import { analyticsInvalidationMiddleware } from './src/modules/analytics/analytics.invalidation.js';
 import { processScheduled, processQueuedDeliveries } from './src/modules/communication/communication.service.js';
+import cache from './src/infrastructure/cache/cache.service.js';
+import { cacheInvalidationAfterMutation } from './src/infrastructure/cache/cache-invalidation.service.js';
+import { validateEnvironment } from './src/config/environment.js';
+import { requestObservability } from './src/middleware/request-observability.middleware.js';
+import { privateNoStore, requestTimeout } from './src/middleware/http-cache.middleware.js';
+import { enforceQueryBounds } from './src/middleware/query-bounds.middleware.js';
 
 const app = express();
+const environment = validateEnvironment();
 const PORT = process.env.PORT || 5000;
 const isProduction = process.env.NODE_ENV === 'production';
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -49,6 +58,11 @@ const frontendDirectory = path.join(currentDirectory, 'public');
 const frontendIndex = path.join(frontendDirectory, 'index.html');
 let server;
 let isShuttingDown = false;
+const rateLimitKey = (req) => createHash('sha256').update([
+  req.socket?.remoteAddress || 'unknown-ip',
+  req.get('authorization') || 'anonymous',
+  req.get('x-school-id') || req.get('x-school-slug') || 'unknown-tenant',
+].join('|')).digest('hex');
 
 const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '')
   .split(',')
@@ -82,6 +96,8 @@ const corsOptions = (req, callback) => {
 // Middleware
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.use(requestObservability);
+app.use(requestTimeout(environment.requestTimeoutMs));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
@@ -106,12 +122,21 @@ app.use(express.urlencoded({
   limit: process.env.FORM_BODY_LIMIT || '1mb',
   parameterLimit: 1000,
 }));
-app.use('/api', (req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  next();
-});
+app.use('/api', privateNoStore);
+if (environment.rateLimitEnabled) {
+  app.use(['/api/auth', '/api/v1/auth'], rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: rateLimitKey,
+    message: { success: false, error: { code: 'AUTH_RATE_LIMITED', message: 'Too many authentication attempts. Try again later.' } },
+  }));
+  app.use(['/api/public', '/api/v1/public'], rateLimit({ windowMs: 60_000, limit: 180, standardHeaders: true, legacyHeaders: false, keyGenerator: rateLimitKey }));
+  app.use('/api', rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: true, legacyHeaders: false, keyGenerator: rateLimitKey }));
+}
+app.use('/api', enforceQueryBounds);
+app.use('/api', cacheInvalidationAfterMutation);
 app.use(analyticsInvalidationMiddleware);
 
 // Health Check Endpoint (without database)
@@ -123,6 +148,22 @@ app.get('/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     uptime: process.uptime(),
   });
+});
+
+app.get('/health/live', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json({ status: 'alive', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
+app.get('/health/ready', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    const cacheAvailable = await cache.ping();
+    res.status(200).json({ status: 'ready', database: 'connected', cache: cacheAvailable ? 'available' : 'bypassed' });
+  } catch {
+    res.status(503).json({ status: 'not_ready', database: 'unavailable' });
+  }
 });
 
 // Database Health Check
@@ -163,6 +204,41 @@ app.get('/api/health', async (req, res) => {
 });
 
 // API Routes
+// Versioned aliases are additive; legacy /api routes remain available while
+// clients migrate without a flag-day release.
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/role-management', roleManagementRoutes);
+app.use('/api/v1/public', publicRoutes);
+app.use('/api/v1/school', schoolRoutes);
+app.use('/api/v1/schools', schoolRoutes);
+app.use('/api/v1/classes', classRoutes);
+app.use('/api/v1/sections', sectionRoutes);
+app.use('/api/v1/subjects', subjectRoutes);
+app.use('/api/v1/teachers', teacherRoutes);
+app.use('/api/v1/teacher', teacherDashboardRoutes);
+app.use('/api/v1/timetables', timetableRoutes);
+app.use('/api/v1/gallery', galleryRoutes);
+app.use('/api/v1/school-settings', schoolSettingsRoutes);
+app.use('/api/v1/uploads', uploadRoutes);
+app.use('/api/v1/academic-structure', academicStructureRoutes);
+app.use('/api/v1/widgets', widgetRoutes);
+app.use('/api/v1/students', studentRoutes);
+app.use('/api/v1/users', usersRoutes);
+app.use('/api/v1/attendance', attendanceRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1', chapterFeedbackRoutes);
+app.use('/api/v1', issueReportRoutes);
+app.use('/api/v1/student', studentPortalRoutes);
+app.use('/api/v1', securityRoutes);
+app.use('/api/v1/curriculum', curriculumRoutes);
+app.use('/api/v1', academicStaffingRoutes);
+app.use('/api/v1/fees', feeRoutes);
+app.use('/api/v1', homeworkRoutes);
+app.use('/api/v1', communicationRoutes);
+app.use('/api/v1/hr', hrRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/examinations', examinationRoutes);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/role-management', roleManagementRoutes);
 app.use('/api/public', publicRoutes);
@@ -295,6 +371,7 @@ process.once('SIGTERM', async () => {
       });
     }
     await prisma.$disconnect();
+    await cache.close();
     console.log('✅ Database connection closed');
     process.exit(0);
   } catch (error) {
@@ -314,6 +391,7 @@ process.once('SIGINT', async () => {
       });
     }
     await prisma.$disconnect();
+    await cache.close();
     console.log('✅ Database connection closed');
     process.exit(0);
   } catch (error) {

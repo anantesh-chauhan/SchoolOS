@@ -10,6 +10,7 @@ import { SummaryCard } from '../../components/DashboardCards';
 import { chapterFeedbackService } from '../../services/chapterFeedbackService';
 import { useQuery } from '@tanstack/react-query';
 import { dashboardService } from '../../services/dashboardService';
+import { queryKeys } from '../../lib/queryClient';
 import { useBranding } from '../../contexts/BrandingContext';
 
 export default function AdminDashboard() {
@@ -25,7 +26,7 @@ export default function AdminDashboard() {
   const [polls, setPolls] = useState([]);
   const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  const dashboardQuery = useQuery({ queryKey: ['dashboard-summary', 'admin'], queryFn: dashboardService.summary });
+  const dashboardQuery = useQuery({ queryKey: queryKeys.dashboard(), queryFn: dashboardService.summary, staleTime: 30_000 });
 
   const loadFeedback = useCallback(async () => {
     setFeedbackLoading(true);

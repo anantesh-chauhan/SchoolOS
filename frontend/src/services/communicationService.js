@@ -7,8 +7,8 @@ const notificationsChanged = (result) => {
   return result;
 };
 export const communicationService = {
-  notifications: (params = {}) => apiClient.get('/notifications', { params }).then(data),
-  unreadCount: () => apiClient.get('/notifications/unread-count').then(data),
+  notifications: (params = {}, signal) => apiClient.get('/notifications', { params, signal }).then(data),
+  unreadCount: (signal) => apiClient.get('/notifications/unread-count', { signal }).then(data),
   notification: (id) => apiClient.get(`/notifications/${id}`).then(data),
   read: (id) => apiClient.patch(`/notifications/${id}/read`).then(data).then(notificationsChanged),
   readAll: () => apiClient.patch('/notifications/read-all').then(data).then(notificationsChanged),
@@ -21,7 +21,7 @@ export const communicationService = {
   publishAnnouncement: (id) => apiClient.post(`/announcements/${id}/publish`).then(data),
   cancelAnnouncement: (id) => apiClient.post(`/announcements/${id}/cancel`).then(data),
   announcementAnalytics: (id) => apiClient.get(`/announcements/${id}/analytics`).then(data),
-  conversations: (params = {}) => apiClient.get('/conversations', { params }).then(data),
+  conversations: (params = {}, signal) => apiClient.get('/conversations', { params, signal }).then(data),
   conversation: (id) => apiClient.get(`/conversations/${id}`).then(data),
   createConversation: (payload) => apiClient.post('/conversations', payload).then(data),
   sendMessage: (id, payload) => apiClient.post(`/conversations/${id}/messages`, payload).then(data),

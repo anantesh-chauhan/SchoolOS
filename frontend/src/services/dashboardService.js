@@ -1,2 +1,2 @@
 import apiClient from './api';
-export const dashboardService = { summary: async () => (await apiClient.get('/dashboard/summary')).data.data };
+export const dashboardService = { summary: async ({ signal } = {}) => (await apiClient.get('/dashboard/summary', { signal })).data.data };

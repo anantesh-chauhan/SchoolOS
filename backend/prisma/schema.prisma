@@ -194,6 +194,7 @@ model School {
   status                     SchoolStatus                    @default(ACTIVE)
   theme                      Json?
   config                     Json?
+  publicationVersion         Int                             @default(1)
   users                      User[]
   userSchoolRoles            UserSchoolRole[]
   workspaceAuditEvents       WorkspaceAuditLog[]
@@ -1629,6 +1630,9 @@ model Student {
   @@unique([parentUserId])
   @@index([schoolId])
   @@index([schoolId, session])
+  @@index([schoolId, isActive, createdAt])
+  @@index([schoolId, className, section, isActive])
+  @@index([schoolId, isActive, className, section, createdAt])
   @@index([schoolId, className])
   @@index([mobile])
   @@index([email])

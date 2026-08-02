@@ -141,23 +141,43 @@ const validateContentTargets = async (user, audienceScope, targets) => {
   }
 
   const normalized = [];
+  const directStudentIds = [...new Set(targets.map((target) => target.studentId).filter(Boolean))];
+  const directStudents = directStudentIds.length
+    ? await prisma.student.findMany({ where: { id: { in: directStudentIds }, schoolId: user.schoolId, isActive: true }, select: { id: true, className: true, section: true } })
+    : [];
+  if (directStudents.length !== directStudentIds.length) throw new HomeworkError('A selected student is outside this school or inactive', 400, 'INVALID_TARGET_STUDENT');
+  const studentById = new Map(directStudents.map((row) => [row.id, row]));
+  const derivedClasses = directStudents.length
+    ? await prisma.class.findMany({ where: { schoolId: user.schoolId, className: { in: [...new Set(directStudents.map((row) => row.className))] }, deletedAt: null }, select: { id: true, className: true } })
+    : [];
+  const derivedClassByName = new Map(derivedClasses.map((row) => [row.className, row]));
+  const derivedSections = derivedClasses.length
+    ? await prisma.section.findMany({ where: { schoolId: user.schoolId, classId: { in: derivedClasses.map((row) => row.id) }, sectionName: { in: [...new Set(directStudents.map((row) => row.section || ''))] }, deletedAt: null }, select: { id: true, classId: true, sectionName: true } })
+    : [];
+  const derivedSectionByScope = new Map(derivedSections.map((row) => [`${row.classId}:${row.sectionName}`, row]));
+  const targetClassIds = [...new Set([...targets.map((target) => target.classId).filter(Boolean), ...derivedClasses.map((row) => row.id)])];
+  const targetSectionIds = [...new Set([...targets.map((target) => target.sectionId).filter(Boolean), ...derivedSections.map((row) => row.id)])];
+  const [validClasses, validSections] = await Promise.all([
+    targetClassIds.length ? prisma.class.findMany({ where: { id: { in: targetClassIds }, schoolId: user.schoolId, deletedAt: null }, select: { id: true } }) : [],
+    targetSectionIds.length ? prisma.section.findMany({ where: { id: { in: targetSectionIds }, schoolId: user.schoolId, deletedAt: null }, select: { id: true, classId: true } }) : [],
+  ]);
+  const validClassIds = new Set(validClasses.map((row) => row.id));
+  const validSectionById = new Map(validSections.map((row) => [row.id, row]));
   for (const target of targets) {
     const row = { ...target, scope: audienceScope };
     if (target.studentId) {
-      const student = await prisma.student.findFirst({ where: { id: target.studentId, schoolId: user.schoolId, isActive: true } });
-      if (!student) throw new HomeworkError('A selected student is outside this school or inactive', 400, 'INVALID_TARGET_STUDENT');
-      const classRow = await prisma.class.findFirst({ where: { schoolId: user.schoolId, className: student.className, deletedAt: null } });
-      const sectionRow = classRow ? await prisma.section.findFirst({ where: { schoolId: user.schoolId, classId: classRow.id, sectionName: student.section || '', deletedAt: null } }) : null;
+      const student = studentById.get(target.studentId);
+      const classRow = derivedClassByName.get(student.className);
+      const sectionRow = classRow ? derivedSectionByScope.get(`${classRow.id}:${student.section || ''}`) : null;
       row.classId = row.classId || classRow?.id || null;
       row.sectionId = row.sectionId || sectionRow?.id || null;
     }
     if (row.classId) {
-      const classRow = await prisma.class.findFirst({ where: { id: row.classId, schoolId: user.schoolId, deletedAt: null } });
-      if (!classRow) throw new HomeworkError('A target class does not belong to this school', 400, 'INVALID_TARGET_CLASS');
+      if (!validClassIds.has(row.classId)) throw new HomeworkError('A target class does not belong to this school', 400, 'INVALID_TARGET_CLASS');
     }
     if (row.sectionId) {
-      const section = await prisma.section.findFirst({ where: { id: row.sectionId, classId: row.classId, schoolId: user.schoolId, deletedAt: null } });
-      if (!section) throw new HomeworkError('A target section does not belong to its class and school', 400, 'INVALID_TARGET_SECTION');
+      const section = validSectionById.get(row.sectionId);
+      if (section?.classId !== row.classId) throw new HomeworkError('A target section does not belong to its class and school', 400, 'INVALID_TARGET_SECTION');
     }
     if (row.subjectId) {
       if (!row.sectionId && user.role === 'TEACHER') throw new HomeworkError('Teachers must choose each assigned section for subject content', 403, 'TEACHER_SECTION_REQUIRED');

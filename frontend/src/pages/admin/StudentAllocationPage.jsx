@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRightLeft, CheckCircle2, GraduationCap, Search, ShieldAlert, UserRoundCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -6,6 +6,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import { authService } from '../../services/authService';
 import { classService, sectionService } from '../../services/managementService';
 import { studentService } from '../../services/studentService';
+import { queryKeys } from '../../lib/queryClient';
 
 const currentSession = () => {
   const today = new Date();
@@ -18,11 +19,20 @@ export default function StudentAllocationPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [view, setView] = useState('PENDING');
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [allocation, setAllocation] = useState({ classId: '', sectionId: '', session: currentSession() });
 
-  const rosterQuery = useQuery({ queryKey: ['student-allocation-roster'], queryFn: studentService.allocationRoster });
+  const deferredSearch = useDeferredValue(search.trim());
+  const rosterParams = { page, limit: 25, status: view, search: deferredSearch };
+  const rosterKey = queryKeys.reference('student-allocation-roster', rosterParams);
+  const rosterQuery = useQuery({
+    queryKey: rosterKey,
+    queryFn: ({ signal }) => studentService.allocationRoster(rosterParams, signal),
+    placeholderData: (previous) => previous,
+    staleTime: 15_000,
+  });
   const classesQuery = useQuery({ queryKey: ['classes'], queryFn: classService.list });
   const sectionsQuery = useQuery({ queryKey: ['sections', 'all'], queryFn: () => sectionService.list() });
 
@@ -30,6 +40,8 @@ export default function StudentAllocationPage() {
   const classes = classesQuery.data?.data || [];
   const sections = sectionsQuery.data?.data || [];
   const availableSections = sections.filter((row) => row.classId === allocation.classId);
+
+  useEffect(() => { setPage(1); }, [deferredSearch, view]);
 
   const visibleStudents = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -48,7 +60,7 @@ export default function StudentAllocationPage() {
     onSuccess: (response) => {
       toast.success(response.message || 'Student allocation saved');
       setSelected(null);
-      queryClient.invalidateQueries({ queryKey: ['student-allocation-roster'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reference('student-allocation-roster') });
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to save allocation'),
   });
@@ -58,7 +70,7 @@ export default function StudentAllocationPage() {
     onSuccess: (response) => {
       toast.success(response.message || 'Student deactivated');
       setDeleteTarget(null);
-      queryClient.invalidateQueries({ queryKey: ['student-allocation-roster'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reference('student-allocation-roster') });
     },
     onError: (error) => toast.error(error.response?.data?.message || 'Failed to deactivate student'),
   });
@@ -70,8 +82,8 @@ export default function StudentAllocationPage() {
     setSelected(student);
   };
 
-  const pendingCount = students.filter((row) => !row.section || !row.rollNumber).length;
-  const allocatedCount = students.length - pendingCount;
+  const pendingCount = rosterQuery.data?.summary?.pending || 0;
+  const allocatedCount = rosterQuery.data?.summary?.allocated || 0;
 
   return (
     <DashboardLayout role={role}>
@@ -113,6 +125,14 @@ export default function StudentAllocationPage() {
             </table>
             {!rosterQuery.isLoading && visibleStudents.length === 0 && <div className="py-14 text-center"><CheckCircle2 className="mx-auto h-9 w-9 text-emerald-500"/><p className="mt-3 font-bold text-slate-800">No students in this view</p><p className="text-sm text-slate-500">Try another filter or search term.</p></div>}
             {rosterQuery.isLoading && <p className="py-12 text-center text-sm text-slate-500">Loading student roster...</p>}
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4 text-sm">
+            <span className="text-slate-500">{rosterQuery.data?.pagination?.total || 0} matching students</span>
+            <div className="flex items-center gap-2">
+              <button disabled={page <= 1 || rosterQuery.isFetching} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Previous</button>
+              <span>Page {page} of {rosterQuery.data?.pagination?.totalPages || 1}</span>
+              <button disabled={!rosterQuery.data?.pagination?.hasNextPage || rosterQuery.isFetching} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Next</button>
+            </div>
           </div>
         </section>
       </div>

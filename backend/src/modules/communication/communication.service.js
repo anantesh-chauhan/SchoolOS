@@ -129,16 +129,17 @@ const assertCreatorScope = async (user, category, rules) => {
 
 const resolveDirect = async (schoolId, values, context) => {
   const results = [];
-  for (const value of values) {
-    if (value.startsWith('user:') || !value.includes(':')) {
-      const id = value.replace(/^user:/, ''); const row = await prisma.user.findFirst({ where: { id, schoolId, isActive: true } });
-      if (row) results.push(userRecipient(row, context));
-    } else if (value.startsWith('student:')) {
-      const row = await prisma.student.findFirst({ where: { id: value.slice(8), schoolId, isActive: true } }); if (row) results.push(...studentRecipients(row, ['STUDENT'], context));
-    } else if (value.startsWith('parent:')) {
-      const identifier = value.slice(7); const row = await prisma.student.findFirst({ where: { schoolId, isActive: true, OR: [{ id: identifier }, { parentUserId: identifier }] } }); if (row) results.push(...studentRecipients(row, ['PARENT'], context));
-    }
-  }
+  const userIds = values.filter((value) => value.startsWith('user:') || !value.includes(':')).map((value) => value.replace(/^user:/, ''));
+  const studentIds = values.filter((value) => value.startsWith('student:')).map((value) => value.slice(8));
+  const parentIds = values.filter((value) => value.startsWith('parent:')).map((value) => value.slice(7));
+  const [users, students, parents] = await Promise.all([
+    userIds.length ? prisma.user.findMany({ where: { id: { in: userIds }, schoolId, isActive: true } }) : [],
+    studentIds.length ? prisma.student.findMany({ where: { id: { in: studentIds }, schoolId, isActive: true } }) : [],
+    parentIds.length ? prisma.student.findMany({ where: { schoolId, isActive: true, OR: [{ id: { in: parentIds } }, { parentUserId: { in: parentIds } }] } }) : [],
+  ]);
+  results.push(...users.map((row) => userRecipient(row, context)));
+  students.forEach((row) => results.push(...studentRecipients(row, ['STUDENT'], context)));
+  parents.forEach((row) => results.push(...studentRecipients(row, ['PARENT'], context)));
   return results;
 };
 
@@ -321,9 +322,17 @@ export const markAllRead = async (user) => prisma.notificationRecipient.updateMa
 
 export const processQueuedDeliveries = async ({ notificationId, limit = 100 } = {}) => {
   const rows = await prisma.notificationDelivery.findMany({ where: { ...(notificationId ? { recipient: { notificationId } } : {}), status: { in: ['QUEUED','FAILED'] }, attemptCount: { lt: 5 }, OR: [{ nextRetryAt: null }, { nextRetryAt: { lte: now() } }] }, include: { recipient: { include: { notification: true } } }, take: limit, orderBy: { createdAt: 'asc' } });
+  const schoolIds = [...new Set(rows.map((row) => row.recipient.schoolId))];
+  const [policies, preferences] = await Promise.all([
+    schoolIds.length ? prisma.communicationPolicy.findMany({ where: { schoolId: { in: schoolIds } } }) : [],
+    rows.length ? prisma.notificationPreference.findMany({ where: { OR: rows.map((row) => ({ schoolId: row.recipient.schoolId, recipientKey: row.recipient.recipientKey, category: row.recipient.notification.category })) } }) : [],
+  ]);
+  const policyBySchool = new Map(policies.map((row) => [row.schoolId, row]));
+  const preferenceByScope = new Map(preferences.map((row) => [`${row.schoolId}:${row.recipientKey}:${row.category}`, row]));
   for (const row of rows) {
     if (row.recipient.notification.expiresAt && row.recipient.notification.expiresAt <= now()) { await prisma.notificationDelivery.update({ where: { id: row.id }, data: { status: 'CANCELLED', failureReason: 'Notification expired before delivery.' } }); continue; }
-    const [policy, preference] = await Promise.all([prisma.communicationPolicy.findUnique({ where: { schoolId: row.recipient.schoolId } }), prisma.notificationPreference.findUnique({ where: { schoolId_recipientKey_category: { schoolId: row.recipient.schoolId, recipientKey: row.recipient.recipientKey, category: row.recipient.notification.category } } })]);
+    const policy = policyBySchool.get(row.recipient.schoolId);
+    const preference = preferenceByScope.get(`${row.recipient.schoolId}:${row.recipient.recipientKey}:${row.recipient.notification.category}`);
     const mandatory = row.recipient.notification.isMandatory || MANDATORY_CATEGORIES.has(row.recipient.notification.category) || row.recipient.notification.priority === 'EMERGENCY';
     const quietStart = preference?.quietHoursStart || policy?.quietHoursStart; const quietEnd = preference?.quietHoursEnd || policy?.quietHoursEnd;
     if (!mandatory && row.channel !== 'IN_APP' && quietStart && quietEnd) { const parts = new Intl.DateTimeFormat('en-GB',{timeZone:preference?.timezone||'UTC',hour:'2-digit',minute:'2-digit',hour12:false}).format(now()).split(':').map(Number); const current=parts[0]*60+parts[1], start=Number(quietStart.slice(0,2))*60+Number(quietStart.slice(3,5)), end=Number(quietEnd.slice(0,2))*60+Number(quietEnd.slice(3,5)); const quiet=start<=end?current>=start&&current<end:current>=start||current<end; if(quiet){await prisma.notificationDelivery.update({where:{id:row.id},data:{nextRetryAt:new Date(Date.now()+15*60000)}});continue;} }
@@ -335,9 +344,12 @@ export const processQueuedDeliveries = async ({ notificationId, limit = 100 } = 
 
 export const processScheduled = async () => {
   const due = await prisma.notification.findMany({ where: { status: 'SCHEDULED', scheduledAt: { lte: now() }, OR: [{ expiresAt: null }, { expiresAt: { gt: now() } }] }, take: 100 });
+  const creatorIds = [...new Set(due.map((row) => row.createdByUserId).filter(Boolean))];
+  const creators = creatorIds.length ? await prisma.user.findMany({ where: { id: { in: creatorIds }, isActive: true } }) : [];
+  const creatorByScope = new Map(creators.map((row) => [`${row.schoolId}:${row.id}`, row]));
   let published = 0;
   for (const row of due) {
-    const creator = await prisma.user.findFirst({ where: { id: row.createdByUserId, schoolId: row.schoolId, isActive: true } });
+    const creator = creatorByScope.get(`${row.schoolId}:${row.createdByUserId}`);
     if (!creator) { await prisma.notification.update({ where: { id: row.id }, data: { status: 'CANCELLED' } }); continue; }
     try { await publishNotification(creator, row.id); await prisma.announcement.updateMany({ where: { notificationId: row.id }, data: { status: 'PUBLISHED' } }); published += 1; } catch (error) { await prisma.communicationAudit.create({ data: { schoolId: row.schoolId, action: 'SCHEDULED_PUBLISH_FAILED', entityType: 'Notification', entityId: row.id, current: { error: String(error.message).slice(0, 500) } } }); }
   }

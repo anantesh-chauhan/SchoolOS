@@ -1,4 +1,7 @@
 import prisma from '../config/prisma.client.js';
+import { getPerformanceSnapshot } from '../infrastructure/observability/performance-metrics.js';
+
+export const getPlatformPerformance = (_req, res) => res.json({ success: true, data: getPerformanceSnapshot() });
 
 const startOfToday = () => { const now = new Date(); return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); };
 const currentSession = () => { const now = new Date(); const year = now.getUTCMonth() >= 3 ? now.getUTCFullYear() : now.getUTCFullYear() - 1; return `${year}-${String(year + 1).slice(-2)}`; };

@@ -1,5 +1,6 @@
 import bcryptjs from 'bcryptjs';
 import prisma from '../config/prisma.client.js';
+import { paginationMeta, parsePagination } from '../utils/pagination.util.js';
 import { accountKeyForUser, resolveAccount, updateAccountPassword, validatePassword } from '../services/accountSecurity.service.js';
 
 
@@ -341,13 +342,23 @@ export const adminUpdateUser = async (req, res) => {
 // GET /api/users?role=STUDENT&classId=...
 export const getUsers = async (req, res) => {
   try {
-    const filters = {};
+    const filters = { schoolId: req.user.schoolId };
     if (req.query.role) filters.role = req.query.role;
     if (req.query.classId) filters.classId = req.query.classId;
+    const search = String(req.query.search || '').trim();
+    if (search) filters.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { email: { contains: search, mode: 'insensitive' } },
+      { employeeId: { contains: search, mode: 'insensitive' } },
+    ];
+    const paging = parsePagination(req.query);
 
-    const users = await prisma.user.findMany({ where: filters, select: { id: true, email: true, name: true, role: true, classId: true, profileImage: true, isActive: true } });
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({ where: filters, skip: paging.skip, take: paging.take, orderBy: [{ name: 'asc' }, { id: 'asc' }], select: { id: true, email: true, name: true, role: true, classId: true, profileImage: true, isActive: true } }),
+      prisma.user.count({ where: filters }),
+    ]);
 
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: users, pagination: paginationMeta({ ...paging, total }) });
   } catch (error) {
     console.error('getUsers error', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users' });

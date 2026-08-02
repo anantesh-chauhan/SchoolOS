@@ -1,6 +1,7 @@
 import prisma from '../config/prisma.client.js';
 import { getScopedSchoolId } from '../utils/tenant.util.js';
 import { getOptimizedCloudinaryImageUrl } from '../utils/cloudinary.util.js';
+import { paginationMeta, parsePagination } from '../utils/pagination.util.js';
 
 
 const toInt = (value, fallback = 0) => {
@@ -229,15 +230,18 @@ export const listGalleryPhotosByGroup = async (req, res) => {
       });
     }
 
-    const rows = await prisma.galleryPhoto.findMany({
-      where: { schoolId, groupId },
-      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
-    });
+    const paging = parsePagination(req.query, { defaultLimit: 50 });
+    const where = { schoolId, groupId };
+    const [rows, total] = await Promise.all([
+      prisma.galleryPhoto.findMany({ where, orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }], skip: paging.skip, take: paging.take }),
+      prisma.galleryPhoto.count({ where }),
+    ]);
 
     return res.json({
       success: true,
       group,
       data: rows.map(mapPhoto),
+      pagination: paginationMeta({ ...paging, total }),
     });
   } catch (error) {
     return res.status(500).json({
@@ -512,19 +516,22 @@ export const listPublicGalleryPhotos = async (req, res) => {
       });
     }
 
-    const photos = await prisma.galleryPhoto.findMany({
-      where: {
+    const paging = parsePagination(req.query, { defaultLimit: 24 });
+    const where = {
         schoolId,
         groupId,
         isVisible: true,
-      },
-      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
-    });
+      };
+    const [photos, total] = await Promise.all([
+      prisma.galleryPhoto.findMany({ where, orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }], skip: paging.skip, take: paging.take }),
+      prisma.galleryPhoto.count({ where }),
+    ]);
 
     return res.json({
       success: true,
       group: mapGroup(group),
       data: photos.map(mapPhoto),
+      pagination: paginationMeta({ ...paging, total }),
     });
   } catch (error) {
     return res.status(500).json({

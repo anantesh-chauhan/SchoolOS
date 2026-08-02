@@ -10,11 +10,24 @@ const publicQuestion = new Map(SECURITY_QUESTIONS);
 export const listCredentialAccounts = async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
-    const [users, students, questionCounts] = await Promise.all([
-      prisma.user.findMany({ where: { schoolId }, include: { class: true, section: true }, orderBy: { name: 'asc' } }),
-      prisma.student.findMany({ where: { schoolId }, orderBy: [{ className: 'asc' }, { studentFirstName: 'asc' }] }),
-      prisma.userSecurityQuestion.groupBy({ by: ['accountKey'], where: { schoolId }, _count: { _all: true } }),
+    const query = String(req.query.search || '').trim().slice(0, 200);
+    const [users, students] = await Promise.all([
+      prisma.user.findMany({
+        where: { schoolId, ...(query ? { OR: [{ name: { contains: query, mode: 'insensitive' } }, { email: { contains: query, mode: 'insensitive' } }, { employeeId: { contains: query, mode: 'insensitive' } }] } : {}) },
+        select: { id: true, name: true, email: true, role: true, employeeId: true, isActive: true, lastLoginAt: true, passwordChangedAt: true, lockedUntil: true, class: { select: { className: true } }, section: { select: { sectionName: true } } },
+        orderBy: { name: 'asc' }, take: 101,
+      }),
+      prisma.student.findMany({
+        where: { schoolId, ...(query ? { OR: [{ studentFirstName: { contains: query, mode: 'insensitive' } }, { studentLastName: { contains: query, mode: 'insensitive' } }, { admissionNo: { contains: query, mode: 'insensitive' } }, { studentUserId: { contains: query, mode: 'insensitive' } }, { parentUserId: { contains: query, mode: 'insensitive' } }] } : {}) },
+        select: { id: true, studentFirstName: true, studentLastName: true, studentUserId: true, parentUserId: true, fatherName: true, className: true, section: true, admissionNo: true, isActive: true, passwordChangedAt: true, lockedUntil: true },
+        orderBy: [{ className: 'asc' }, { studentFirstName: 'asc' }], take: 101,
+      }),
     ]);
+    const accountKeys = [
+      ...users.map((row) => `user:${row.id}`),
+      ...students.flatMap((row) => [`student:${row.id}`, `parent:${row.id}`]),
+    ];
+    const questionCounts = accountKeys.length ? await prisma.userSecurityQuestion.groupBy({ by: ['accountKey'], where: { schoolId, accountKey: { in: accountKeys } }, _count: { _all: true } }) : [];
     const configured = new Map(questionCounts.map((row) => [row.accountKey, row._count._all >= 2]));
     const rows = [
       ...users.map((row) => ({ accountKey: `user:${row.id}`, name: row.name, loginId: row.email, role: row.role, className: row.class?.className, sectionName: row.section?.sectionName, referenceId: row.employeeId, active: row.isActive, securityConfigured: configured.get(`user:${row.id}`) || false, lastLoginAt: row.lastLoginAt, passwordChangedAt: row.passwordChangedAt, locked: Boolean(row.lockedUntil && row.lockedUntil > new Date()) })),
@@ -23,13 +36,13 @@ export const listCredentialAccounts = async (req, res) => {
         { accountKey: `parent:${row.id}`, name: row.fatherName, loginId: row.parentUserId, role: 'PARENT', className: row.className, sectionName: row.section, referenceId: row.admissionNo, linkedStudent: [row.studentFirstName, row.studentLastName].filter(Boolean).join(' '), active: row.isActive, securityConfigured: configured.get(`parent:${row.id}`) || false, passwordChangedAt: row.passwordChangedAt, locked: Boolean(row.lockedUntil && row.lockedUntil > new Date()) },
       ]),
     ];
-    const query = String(req.query.search || '').trim().toLowerCase();
     const filtered = rows.filter((row) => (!req.query.role || row.role === req.query.role)
       && (!req.query.status || String(row.active) === req.query.status)
       && (!req.query.security || String(row.securityConfigured) === req.query.security)
       && (!req.query.locked || String(row.locked) === req.query.locked)
-      && (!query || Object.values(row).filter(Boolean).some((value) => String(value).toLowerCase().includes(query))));
-    return res.json({ success: true, data: filtered });
+      && (!query || Object.values(row).filter(Boolean).some((value) => String(value).toLowerCase().includes(query.toLowerCase()))));
+    const limit = Math.min(Number(req.query.limit) || 100, 100);
+    return res.json({ success: true, data: filtered.slice(0, limit), pagination: { limit, returned: Math.min(filtered.length, limit), truncated: users.length > 100 || students.length > 100 || filtered.length > limit } });
   } catch (error) { return res.status(500).json({ success: false, message: 'Failed to load credential accounts' }); }
 };
 
