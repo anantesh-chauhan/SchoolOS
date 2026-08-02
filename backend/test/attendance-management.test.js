@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { assertAttendanceTransition, attendancePermission, buildWorkingDays, canTransitionAttendance, dateInTimezone, isEnrollmentEligible, percentage, statusWeight, summarizeAttendance } from '../src/services/attendance.service.js';
+import { buildStudentSectionEligibilityWhere } from '../src/services/studentSectionEnrollment.service.js';
 import { assertSameSchool } from '../src/utils/teacherAuthorization.util.js';
 
 const date = (value) => new Date(`${value}T00:00:00.000Z`);
@@ -15,7 +17,7 @@ test('new admission excludes days before effective joining date', () => { const 
 test('withdrawal excludes days after effective exit date', () => { const days=buildWorkingDays({start:date('2026-07-01'),end:date('2026-07-06'),weeklyOffDays:[]});const result=summarizeAttendance({rows:[row('2026-07-01','PRESENT',1),row('2026-07-02','ABSENT',0),row('2026-07-03','PRESENT',1)],workingDays:days,enrollment:{effectiveTo:date('2026-07-03')}});assert.equal(result.eligibleWorkingDays,3);assert.equal(result.percentage,66.7); });
 test('missing attendance stays visible and does not silently become present', () => { const days=buildWorkingDays({start:date('2026-07-01'),end:date('2026-07-04'),weeklyOffDays:[]});const result=summarizeAttendance({rows:[row('2026-07-01','PRESENT',1)],workingDays:days});assert.equal(result.missingDays,2);assert.equal(result.counts.NOT_MARKED,2);assert.equal(result.percentage,33.3); });
 test('custom status definitions drive units without UI hard-coding', () => { const definitions=[{code:'SPORTS_DUTY',attendanceWeight:.75}];assert.equal(statusWeight('SPORTS_DUTY',{},definitions),.75); });
-test('class teachers can mark students but cannot approve or lock', () => { assert.equal(attendancePermission('TEACHER','markStudent'),true);assert.equal(attendancePermission('TEACHER','approve'),false);assert.equal(attendancePermission('TEACHER','lock'),false); });
+test('only the Class Teacher responsibility can mark students', () => { assert.equal(attendancePermission('TEACHER','markStudent'),false);assert.equal(attendancePermission('CLASS_TEACHER','markStudent'),true);assert.equal(attendancePermission('CLASS_TEACHER','approve'),false);assert.equal(attendancePermission('CLASS_TEACHER','lock'),false); });
 test('HR can manage employees and corrections without student marking rights', () => { assert.equal(attendancePermission('HR','markEmployee'),true);assert.equal(attendancePermission('HR','approve'),true);assert.equal(attendancePermission('HR','markStudent'),false); });
 test('student and parent roles are view-only', () => { for(const role of ['STUDENT','PARENT']){assert.equal(attendancePermission(role,'viewOwn'),true);assert.equal(attendancePermission(role,'markStudent'),false);assert.equal(attendancePermission(role,'export'),false);} });
 test('school owner attendance administration is view-only by default', () => { assert.equal(attendancePermission('SCHOOL_OWNER','audit'),true); assert.equal(attendancePermission('SCHOOL_OWNER','export'),true); assert.equal(attendancePermission('SCHOOL_OWNER','markStudent'),false); assert.equal(attendancePermission('SCHOOL_OWNER','approve'),false); assert.equal(attendancePermission('SCHOOL_OWNER','lock'),false); });
@@ -24,3 +26,34 @@ test('tenant isolation rejects cross-school access', () => assert.throws(() => a
 test('session cumulative summary is derived from source records', () => { const days=buildWorkingDays({start:date('2026-04-01'),end:date('2026-04-05'),weeklyOffDays:[]});const result=summarizeAttendance({rows:[row('2026-04-01','PRESENT',1),row('2026-04-02','HALF_DAY',.5),row('2026-04-03','ABSENT',0),row('2026-04-04','PRESENT',1)],workingDays:days});assert.equal(result.attendanceUnits,2.5);assert.equal(result.percentage,62.5); });
 test('enrollment boundaries include the joining and exit dates', () => { const enrollment={effectiveFrom:date('2026-07-10'),effectiveTo:date('2026-07-20')};assert.equal(isEnrollmentEligible('2026-07-09',enrollment),false);assert.equal(isEnrollmentEligible('2026-07-10',enrollment),true);assert.equal(isEnrollmentEligible('2026-07-20',enrollment),true);assert.equal(isEnrollmentEligible('2026-07-21',enrollment),false); });
 test('school timezone controls the current attendance date', () => assert.equal(dateInTimezone(new Date('2026-07-21T19:30:00Z'),'Asia/Kolkata').toISOString().slice(0,10),'2026-07-22'));
+test('section roster eligibility accepts canonical student-user allocations without losing tenant scope', () => {
+  const effectiveDate = date('2026-08-02');
+  const where = buildStudentSectionEligibilityWhere({
+    section: { id: 'section-a', sectionName: 'A', classId: 'class-1', schoolId: 'school-a', class: { className: 'Class 1' } },
+    effectiveDate,
+    allocatedStudentUserIds: ['student-1@school.test', 'student-1@school.test'],
+  });
+  assert.equal(where.schoolId, 'school-a');
+  assert.equal(where.isActive, true);
+  assert.deepEqual(where.OR[2].studentUserId.in, ['student-1@school.test']);
+  assert.equal(where.OR[1].enrollmentHistory.some.schoolId, 'school-a');
+  assert.equal(where.OR[1].enrollmentHistory.some.sectionId, 'section-a');
+});
+test('section roster eligibility rejects an incomplete unscoped section', () => {
+  assert.throws(() => buildStudentSectionEligibilityWhere({ section: { id: 'section-a' }, effectiveDate: date('2026-08-02') }), /tenant-scoped section/);
+});
+test('attendance client exposes accountability actions on attendanceService', async () => {
+  const source = await readFile(new URL('../../frontend/src/services/managementService.js', import.meta.url), 'utf8');
+  const attendanceBlock = source.slice(source.indexOf('export const attendanceService'), source.indexOf('export const userService'));
+  for (const method of ['saveAttendanceDraft', 'submitAttendance', 'correctAttendance', 'attendanceHistory']) assert.match(attendanceBlock, new RegExp(`${method}:`));
+});
+test('monthly class report exposes a clickable daily summary calendar', async () => {
+  const [controller, page] = await Promise.all([
+    readFile(new URL('../src/controllers/attendanceManagement.controller.js', import.meta.url), 'utf8'),
+    readFile(new URL('../../frontend/src/pages/attendance/MonthlyClassAttendancePage.jsx', import.meta.url), 'utf8'),
+  ]);
+  assert.match(controller, /dailySummaries = currentCalendar\.days\.map/);
+  assert.match(controller, /calendar: dailySummaries/);
+  assert.match(page, /Daily calendar summary/);
+  assert.match(page, /openDay\(day\)/);
+});

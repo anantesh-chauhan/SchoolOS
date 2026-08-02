@@ -1,23 +1,11 @@
 import apiClient from './api';
 import { clearPrivateClientState } from '../lib/queryClient';
 
-const roleRoutes = {
-  PLATFORM_OWNER: '/dashboard/platform',
-  SCHOOL_OWNER: '/dashboard/school',
-  PRINCIPAL: '/examinations',
-  EXAM_COORDINATOR: '/examinations',
-  EXAM_CONTROLLER: '/examinations',
-  ADMIN: '/dashboard/admin',
-  TEACHER: '/dashboard/teacher',
-  CLASS_TEACHER: '/dashboard/class-teacher',
-  PARENT: '/dashboard/parent',
-  STUDENT: '/dashboard/student',
-  STAFF: '/dashboard/staff',
-  CURRICULUM_MANAGER: '/dashboard/curriculum',
-  FEE_MANAGER: '/dashboard/fees',
-  HR: '/dashboard/hr',
-  HR_MANAGER: '/dashboard/hr',
-};
+const roleRoutes = Object.fromEntries([
+  'PLATFORM_OWNER', 'SCHOOL_OWNER', 'PRINCIPAL', 'EXAM_COORDINATOR', 'EXAM_CONTROLLER',
+  'ADMIN', 'TEACHER', 'CLASS_TEACHER', 'PARENT', 'STUDENT', 'STAFF',
+  'CURRICULUM_MANAGER', 'FEE_MANAGER', 'HR', 'HR_MANAGER',
+].map((role) => [role, '/workspace/home']));
 
 const persistSession = ({ token, accessToken, refreshToken, user }) => {
   localStorage.setItem('authToken', accessToken || token);

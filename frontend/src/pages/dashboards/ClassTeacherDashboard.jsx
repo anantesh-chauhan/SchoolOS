@@ -1,5 +1,5 @@
 import React from 'react';
-import { BellRing, ClipboardCheck, MessageSquare, UsersRound } from 'lucide-react';
+import { BellRing, ClipboardCheck, MessageSquare, UsersRound, WalletCards } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { authService } from '../../services/authService';
@@ -7,6 +7,7 @@ import { authService } from '../../services/authService';
 const actions = [
   { label: 'Class attendance', description: 'Mark and review attendance for your assigned section', to: '/teacher/attendance', icon: ClipboardCheck },
   { label: 'Students', description: 'View students within your class-teacher scope', to: '/teacher/my-class', icon: UsersRound },
+  { label: 'Class fee status', description: 'View fee records and send reminders; collection and editing stay with Finance', to: '/teacher/fees', icon: WalletCards },
   { label: 'Announcements', description: 'Send a message to your class community', to: '/communication', icon: MessageSquare },
   { label: 'Result verification', description: 'Review submitted subject results for your section', to: '/examinations', icon: BellRing },
 ];

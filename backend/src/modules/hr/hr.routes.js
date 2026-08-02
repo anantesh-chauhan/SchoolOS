@@ -2,7 +2,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { authMiddleware, requireRole } from '../../middleware/auth.middleware.js';
 import * as controller from './hr.controller.js';
-const router=express.Router(); const managers=requireRole('SCHOOL_OWNER','ADMIN','HR'); const access=requireRole('SCHOOL_OWNER','ADMIN','HR','TEACHER','STAFF'); const sensitive=rateLimit({windowMs:60000,limit:60});
+const router=express.Router(); const managers=requireRole('SCHOOL_OWNER','ADMIN','HR'); const access=requireRole('SCHOOL_OWNER','ADMIN','HR','TEACHER','CLASS_TEACHER','STAFF'); const sensitive=rateLimit({windowMs:60000,limit:60});
 router.use(authMiddleware); router.get('/platform/analytics',requireRole('PLATFORM_OWNER'),controller.platformAnalytics); router.use(access);
 router.get('/dashboard',managers,controller.dashboard);
 router.get('/employees',managers,controller.employees); router.post('/employees',managers,sensitive,controller.createEmployee); router.get('/employees/me',controller.me); router.get('/employees/:id',controller.employee); router.patch('/employees/:id',managers,sensitive,controller.updateEmployee);

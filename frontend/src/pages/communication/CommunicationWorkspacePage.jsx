@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, BellRing, CheckCircle2, Inbox as InboxIcon, Loader2, MessageSquare, Plus, RefreshCw, Send, Settings2, Users, X } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -6,14 +7,14 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import { authService } from '../../services/authService';
 import { communicationService } from '../../services/communicationService';
 
-const managers = new Set(['SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'TEACHER']);
+const managers = new Set(['SCHOOL_OWNER', 'ADMIN', 'CURRICULUM_MANAGER', 'FEE_MANAGER', 'TEACHER', 'CLASS_TEACHER']);
 const field = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100';
 const card = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900';
 
 const principalKey = (user) => user?.role === 'STUDENT' ? `student:${user.studentId || user.id}` : user?.role === 'PARENT' ? `parent:${user.email}` : `user:${user?.id}`;
 
 const announcementConfig = (role) => {
-  if (role === 'TEACHER') return { category: 'ACADEMIC', audiences: ['CLASS', 'SECTION', 'DIRECT'] };
+  if (['TEACHER', 'CLASS_TEACHER'].includes(role)) return { category: 'ACADEMIC', audiences: ['CLASS', 'SECTION', 'DIRECT'] };
   if (role === 'FEE_MANAGER') return { category: 'FEE', audiences: ['ROLE', 'CLASS', 'SECTION', 'DIRECT'] };
   return { category: role === 'CURRICULUM_MANAGER' ? 'ACADEMIC' : 'GENERAL', audiences: ['SCHOOL_WIDE', 'STAFF', 'ROLE', 'DIRECT'] };
 };
@@ -25,6 +26,7 @@ const conversationTypes = (role) => ({
   CURRICULUM_MANAGER: ['ACADEMIC_SUPPORT', 'DIRECT'],
   STAFF: ['DIRECT'],
   TEACHER: ['DIRECT', 'PARENT_TEACHER', 'STUDENT_TEACHER', 'ACADEMIC_SUPPORT'],
+  CLASS_TEACHER: ['DIRECT', 'PARENT_TEACHER', 'STUDENT_TEACHER', 'ACADEMIC_SUPPORT'],
   SCHOOL_OWNER: ['DIRECT', 'ADMIN_STAFF', 'PARENT_TEACHER', 'FEE_SUPPORT', 'ACADEMIC_SUPPORT'],
   ADMIN: ['DIRECT', 'ADMIN_STAFF', 'PARENT_TEACHER', 'FEE_SUPPORT', 'ACADEMIC_SUPPORT'],
 }[role] || ['DIRECT']);
@@ -77,7 +79,7 @@ function AnnouncementComposer({ user, onCreated }) {
     } finally { setBusy(false); }
   };
 
-  const categories = user?.role === 'FEE_MANAGER' ? ['FEE'] : user?.role === 'TEACHER' ? ['ACADEMIC', 'HOMEWORK', 'RESOURCE', 'ATTENDANCE', 'GENERAL'] : user?.role === 'CURRICULUM_MANAGER' ? ['ACADEMIC', 'HOMEWORK', 'RESOURCE', 'EXAM', 'RESULT', 'EVENT', 'HOLIDAY', 'GENERAL'] : ['GENERAL', 'ACADEMIC', 'HOMEWORK', 'ATTENDANCE', 'FEE', 'EXAM', 'RESULT', 'EVENT', 'HOLIDAY', 'EMERGENCY'];
+  const categories = user?.role === 'FEE_MANAGER' ? ['FEE'] : ['TEACHER', 'CLASS_TEACHER'].includes(user?.role) ? ['ACADEMIC', 'HOMEWORK', 'RESOURCE', 'ATTENDANCE', 'GENERAL'] : user?.role === 'CURRICULUM_MANAGER' ? ['ACADEMIC', 'HOMEWORK', 'RESOURCE', 'EXAM', 'RESULT', 'EVENT', 'HOLIDAY', 'GENERAL'] : ['GENERAL', 'ACADEMIC', 'HOMEWORK', 'ATTENDANCE', 'FEE', 'EXAM', 'RESULT', 'EVENT', 'HOLIDAY', 'EMERGENCY'];
   const targetItems = form.audience === 'CLASS' ? options?.classes : form.audience === 'SECTION' ? options?.sections : form.audience === 'SUBJECT' ? options?.subjects : form.audience === 'DIRECT' ? options?.people?.map((person) => ({ id: person.key, name: `${person.name} · ${person.role}${person.className ? ` · ${person.className} ${person.section}` : ''}` })) : form.audience === 'PARENT_OF_STUDENT' ? options?.students?.filter((student) => student.hasParent).map((student) => ({ id: student.id, name: `${student.parentName || 'Parent'} · parent of ${student.name} · ${student.className} ${student.section}` })) : [];
   const targetLabel = form.audience === 'CLASS' ? 'Class' : form.audience === 'SECTION' ? 'Section' : form.audience === 'SUBJECT' ? 'Subject' : form.audience === 'PARENT_OF_STUDENT' ? 'Student’s parent' : 'Individual recipient';
   if (optionsError) return <ErrorState message="Could not load your permitted communication audiences." onRetry={loadOptions} />;

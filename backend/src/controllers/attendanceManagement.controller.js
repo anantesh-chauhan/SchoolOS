@@ -2,7 +2,7 @@ import prisma from '../config/prisma.client.js';
 import { isSchoolAdmin, requireSchoolAdminOrAssignedTeacherForSection, requireSchoolAdminOrClassTeacher, sendAuthorizationError } from '../utils/teacherAuthorization.util.js';
 import {
   DEFAULT_RULES, EMPLOYEE_STATUS_DEFAULTS, STUDENT_STATUS_DEFAULTS, attendancePermission,
-  buildWorkingDays, dateInTimezone, parseMonth, statusWeight, summarizeAttendance, utcDate,
+  buildWorkingDays, dateInTimezone, isEnrollmentEligible, parseMonth, statusWeight, summarizeAttendance, utcDate,
 } from '../services/attendance.service.js';
 import { publishAttendanceEvent } from '../services/attendanceEvents.service.js';
 import { correctStudentAttendanceSession, saveStudentAttendanceSession } from '../services/attendanceWorkflow.service.js';
@@ -158,7 +158,10 @@ export const getStudentMonthlyReport = async (req, res) => {
       prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate: { gte: range.start, lt: range.end } }, orderBy: { attendanceDate: 'asc' } }),
       prisma.studentAttendance.findMany({ where: { schoolId, studentId: { not: '' }, academicSession: session.name, attendanceDate: { gte: session.startDate, lt: cumulativeEnd } }, orderBy: { attendanceDate: 'asc' } }),
       prisma.attendanceDailyRegister.findMany({ where: { schoolId, classId, sectionId, attendanceDate: { gte: range.start, lt: range.end } } }),
-      prisma.teacherAssignment.findFirst({ where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER','BOTH'] } }, include: { teacher: { select: { id: true, teacherName: true } } } }),
+      (async () => {
+        const canonical = await prisma.sectionClassTeacherAssignment.findFirst({ where: { schoolId, sectionId, isPrimary: true, status: 'ACTIVE', section: { classId }, startDate: { lt: range.end }, OR: [{ endDate: null }, { endDate: { gte: range.start } }] }, include: { teacher: { select: { id: true, teacherName: true } } } });
+        return canonical || prisma.teacherAssignment.findFirst({ where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER','BOTH'] } }, include: { teacher: { select: { id: true, teacherName: true } } } });
+      })(),
       prisma.attendanceLock.findMany({ where: { schoolId, isActive: true, periodStart: { lt: range.end }, periodEnd: { gte: range.start }, OR: [{ scope: 'SCHOOL' }, { scopeKey: { in: [`${classId}:${sectionId}`, sectionId] } }] } }),
     ]);
     const enrollmentByStudent = new Map(enrollments.map((row) => [row.studentId, row])); const currentByStudent = new Map(); const cumulativeByStudent = new Map();
@@ -172,9 +175,19 @@ export const getStudentMonthlyReport = async (req, res) => {
       return { id: student.id, admissionNo: student.admissionNo, rollNumber: student.rollNumber, name: [student.studentFirstName, student.studentLastName].filter(Boolean).join(' '), active: student.isActive, selected, previous, cumulative, warning: cumulative.percentage !== null && cumulative.percentage < currentCalendar.rules.studentMinimumPercentage ? 'NEEDS_SUPPORT' : 'ON_TRACK' };
     });
     const percentages = rows.map((row) => row.selected.percentage).filter((value) => value !== null); const markedWorking = currentCalendar.days.filter((day) => day.isWorkingDay && registers.some((register) => register.attendanceDate.toISOString().slice(0,10) === day.date && ['SUBMITTED','LOCKED'].includes(register.state)));
+    const attendanceByDate = new Map(); currentRows.forEach((row) => { const key = row.attendanceDate.toISOString().slice(0,10); attendanceByDate.set(key, [...(attendanceByDate.get(key) || []), row]); });
+    const registerByDate = new Map(registers.map((register) => [register.attendanceDate.toISOString().slice(0,10), register]));
+    const dailySummaries = currentCalendar.days.map((day) => {
+      const dayRows = attendanceByDate.get(day.date) || []; const register = registerByDate.get(day.date); const counts = {};
+      dayRows.forEach((row) => { counts[row.status] = (counts[row.status] || 0) + 1; });
+      const eligibleStudents = students.filter((student) => isEnrollmentEligible(day.date, enrollmentByStudent.get(student.id) || { admissionDate: student.admissionDate, effectiveTo: student.isActive ? null : student.updatedAt })).length;
+      const attendanceUnits = dayRows.reduce((sum, row) => sum + Number(row.attendanceUnits ?? statusWeight(row.status, currentCalendar.rules, statuses)), 0);
+      return { ...day, registerId: register?.id || null, state: register?.state || (day.isWorkingDay ? 'NOT_STARTED' : day.dayType), isLocked: Boolean(register?.isLocked || ['LOCKED','CORRECTED'].includes(register?.state)), eligibleStudents, markedStudents: dayRows.length, attendanceUnits, percentage: eligibleStudents ? Math.round(attendanceUnits / eligibleStudents * 1000) / 10 : null, counts };
+    });
     const totals = rows.reduce((acc, row) => { acc.present += row.selected.counts.PRESENT || 0; acc.absent += row.selected.counts.ABSENT || 0; acc.leave += (row.selected.counts.APPROVED_LEAVE || 0) + (row.selected.counts.LEAVE || 0); acc.halfDay += row.selected.counts.HALF_DAY || 0; acc.late += row.selected.counts.LATE || 0; return acc; }, { present: 0, absent: 0, leave: 0, halfDay: 0, late: 0 });
     const average = percentages.length ? Math.round(percentages.reduce((a,b) => a+b, 0) / percentages.length * 10) / 10 : null;
-    return res.json({ success: true, data: { month: `${range.year}-${String(range.monthIndex+1).padStart(2,'0')}`, academicSession: session, class: section.class, section: { id: section.id, sectionName: section.sectionName }, classTeacher: classTeacher?.teacher || null, workingDays: currentCalendar.days.filter((day) => day.isWorkingDay).reduce((sum, day) => sum + day.weight, 0), markedDays: markedWorking.length, pendingDays: currentCalendar.days.filter((day) => day.isWorkingDay).length - markedWorking.length, holidays: currentCalendar.days.filter((day) => !day.isWorkingDay).length, locked: locks.length > 0, rows, calendar: currentCalendar.days, summary: { totalStudents: rows.length, averagePercentage: average, ...totals, aboveThreshold: rows.filter((row) => row.selected.percentage !== null && row.selected.percentage >= currentCalendar.rules.studentMinimumPercentage).length, belowThreshold: rows.filter((row) => row.selected.percentage !== null && row.selected.percentage < currentCalendar.rules.studentMinimumPercentage).length, highest: percentages.length ? Math.max(...percentages) : null, lowest: percentages.length ? Math.min(...percentages) : null, perfect: percentages.filter((value) => value === 100).length, notCalculated: rows.length - percentages.length, completionRate: currentCalendar.days.filter((day) => day.isWorkingDay).length ? Math.round(markedWorking.length / currentCalendar.days.filter((day) => day.isWorkingDay).length * 1000) / 10 : 100 } } });
+    res.set('Cache-Control', 'private, no-store');
+    return res.json({ success: true, data: { month: `${range.year}-${String(range.monthIndex+1).padStart(2,'0')}`, academicSession: session, class: section.class, section: { id: section.id, sectionName: section.sectionName }, classTeacher: classTeacher?.teacher || null, workingDays: currentCalendar.days.filter((day) => day.isWorkingDay).reduce((sum, day) => sum + day.weight, 0), markedDays: markedWorking.length, pendingDays: currentCalendar.days.filter((day) => day.isWorkingDay).length - markedWorking.length, holidays: currentCalendar.days.filter((day) => !day.isWorkingDay).length, locked: locks.length > 0, rows, calendar: dailySummaries, summary: { totalStudents: rows.length, averagePercentage: average, ...totals, aboveThreshold: rows.filter((row) => row.selected.percentage !== null && row.selected.percentage >= currentCalendar.rules.studentMinimumPercentage).length, belowThreshold: rows.filter((row) => row.selected.percentage !== null && row.selected.percentage < currentCalendar.rules.studentMinimumPercentage).length, highest: percentages.length ? Math.max(...percentages) : null, lowest: percentages.length ? Math.min(...percentages) : null, perfect: percentages.filter((value) => value === 100).length, notCalculated: rows.length - percentages.length, completionRate: currentCalendar.days.filter((day) => day.isWorkingDay).length ? Math.round(markedWorking.length / currentCalendar.days.filter((day) => day.isWorkingDay).length * 1000) / 10 : 100 } } });
   } catch (error) { if (sendAuthorizationError(res, error)) return; return fail(res, error.statusCode || 500, error.message || 'Failed to build monthly report'); }
 };
 
@@ -194,7 +207,7 @@ export const getStudentProfile = async (req, res) => {
     if (!studentId) return fail(res, 400, 'A student is required');
     if (['STUDENT','PARENT'].includes(req.user.role) && !(await linkedStudentIds(req.user)).includes(studentId)) return fail(res, 403, 'You may only view attendance for a linked student');
     const student = await prisma.student.findFirst({ where: { id: studentId, schoolId } }); if (!student) return fail(res, 404, 'Student not found');
-    if (req.user.role === 'TEACHER') {
+    if (['TEACHER','CLASS_TEACHER'].includes(req.user.role)) {
       const section = await prisma.section.findFirst({ where: { schoolId, sectionName: student.section, class: { className: student.className } } }); if (!section) return fail(res, 404, 'Student section not found');
       await requireSchoolAdminOrClassTeacher(req.user, { schoolId, classId: section.classId, sectionId: section.id });
     } else if (!isSchoolAdmin(req.user) && !['STUDENT','PARENT'].includes(req.user.role)) return fail(res, 403, 'You cannot view this student attendance');

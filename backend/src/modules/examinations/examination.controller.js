@@ -81,7 +81,7 @@ export const roleDashboard = async (req, res, next) => {
     const scope = teacherWorkspace ? await teacherScope(req) : null;
     const scopedCohorts = scope ? (req.user.role === 'CLASS_TEACHER'
       ? { sectionId: { in: scope.classTeacherSectionIds } }
-      : { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] }) : null;
+      : { subjects: { some: { teacherId: scope.teacherId } } }) : null;
     const examWhere = { schoolId: tenantId, ...(scope ? { cohorts: { some: scopedCohorts } } : {}) };
     const [grouped, exams, resultCount, reportCardCount] = await Promise.all([
       prisma.examination.groupBy({ by: ['status'], where: examWhere, _count: true }),
@@ -92,7 +92,7 @@ export const roleDashboard = async (req, res, next) => {
     let workQueue = [];
     if (teacherWorkspace) {
       const subjectQueue = req.user.role === 'TEACHER' ? await prisma.examinationSubject.findMany({ where: { teacherId: scope.teacherId, examination: { schoolId: tenantId, status: { in: ['MARK_ENTRY_OPEN', 'MARK_ENTRY_CLOSED'] } }, status: { in: ['PENDING', 'DRAFT', 'REJECTED', 'SUBMITTED'] } }, take: 50, orderBy: { examination: { startDate: 'asc' } }, include: { examination: { select: { id: true, name: true, status: true, endDate: true } }, subject: { select: { subjectName: true } }, cohort: { include: { class: { select: { className: true } }, section: { select: { sectionName: true } } } } } }) : [];
-      const reviewQueue = await prisma.examinationCohort.findMany({ where: { schoolId: tenantId, sectionId: { in: scope.classTeacherSectionIds }, status: 'READY_FOR_CLASS_REVIEW' }, take: 30, include: { examination: { select: { id: true, name: true, status: true } }, class: { select: { className: true } }, section: { select: { sectionName: true } }, _count: { select: { subjects: true } } } });
+      const reviewQueue = req.user.role === 'CLASS_TEACHER' ? await prisma.examinationCohort.findMany({ where: { schoolId: tenantId, sectionId: { in: scope.classTeacherSectionIds }, status: 'READY_FOR_CLASS_REVIEW' }, take: 30, include: { examination: { select: { id: true, name: true, status: true } }, class: { select: { className: true } }, section: { select: { sectionName: true } }, _count: { select: { subjects: true } } } }) : [];
       workQueue = [...subjectQueue.map((item) => ({ type: 'MARK_ENTRY', ...item })), ...reviewQueue.map((item) => ({ type: 'CLASS_REVIEW', ...item }))];
     } else {
       const statuses = req.user.role === 'PRINCIPAL' ? ['COORDINATOR_APPROVED'] : ['FORWARDED', 'REJECTED'];
@@ -166,7 +166,7 @@ export const list = async (req, res, next) => {
     const scope = teacherWorkspace ? await teacherScope(req) : null;
     const cohortScope = scope && (req.user.role === 'CLASS_TEACHER'
       ? { sectionId: { in: scope.classTeacherSectionIds } }
-      : { OR: [{ sectionId: { in: scope.classTeacherSectionIds } }, { subjects: { some: { teacherId: scope.teacherId } } }] });
+      : { subjects: { some: { teacherId: scope.teacherId } } });
     const where = { schoolId: schoolId(req), ...(req.query.status ? { status: req.query.status } : {}), ...(cohortScope ? { cohorts: { some: cohortScope } } : {}) };
     const exams = await prisma.examination.findMany({ where, orderBy: { startDate: 'desc' }, include: { academicSession: { select: { name: true } }, cohorts: { include: { class: { select: { className: true } }, section: { select: { sectionName: true } }, subjects: { select: { id: true, status: true } } } } } });
     ok(res, exams);
@@ -179,7 +179,9 @@ export const detail = async (req, res, next) => {
     if (!exam) return fail(res, 404, 'Examination not found');
     if (['TEACHER', 'CLASS_TEACHER'].includes(req.user.role)) {
       const scope = await teacherScope(req);
-      exam.cohorts = exam.cohorts.filter((cohort) => cohort.sectionId && (scope.classTeacherSectionIds.includes(cohort.sectionId) || (req.user.role === 'TEACHER' && cohort.subjects.some((subject) => subject.teacherId === scope.teacherId)))).map((cohort) => ({ ...cohort, subjects: scope.classTeacherSectionIds.includes(cohort.sectionId) ? cohort.subjects : cohort.subjects.filter((subject) => subject.teacherId === scope.teacherId) }));
+      exam.cohorts = req.user.role === 'CLASS_TEACHER'
+        ? exam.cohorts.filter((cohort) => cohort.sectionId && scope.classTeacherSectionIds.includes(cohort.sectionId))
+        : exam.cohorts.filter((cohort) => cohort.subjects.some((subject) => subject.teacherId === scope.teacherId)).map((cohort) => ({ ...cohort, status: cohort.status === 'READY_FOR_CLASS_REVIEW' ? 'SUBJECT_MARKS_SUBMITTED' : cohort.status, subjects: cohort.subjects.filter((subject) => subject.teacherId === scope.teacherId) }));
       if (!exam.cohorts.length) return fail(res, 403, 'This examination is outside your allocation');
     }
     ok(res, exam);
@@ -388,7 +390,7 @@ export const review = async (req, res, next) => {
     const cohort = cohortId && await prisma.examinationCohort.findFirst({ where: { id: cohortId, examinationId: exam.id } });
     if (cohortId && !cohort) return fail(res, 404, 'Exam section not found');
     if (level === 'CLASS_TEACHER') {
-      if (req.user.role !== 'TEACHER') return fail(res, 403, 'Class teacher authority is required');
+      if (req.user.role !== 'CLASS_TEACHER') return fail(res, 403, 'Open the Class Teacher workspace to review class results');
       const scope = await teacherScope(req);
       if (!cohort || !scope.classTeacherSectionIds.includes(cohort.sectionId)) return fail(res, 403, 'This section is outside your class-teacher allocation');
       if (cohort.status !== 'READY_FOR_CLASS_REVIEW') return fail(res, 409, 'All subjects must be submitted before forwarding');

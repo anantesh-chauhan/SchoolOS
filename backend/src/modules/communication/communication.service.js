@@ -7,9 +7,12 @@ import { sendDelivery } from './delivery.providers.js';
 
 const ADMIN_ROLES = new Set(['SCHOOL_OWNER', 'ADMIN']);
 const MANDATORY_CATEGORIES = new Set(['EMERGENCY', 'SECURITY', 'LEGAL']);
-const MASS_ROLES = new Set(['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER']);
+const MASS_ROLES = new Set(['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','CLASS_TEACHER']);
 const STAFF_ROLES = ['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','FEE_MANAGER','TEACHER','STAFF'];
 const TEACHER_DIRECT_ROLES = ['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','STAFF'];
+const LEGACY_SYNC_TTL_MS = 60_000;
+const LEGACY_SYNC_CACHE_LIMIT = 500;
+const legacySyncCache = new Map();
 
 export const principalKey = (user) => user.role === 'STUDENT' ? `student:${user.studentId}` : user.role === 'PARENT' ? `parent:${user.email}` : `user:${user.id}`;
 const auditContext = (req) => ({ ipAddress: req?.ip || null, userAgent: req?.get?.('user-agent')?.slice(0, 500) || null });
@@ -21,56 +24,145 @@ const studentRecipients = (student, roles = ['STUDENT','PARENT'], context = 'SEC
   ...(roles.includes('PARENT') && student.parentUserId ? [{ recipientKey: `parent:${student.parentUserId}`, userId: null, studentId: student.id, parentId: student.parentUserId, recipientRole: 'PARENT', deliveryContext: context === 'DIRECT' ? 'DIRECT' : 'PARENT_OF_STUDENT', context: { studentId: student.id, studentName: `${student.studentFirstName} ${student.studentLastName || ''}`.trim() } }] : []),
 ];
 
-const ensureLegacyRecipient = async ({ schoolId, dedupeKey, notification, recipient }) => {
-  const unified = await prisma.notification.upsert({
-    where: { schoolId_dedupeKey: { schoolId, dedupeKey } },
-    create: { schoolId, dedupeKey, status: 'PUBLISHED', publishedAt: notification.createdAt, resolvedRecipientCount: 1, ...notification },
-    update: {},
+const ensureLegacyRecipients = async (candidates) => {
+  if (!candidates.length) return { synced: 0 };
+
+  const schoolId = candidates[0].schoolId;
+  const dedupeKeys = candidates.map((candidate) => candidate.dedupeKey);
+  let notifications = await prisma.notification.findMany({
+    where: { schoolId, dedupeKey: { in: dedupeKeys } },
+    select: { id: true, dedupeKey: true },
   });
-  const row = await prisma.notificationRecipient.upsert({
-    where: { notificationId_recipientKey: { notificationId: unified.id, recipientKey: recipient.recipientKey } },
-    create: { notificationId: unified.id, schoolId, ...recipient },
-    update: { readAt: recipient.readAt || undefined },
+  const existingDedupeKeys = new Set(notifications.map((row) => row.dedupeKey));
+  const missingNotifications = candidates.filter((candidate) => !existingDedupeKeys.has(candidate.dedupeKey));
+
+  if (missingNotifications.length) {
+    await prisma.notification.createMany({
+      data: missingNotifications.map(({ dedupeKey, notification }) => ({
+        schoolId,
+        dedupeKey,
+        status: 'PUBLISHED',
+        publishedAt: notification.createdAt,
+        resolvedRecipientCount: 1,
+        ...notification,
+      })),
+      skipDuplicates: true,
+    });
+    notifications = await prisma.notification.findMany({
+      where: { schoolId, dedupeKey: { in: dedupeKeys } },
+      select: { id: true, dedupeKey: true },
+    });
+  }
+
+  const notificationByDedupeKey = new Map(notifications.map((row) => [row.dedupeKey, row]));
+  const recipientCandidates = candidates.flatMap((candidate) => {
+    const notification = notificationByDedupeKey.get(candidate.dedupeKey);
+    return notification ? [{ ...candidate, notificationId: notification.id }] : [];
   });
-  await prisma.notificationDelivery.upsert({
-    where: { notificationRecipientId_channel: { notificationRecipientId: row.id, channel: 'IN_APP' } },
-    create: { notificationRecipientId: row.id, channel: 'IN_APP', status: 'DELIVERED', provider: 'database-legacy-bridge', attemptCount: 1, sentAt: notification.createdAt, deliveredAt: notification.createdAt },
-    update: {},
+  const notificationIds = recipientCandidates.map((candidate) => candidate.notificationId);
+  let recipients = await prisma.notificationRecipient.findMany({
+    where: { notificationId: { in: notificationIds } },
+    select: { id: true, notificationId: true, recipientKey: true, readAt: true },
   });
+  const recipientScope = (notificationId, recipientKey) => `${notificationId}:${recipientKey}`;
+  const existingRecipientByScope = new Map(
+    recipients.map((row) => [recipientScope(row.notificationId, row.recipientKey), row]),
+  );
+  const missingRecipients = recipientCandidates.filter(
+    (candidate) => !existingRecipientByScope.has(recipientScope(candidate.notificationId, candidate.recipient.recipientKey)),
+  );
+
+  if (missingRecipients.length) {
+    await prisma.notificationRecipient.createMany({
+      data: missingRecipients.map(({ notificationId, recipient }) => ({ notificationId, schoolId, ...recipient })),
+      skipDuplicates: true,
+    });
+  }
+
+  const readStateUpdates = recipientCandidates.flatMap((candidate) => {
+    const existing = existingRecipientByScope.get(recipientScope(candidate.notificationId, candidate.recipient.recipientKey));
+    return existing && !existing.readAt && candidate.recipient.readAt
+      ? [prisma.notificationRecipient.update({ where: { id: existing.id }, data: { readAt: candidate.recipient.readAt } })]
+      : [];
+  });
+  if (readStateUpdates.length) await prisma.$transaction(readStateUpdates);
+
+  if (missingRecipients.length) {
+    recipients = await prisma.notificationRecipient.findMany({
+      where: { notificationId: { in: notificationIds } },
+      select: { id: true, notificationId: true, recipientKey: true },
+    });
+  }
+  const candidateByScope = new Map(
+    recipientCandidates.map((candidate) => [recipientScope(candidate.notificationId, candidate.recipient.recipientKey), candidate]),
+  );
+  await prisma.notificationDelivery.createMany({
+    data: recipients.flatMap((recipient) => {
+      const candidate = candidateByScope.get(recipientScope(recipient.notificationId, recipient.recipientKey));
+      return candidate ? [{
+        notificationRecipientId: recipient.id,
+        channel: 'IN_APP',
+        status: 'DELIVERED',
+        provider: 'database-legacy-bridge',
+        attemptCount: 1,
+        sentAt: candidate.notification.createdAt,
+        deliveredAt: candidate.notification.createdAt,
+      }] : [];
+    }),
+    skipDuplicates: true,
+  });
+
+  return { synced: recipientCandidates.length };
 };
 
 // Keep notifications created by older modules visible in the unified navbar and page.
-export const syncLegacyNotifications = async (user) => {
+const runLegacyNotificationSync = async (user) => {
   if (!user?.schoolId) return { synced: 0 };
-  let synced = 0;
   if (['STUDENT', 'PARENT'].includes(user.role) && user.studentId) {
     const student = await prisma.student.findFirst({ where: { id: user.studentId, schoolId: user.schoolId, isActive: true }, select: { id: true, parentUserId: true } });
-    if (!student) return { synced };
+    if (!student) return { synced: 0 };
     const rows = await prisma.academicNotification.findMany({ where: { schoolId: user.schoolId, recipientStudentId: student.id, recipientRole: user.role }, orderBy: { createdAt: 'desc' }, take: 200 });
-    for (const row of rows) {
-      const recipientKey = user.role === 'PARENT' ? `parent:${student.parentUserId}` : `student:${student.id}`;
-      if (recipientKey.endsWith(':null')) continue;
-      await ensureLegacyRecipient({
+    const recipientKey = user.role === 'PARENT' ? `parent:${student.parentUserId}` : `student:${student.id}`;
+    if (recipientKey.endsWith(':null')) return { synced: 0 };
+    return ensureLegacyRecipients(rows.map((row) => ({
         schoolId: user.schoolId,
         dedupeKey: `LEGACY_ACADEMIC:${row.id}`,
         notification: { type: row.type, category: row.entityType === 'RESOURCE' ? 'RESOURCE' : 'HOMEWORK', priority: 'NORMAL', title: row.title, message: row.body, actionUrl: '/homework', sourceModule: 'LEGACY_ACADEMIC', sourceEntityType: row.entityType, sourceEntityId: row.entityId, isSystemGenerated: true, createdAt: row.createdAt },
         recipient: { recipientKey, userId: null, studentId: student.id, parentId: user.role === 'PARENT' ? student.parentUserId : null, recipientRole: user.role, deliveryContext: 'AUTOMATED_RULE', readAt: row.readAt, context: { studentId: student.id } },
-      });
-      synced += 1;
-    }
+      })));
   } else if (user.id) {
     const rows = await prisma.userWidgetNotification.findMany({ where: { schoolId: user.schoolId, userId: user.id }, orderBy: { createdAt: 'desc' }, take: 200 });
-    for (const row of rows) {
-      await ensureLegacyRecipient({
+    return ensureLegacyRecipients(rows.map((row) => ({
         schoolId: user.schoolId,
         dedupeKey: `LEGACY_WIDGET:${row.id}`,
         notification: { type: row.type, category: row.type?.includes('SECURITY') ? 'SECURITY' : 'SYSTEM', priority: 'NORMAL', title: row.title, message: row.body, actionUrl: row.link, sourceModule: 'LEGACY_WIDGET', sourceEntityType: 'UserWidgetNotification', sourceEntityId: row.id, isSystemGenerated: true, createdAt: row.createdAt },
         recipient: { recipientKey: `user:${user.id}`, userId: user.id, studentId: null, parentId: null, recipientRole: user.role, deliveryContext: 'DIRECT', readAt: row.isRead ? row.updatedAt : null },
-      });
-      synced += 1;
-    }
+      })));
   }
-  return { synced };
+  return { synced: 0 };
+};
+
+export const syncLegacyNotifications = async (user) => {
+  if (!user?.schoolId) return { synced: 0 };
+  const cacheKey = `${user.schoolId}:${principalKey(user)}`;
+  const cached = legacySyncCache.get(cacheKey);
+  if (cached?.promise) return cached.promise;
+  if (cached && Date.now() - cached.completedAt < LEGACY_SYNC_TTL_MS) return cached.result;
+
+  const promise = runLegacyNotificationSync(user);
+  legacySyncCache.set(cacheKey, { promise, completedAt: 0, result: null });
+  try {
+    const result = await promise;
+    legacySyncCache.set(cacheKey, { promise: null, completedAt: Date.now(), result });
+    if (legacySyncCache.size > LEGACY_SYNC_CACHE_LIMIT) {
+      const oldestKey = legacySyncCache.keys().next().value;
+      if (oldestKey !== cacheKey) legacySyncCache.delete(oldestKey);
+    }
+    return result;
+  } catch (error) {
+    legacySyncCache.delete(cacheKey);
+    throw error;
+  }
 };
 
 const assertSchoolUser = (user, schoolId) => {
@@ -100,13 +192,16 @@ const assertCreatorScope = async (user, category, rules) => {
     if (parentIds.length) { const count = await prisma.student.count({ where: { schoolId: user.schoolId, parentUserId: { in: parentIds }, isActive: true } }); if (count !== new Set(parentIds).size) throw new CommunicationError('A parent recipient is outside this school.', 403); }
     return;
   }
-  if (user.role !== 'TEACHER') return;
+  if (!['TEACHER', 'CLASS_TEACHER'].includes(user.role)) return;
   if (!['ACADEMIC','HOMEWORK','RESOURCE','ATTENDANCE','GENERAL'].includes(category)) throw new CommunicationError('Teachers can only send communication within their academic scope.', 403);
   if (rules.some((rule) => ['SCHOOL_WIDE','STAFF','SAVED_GROUP','AUTOMATED_RULE'].includes(rule.kind))) throw new CommunicationError('Teachers cannot use school-wide or unrestricted audiences.', 403);
   const teacher = await getTeacherForUser(user);
   if (!teacher) throw new CommunicationError('Teacher profile not found.', 403);
-  const assignments = await prisma.teacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, isActive: true, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, select: { classId: true, sectionId: true, subjectId: true } });
-  const classIds = new Set(assignments.map((row) => row.classId)); const sectionIds = new Set(assignments.map((row) => row.sectionId)); const subjectIds = new Set(assignments.map((row) => row.subjectId));
+  const [assignments, classAssignments] = await Promise.all([
+    prisma.teacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, isActive: true, ...(user.role === 'CLASS_TEACHER' ? { roleType: { in: ['CLASS_TEACHER', 'BOTH'] } } : {}), OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, select: { classId: true, sectionId: true, subjectId: true } }),
+    user.role === 'CLASS_TEACHER' ? prisma.sectionClassTeacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, status: 'ACTIVE', isPrimary: true, startDate: { lte: now() }, OR: [{ endDate: null }, { endDate: { gte: now() } }] }, select: { sectionId: true, section: { select: { classId: true } } } }) : [],
+  ]);
+  const classIds = new Set([...assignments.map((row) => row.classId), ...classAssignments.map((row) => row.section.classId)]); const sectionIds = new Set([...assignments.map((row) => row.sectionId), ...classAssignments.map((row) => row.sectionId)]); const subjectIds = new Set(user.role === 'TEACHER' ? assignments.map((row) => row.subjectId) : []);
   const assignedSections = await prisma.section.findMany({ where: { schoolId: user.schoolId, id: { in: [...sectionIds] } }, include: { class: true } });
   const assignedStudents = await prisma.student.findMany({ where: { schoolId: user.schoolId, isActive: true, OR: assignedSections.length ? assignedSections.map((section) => ({ className: section.class.className, section: section.sectionName })) : [{ id: '__none__' }] }, select: { id: true, parentUserId: true } });
   const allowedStudentIds = new Set(assignedStudents.map((student) => student.id));
@@ -190,7 +285,20 @@ export const audienceOptions = async (user) => {
   const isAdmin = ADMIN_ROLES.has(user.role);
   let classes = []; let sections = []; let subjects = []; let students = []; let staffRoles = []; let audiences = [];
 
-  if (user.role === 'TEACHER') {
+  if (user.role === 'CLASS_TEACHER') {
+    const teacher = await getTeacherForUser(user);
+    if (!teacher) throw new CommunicationError('Teacher profile not found.', 403);
+    const [canonical, legacy] = await Promise.all([
+      prisma.sectionClassTeacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, status: 'ACTIVE', isPrimary: true, startDate: { lte: now() }, OR: [{ endDate: null }, { endDate: { gte: now() } }] }, include: { section: { include: { class: true } } } }),
+      prisma.teacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, isActive: true, roleType: { in: ['CLASS_TEACHER', 'BOTH'] }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, include: { class: true, section: true } }),
+    ]);
+    classes = uniqueById([...canonical.map((row) => ({ id: row.section.class.id, name: row.section.class.className })), ...legacy.map((row) => ({ id: row.class.id, name: row.class.className }))]);
+    sections = uniqueById([...canonical.map((row) => ({ id: row.section.id, classId: row.section.classId, name: `${row.section.class.className} · ${row.section.sectionName}` })), ...legacy.map((row) => ({ id: row.section.id, classId: row.section.classId, name: `${row.class.className} · ${row.section.sectionName}` }))]);
+    const pairs = [...canonical.map((row) => ({ className: row.section.class.className, section: row.section.sectionName })), ...legacy.map((row) => ({ className: row.class.className, section: row.section.sectionName }))];
+    students = await prisma.student.findMany({ where: { schoolId: user.schoolId, isActive: true, OR: pairs.length ? pairs : [{ id: '__none__' }] }, select: { id: true, studentFirstName: true, studentLastName: true, fatherName: true, studentUserId: true, parentUserId: true, className: true, section: true }, orderBy: [{ className: 'asc' }, { section: 'asc' }, { studentFirstName: 'asc' }] });
+    staffRoles = TEACHER_DIRECT_ROLES;
+    audiences = ['CLASS','SECTION','ROLE','DIRECT','PARENT_OF_STUDENT'];
+  } else if (user.role === 'TEACHER') {
     const teacher = await getTeacherForUser(user);
     if (!teacher) throw new CommunicationError('Teacher profile not found.', 403);
     const assignments = await prisma.teacherAssignment.findMany({ where: { schoolId: user.schoolId, teacherId: teacher.id, isActive: true, OR: [{ effectiveTo: null }, { effectiveTo: { gte: now() } }] }, include: { class: { select: { id: true, className: true } }, section: { select: { id: true, sectionName: true, classId: true } }, subject: { select: { id: true, subjectName: true } } } });
@@ -219,7 +327,7 @@ export const audienceOptions = async (user) => {
     else if (user.role === 'FEE_MANAGER') { audiences = ['ROLE','CLASS','SECTION','DIRECT','PARENT_OF_STUDENT']; staffRoles = ['PARENT']; subjects = []; }
   }
 
-  const userRoleFilter = user.role === 'FEE_MANAGER' ? ['SCHOOL_OWNER','ADMIN'] : user.role === 'TEACHER' ? TEACHER_DIRECT_ROLES : STAFF_ROLES;
+  const userRoleFilter = user.role === 'FEE_MANAGER' ? ['SCHOOL_OWNER','ADMIN'] : ['TEACHER', 'CLASS_TEACHER'].includes(user.role) ? TEACHER_DIRECT_ROLES : STAFF_ROLES;
   const userRows = await prisma.user.findMany({ where: { schoolId: user.schoolId, isActive: true, id: { not: user.id }, role: { in: userRoleFilter } }, select: { id: true, name: true, role: true }, orderBy: { name: 'asc' } });
   const people = [
     ...userRows.map((row) => ({ key: `user:${row.id}`, name: row.name, role: row.role, kind: 'STAFF' })),

@@ -14,13 +14,13 @@ export const portalRoutes = (
           <Route path="/teacher/polls" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollsPage /></ProtectedRoute>} />
           <Route path="/teacher/polls/:pollId" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPollPage /></ProtectedRoute>} />
           <Route path="/teacher/performance" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherPerformancePage /></ProtectedRoute>} />
-          <Route path="/teacher/my-class" element={<ProtectedRoute allowedRoles={['TEACHER','CLASS_TEACHER']}><TeacherMyClassPage /></ProtectedRoute>} />
-          <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['TEACHER','CLASS_TEACHER']}><StudentAttendancePage /></ProtectedRoute>} />
+          <Route path="/teacher/my-class" element={<ProtectedRoute allowedRoles={['CLASS_TEACHER']}><TeacherMyClassPage /></ProtectedRoute>} />
+          <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['CLASS_TEACHER']}><StudentAttendancePage /></ProtectedRoute>} />
 
           <Route
             path="/dashboard/teacher/attendance"
             element={
-              <ProtectedRoute allowedRoles={['TEACHER']}>
+              <ProtectedRoute allowedRoles={['CLASS_TEACHER']}>
                 <StudentAttendancePage />
               </ProtectedRoute>
             }

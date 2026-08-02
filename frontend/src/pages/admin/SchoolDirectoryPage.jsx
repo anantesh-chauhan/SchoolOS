@@ -44,7 +44,7 @@ export default function SchoolDirectoryPage() {
   const [classFilter, setClassFilter] = useState('');
   const [sectionFilter, setSectionFilter] = useState('');
   const academics = useAcademicStructure();
-  const teachersQuery = useQuery({ queryKey: ['teachers', 'directory'], queryFn: () => teacherService.list({ page: 1, limit: 1000 }) });
+  const teachersQuery = useQuery({ queryKey: ['teachers', 'directory'], queryFn: () => teacherService.listAll() });
   const studentsQuery = useQuery({ queryKey: ['student-allocation-roster'], queryFn: studentService.allocationRoster });
   const teachers = teachersQuery.data?.data || [];
   const students = studentsQuery.data?.data || [];

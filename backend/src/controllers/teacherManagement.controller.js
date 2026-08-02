@@ -165,7 +165,7 @@ export const listTeachers = async (req, res) => {
   try {
     const schoolId = getScopedSchoolId(req.user, req.query.schoolId);
     const page = Math.max(1, Number(req.query.page || 1));
-    const limit = Math.min(1000, Math.max(1, Number(req.query.limit || 10)));
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit || 10)));
     const search = String(req.query.search || '').trim();
     const subject = String(req.query.subject || '').trim();
 

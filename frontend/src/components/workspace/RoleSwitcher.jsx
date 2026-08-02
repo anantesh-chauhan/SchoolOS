@@ -39,14 +39,14 @@ export default function RoleSwitcher() {
 
   return (
     <div className="relative" ref={rootRef}>
-      <button type="button" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={`Current workspace: ${active.label || active.role}`} className="flex h-10 w-10 items-center justify-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-2 text-left shadow-sm transition hover:bg-[var(--surface-hover)] sm:h-auto sm:w-auto sm:min-w-48 sm:justify-start sm:px-3 sm:py-2">
+      <button type="button" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={`Current responsibility: ${active.label || active.role}`} className="flex h-10 w-10 items-center justify-center gap-3 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] px-2 text-left shadow-sm transition hover:bg-[var(--surface-hover)] sm:h-auto sm:w-auto sm:min-w-48 sm:justify-start sm:px-3 sm:py-2">
         <LayoutDashboard size={18} className="text-[var(--school-primary)]" />
-        <span className="hidden min-w-0 flex-1 sm:block"><span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Current workspace</span><span className="block truncate text-sm font-semibold">{active.label || active.role}</span></span>
+        <span className="hidden min-w-0 flex-1 sm:block"><span className="block text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Current responsibility</span><span className="block truncate text-sm font-semibold">{active.label || active.role}</span></span>
         <ChevronDown size={16} className={`hidden transition sm:block ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && roles.length > 1 && (
         <div role="menu" className="fixed left-3 right-3 top-20 z-50 max-h-[70dvh] overflow-y-auto rounded-2xl border border-[var(--border-soft)] bg-[var(--surface-elevated)] p-2 shadow-2xl sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
-          <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Switch workspace</p>
+          <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Switch responsibility</p>
           {roles.map((role) => (
             <button key={role.assignmentId} type="button" role="menuitem" disabled={Boolean(switching)} onClick={() => switchTo(role)} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-[var(--surface-hover)] disabled:opacity-60">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--school-primary-soft)] text-[var(--school-primary)]">{switching === role.assignmentId ? <Loader2 className="animate-spin" size={16} /> : role.assignmentId === activeId ? <Check size={16} /> : <LayoutDashboard size={16} />}</span>

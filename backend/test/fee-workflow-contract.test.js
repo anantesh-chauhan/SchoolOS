@@ -54,10 +54,10 @@ test('class-plan publication uses bounded bulk writes and reports allocation fai
   assert.doesNotMatch(wizard, /catch \{ result = await feeService\.publishAssignment/);
 });
 
-test('student and assigned-teacher portals expose fee settings, section summaries, and drill-down', () => {
-  assert.match(routes, /"FEE_MANAGER", "TEACHER", "STUDENT", "PARENT"/);
+test('student and assigned-class-teacher portals expose fee settings, section summaries, and drill-down', () => {
+  assert.match(routes, /"FEE_MANAGER", "CLASS_TEACHER", "STUDENT", "PARENT"/);
   assert.match(routes, /\/teacher\/students\/:studentId/);
-  assert.match(advanced, /requireSchoolAdminOrAssignedTeacherForSection/);
+  assert.match(advanced, /assertTeacherIsClassTeacherForSection/);
   assert.match(advanced, /export const teacherStudentFees/);
   assert.match(advanced, /structures: assignmentRows\.map/);
   assert.match(advanced, /studentsWithDues/);

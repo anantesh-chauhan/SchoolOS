@@ -35,7 +35,7 @@ router.get(
 );
 router.get(
   "/settings",
-  requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER", "TEACHER", "STUDENT", "PARENT"),
+  requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER", "CLASS_TEACHER", "STUDENT", "PARENT"),
   controller.getSettings,
 );
 router.put("/settings", admin, controller.saveSettings);
@@ -156,9 +156,9 @@ router.post(
   requireRole("SCHOOL_OWNER", "ADMIN", "FEE_MANAGER"),
   advanced.document,
 );
-router.get("/teacher/sections", requireRole("TEACHER"), advanced.teacherSections);
-router.get("/teacher/sections/:sectionId", requireRole("TEACHER"), advanced.teacherSectionFees);
-router.get("/teacher/students/:studentId", requireRole("TEACHER"), advanced.teacherStudentFees);
-router.post("/teacher/reminders", requireRole("TEACHER"), sensitive, advanced.teacherReminder);
+router.get("/teacher/sections", requireRole("CLASS_TEACHER"), requirePermission(PERMISSIONS.FEES_VIEW), advanced.teacherSections);
+router.get("/teacher/sections/:sectionId", requireRole("CLASS_TEACHER"), requirePermission(PERMISSIONS.FEES_VIEW), advanced.teacherSectionFees);
+router.get("/teacher/students/:studentId", requireRole("CLASS_TEACHER"), requirePermission(PERMISSIONS.FEES_VIEW), advanced.teacherStudentFees);
+router.post("/teacher/reminders", requireRole("CLASS_TEACHER"), requirePermission(PERMISSIONS.FEES_REMIND), sensitive, advanced.teacherReminder);
 
 export default router;

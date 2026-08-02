@@ -21,7 +21,7 @@ router.post('/:id/transition', requireRole('PRINCIPAL','EXAM_COORDINATOR','ADMIN
 router.get('/:id/mark-sheet', requireRole('EXAM_COORDINATOR','ADMIN','TEACHER'), controller.markSheet);
 router.put('/:id/marks', requireRole('EXAM_COORDINATOR','ADMIN','TEACHER'), controller.saveMarks);
 router.post('/:id/subjects/:examSubjectId/submit', requireRole('EXAM_COORDINATOR','ADMIN','TEACHER'), controller.submitMarks);
-router.post('/:id/review', requireRole('PRINCIPAL','EXAM_COORDINATOR','ADMIN','TEACHER','CLASS_TEACHER'), controller.review);
+router.post('/:id/review', requireRole('PRINCIPAL','EXAM_COORDINATOR','ADMIN','CLASS_TEACHER'), controller.review);
 router.post('/:id/calculate', requireRole('EXAM_COORDINATOR','ADMIN'), controller.calculate);
 router.post('/:id/publish', requireRole('PRINCIPAL','EXAM_COORDINATOR'), controller.publish);
 router.post('/:id/corrections', requireRole('PRINCIPAL','EXAM_COORDINATOR'), controller.requestCorrection);

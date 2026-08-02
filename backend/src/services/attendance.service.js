@@ -119,7 +119,7 @@ export const attendancePermission = (role, action) => {
   if (action === 'lock' || action === 'approve') return attendanceAdmin || role === 'HR';
   if (action === 'audit' || action === 'export') return ownerOrAdmin || role === 'HR';
   if (action === 'markEmployee') return attendanceAdmin || role === 'HR';
-  if (action === 'markStudent') return attendanceAdmin || ['TEACHER', 'CLASS_TEACHER'].includes(role);
+  if (action === 'markStudent') return attendanceAdmin || role === 'CLASS_TEACHER';
   if (action === 'viewOwn') return ['STUDENT', 'PARENT', 'TEACHER', 'CLASS_TEACHER', 'STAFF', 'HR'].includes(role) || ownerOrAdmin;
   return false;
 };

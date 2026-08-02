@@ -117,10 +117,21 @@ export const requireAssignedClass = ({ classParam = 'classId', sectionParam = 's
     const teacher = await getTeacherForUser(req.user);
     const classId = req.params?.[classParam] || req.body?.[classParam] || req.query?.[classParam];
     const sectionId = req.params?.[sectionParam] || req.body?.[sectionParam] || req.query?.[sectionParam];
-    const assignment = teacher && await prisma.teacherAssignment.findFirst({
+    const classTeacherAssignment = teacher && req.user.role === 'CLASS_TEACHER' && sectionId
+      ? await prisma.sectionClassTeacherAssignment.findFirst({
+          where: {
+            schoolId: req.user.schoolId, teacherId: teacher.id, sectionId,
+            status: 'ACTIVE', isPrimary: true, section: { classId },
+            startDate: { lte: new Date() }, OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+          },
+          select: { id: true },
+        })
+      : null;
+    const assignment = classTeacherAssignment || teacher && await prisma.teacherAssignment.findFirst({
       where: {
         schoolId: req.user.schoolId, teacherId: teacher.id, classId,
         ...(sectionId ? { sectionId } : {}), isActive: true,
+        ...(req.user.role === 'CLASS_TEACHER' ? { roleType: { in: ['CLASS_TEACHER', 'BOTH'] } } : {}),
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
       },
       select: { id: true },

@@ -22,8 +22,8 @@ export const operationsRoutes = (
           <Route path="/dashboard/fees/collect" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','FEE_MANAGER']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/student/fees" element={<ProtectedRoute allowedRoles={['STUDENT']}><FeePortalPage /></ProtectedRoute>} />
           <Route path="/parent/fees" element={<ProtectedRoute allowedRoles={['PARENT']}><FeePortalPage /></ProtectedRoute>} />
-          <Route path="/teacher/fees" element={<ProtectedRoute allowedRoles={['TEACHER']}><TeacherFeePage /></ProtectedRoute>} />
-          <Route path="/dashboard/calendar" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','PARENT','STUDENT','STAFF']}><AcademicCalendarPage /></ProtectedRoute>} />
+          <Route path="/teacher/fees" element={<ProtectedRoute allowedRoles={['CLASS_TEACHER']}><TeacherFeePage /></ProtectedRoute>} />
+          <Route path="/dashboard/calendar" element={<ProtectedRoute allowedRoles={['SCHOOL_OWNER','ADMIN','CURRICULUM_MANAGER','TEACHER','CLASS_TEACHER','PARENT','STUDENT','STAFF']}><AcademicCalendarPage /></ProtectedRoute>} />
           <Route
             path="/dashboard/admin/class-teachers"
             element={

@@ -116,12 +116,27 @@ export const subjectService = {
   },
 };
 
+const listTeachersPage = async ({ page = 1, limit = 10, search = '', subject = '' } = {}) => {
+  const response = await apiClient.get('/teachers', {
+    params: { page, limit, search, subject },
+  });
+  return response.data;
+};
+
 export const teacherService = {
-  list: async ({ page = 1, limit = 10, search = '', subject = '' } = {}) => {
-    const response = await apiClient.get('/teachers', {
-      params: { page, limit, search, subject },
-    });
-    return response.data;
+  list: listTeachersPage,
+  listAll: async ({ search = '', subject = '' } = {}) => {
+    const limit = 100;
+    const firstPage = await listTeachersPage({ page: 1, limit, search, subject });
+    const totalPages = Math.max(1, Number(firstPage?.pagination?.totalPages) || 1);
+    const data = [...(firstPage?.data || [])];
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const response = await listTeachersPage({ page, limit, search, subject });
+      data.push(...(response?.data || []));
+    }
+
+    return { ...firstPage, data };
   },
   create: async (payload) => {
     const response = await apiClient.post('/teachers', payload);
@@ -223,6 +238,13 @@ export const attendanceService = {
   unlock: async (id, payload) => (await apiClient.post(`/attendance/locks/${id}/unlock`, payload)).data,
   audit: async (params = {}) => (await apiClient.get('/attendance/audit', { params })).data,
   exportCsv: async (kind, month) => (await apiClient.get('/attendance/export.csv', { params: { kind, month }, responseType: 'blob' })).data,
+  saveAttendanceDraft: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/draft`, payload)).data,
+  submitAttendance: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/submit`, payload)).data,
+  correctAttendance: async (sessionId, payload) => (await apiClient.post(`/admin/attendance/sessions/${sessionId}/corrections`, payload)).data,
+  attendanceHistory: async (sessionId) => (await apiClient.get(`/attendance/sessions/${sessionId}/history`)).data,
+  attendanceOverview: async (date) => (await apiClient.get('/admin/attendance/overview', { params: { date } })).data,
+  pendingAttendance: async (date) => (await apiClient.get('/admin/attendance/pending', { params: { date } })).data,
+  markNotApplicable: async (sectionId, date, payload) => (await apiClient.post(`/admin/attendance/sections/${sectionId}/dates/${date}/not-applicable`, payload)).data,
 };
 
 export const userService = {
@@ -238,13 +260,6 @@ export const userService = {
     const response = await apiClient.post('/users/create-curriculum-manager', payload);
     return response.data;
   },
-  saveAttendanceDraft: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/draft`, payload)).data,
-  submitAttendance: async (sectionId, date, payload) => (await apiClient.post(`/attendance/sections/${sectionId}/dates/${date}/submit`, payload)).data,
-  correctAttendance: async (sessionId, payload) => (await apiClient.post(`/admin/attendance/sessions/${sessionId}/corrections`, payload)).data,
-  attendanceHistory: async (sessionId) => (await apiClient.get(`/attendance/sessions/${sessionId}/history`)).data,
-  attendanceOverview: async (date) => (await apiClient.get('/admin/attendance/overview', { params: { date } })).data,
-  pendingAttendance: async (date) => (await apiClient.get('/admin/attendance/pending', { params: { date } })).data,
-  markNotApplicable: async (sectionId, date, payload) => (await apiClient.post(`/admin/attendance/sections/${sectionId}/dates/${date}/not-applicable`, payload)).data,
   createExaminationRole: async (payload) => {
     const response = await apiClient.post('/users/create-examination-role', payload);
     return response.data;

@@ -18,7 +18,7 @@ export default function ClassTeacherAssignmentPage() {
 
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all'],
-    queryFn: () => teacherService.list({ page: 1, limit: 1000 }),
+    queryFn: () => teacherService.listAll(),
   });
 
   const assignmentsQuery = useQuery({

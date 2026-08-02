@@ -87,7 +87,19 @@ export const assertTeacherIsClassTeacherForSection = async (user, { schoolId, cl
     throw new AuthorizationError('Teacher profile not found for this user.', 403);
   }
 
-  const assignment = await prisma.teacherAssignment.findFirst({
+  const canonicalAssignment = await prisma.sectionClassTeacherAssignment.findFirst({
+    where: {
+      schoolId,
+      teacherId: teacher.id,
+      sectionId,
+      status: 'ACTIVE',
+      isPrimary: true,
+      section: { classId },
+      startDate: { lte: new Date() },
+      OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+    },
+  });
+  const legacyAssignment = canonicalAssignment ? null : await prisma.teacherAssignment.findFirst({
     where: {
       schoolId,
       teacherId: teacher.id,
@@ -98,6 +110,7 @@ export const assertTeacherIsClassTeacherForSection = async (user, { schoolId, cl
       OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
     },
   });
+  const assignment = canonicalAssignment || legacyAssignment;
 
   if (!assignment) {
     throw new AuthorizationError('Only the class teacher can access attendance for this section.', 403);
@@ -126,12 +139,16 @@ export const requireSchoolAdminOrAssignedTeacherForSection = async (user, { scho
     return { allowed: true, isAdmin: true, canMark: true };
   }
   if (!['TEACHER', 'CLASS_TEACHER'].includes(user?.role)) throw new AuthorizationError('Only school admins or assigned teachers can view this attendance.', 403);
+  if (user.role === 'CLASS_TEACHER') {
+    const result = await assertTeacherIsClassTeacherForSection(user, { schoolId, classId, sectionId });
+    return { allowed: true, ...result, isAdmin: false, canMark: true };
+  }
   assertSameSchool(user, schoolId);
   const teacher = await getTeacherForUser(user);
   if (!teacher) throw new AuthorizationError('Teacher profile not found for this user.', 403);
   const assignment = await prisma.teacherAssignment.findFirst({ where: { schoolId, teacherId: teacher.id, classId, sectionId, isActive: true, OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }] } });
   if (!assignment) throw new AuthorizationError('You are not assigned to this section.', 403);
-  return { allowed: true, teacher, assignment, isAdmin: false, canMark: ['CLASS_TEACHER', 'BOTH'].includes(assignment.roleType) };
+  return { allowed: true, teacher, assignment, isAdmin: false, canMark: false };
 };
 
 export const canManageSectionSubject = async (user, params) => {

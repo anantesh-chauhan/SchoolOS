@@ -1,5 +1,6 @@
 import prisma from '../config/prisma.client.js';
 import { createSystemNotification } from '../modules/communication/communication.service.js';
+import { findEligibleStudentsForSection } from '../services/studentSectionEnrollment.service.js';
 import {
   assertTeacherIsClassTeacherForSection,
   isSchoolAdmin,
@@ -52,15 +53,9 @@ const getSectionOr404 = async ({ schoolId, classId, sectionId }) => {
   return section;
 };
 
-const getSectionStudents = async (section, effectiveDate = normalizeDate(new Date())) => prisma.student.findMany({
-  where: {
-    schoolId: section.schoolId,
-    isActive: true,
-    OR: [
-      { className: section.class.className, section: section.sectionName, OR: [{ admissionDate: null }, { admissionDate: { lte: effectiveDate } }] },
-      { enrollmentHistory: { some: { classId: section.classId, sectionId: section.id, effectiveFrom: { lte: effectiveDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: effectiveDate } }] } } },
-    ],
-  },
+const getSectionStudents = async (section, effectiveDate = normalizeDate(new Date())) => findEligibleStudentsForSection({
+  section,
+  effectiveDate,
   orderBy: [{ serialNo: 'asc' }, { studentFirstName: 'asc' }],
 });
 
@@ -80,10 +75,16 @@ export const getStudentAttendanceRoster = async (req, res) => {
     const [students, attendanceRows, classTeacher, register] = await Promise.all([
       getSectionStudents(section, attendanceDate),
       prisma.studentAttendance.findMany({ where: { schoolId, classId, sectionId, attendanceDate } }),
-      prisma.teacherAssignment.findFirst({
-        where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER', 'BOTH'] } },
-        include: { teacher: { select: { id: true, teacherName: true, employeeId: true } } },
-      }),
+      (async () => {
+        const canonical = await prisma.sectionClassTeacherAssignment.findFirst({
+          where: { schoolId, sectionId, status: 'ACTIVE', isPrimary: true, section: { classId }, startDate: { lte: attendanceDate }, OR: [{ endDate: null }, { endDate: { gte: attendanceDate } }] },
+          include: { teacher: { select: { id: true, teacherName: true, employeeId: true } } },
+        });
+        return canonical || prisma.teacherAssignment.findFirst({
+          where: { schoolId, classId, sectionId, isActive: true, roleType: { in: ['CLASS_TEACHER', 'BOTH'] } },
+          include: { teacher: { select: { id: true, teacherName: true, employeeId: true } } },
+        });
+      })(),
       prisma.attendanceDailyRegister.findUnique({
         where: { schoolId_classId_sectionId_attendanceDate: { schoolId, classId, sectionId, attendanceDate } },
         select: { id: true, state: true, markedCount: true, submittedAt: true, version: true, lockedAt: true, isLocked: true, currentRevisionNumber: true, markedByType: true, markedById: true, assignedClassTeacherId: true, overrideReasonCode: true, overrideReasonNote: true },
@@ -92,6 +93,7 @@ export const getStudentAttendanceRoster = async (req, res) => {
 
     const attendanceByStudentId = new Map(attendanceRows.map((row) => [row.studentId, row]));
 
+    res.set('Cache-Control', 'private, no-store');
     return res.json({
       success: true,
       data: {

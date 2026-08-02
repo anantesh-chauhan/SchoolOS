@@ -7,7 +7,6 @@ import { annualComponentTotal, buildComponentInstallments } from "./feeSchedule.
 import {
   assertTeacherIsClassTeacherForSection,
   getTeacherForUser,
-  requireSchoolAdminOrAssignedTeacherForSection,
 } from "../../utils/teacherAuthorization.util.js";
 import { schoolIdOf, safe, recordAudit, ensureUnlocked, assignmentMatches, normalizeAssignmentTarget } from "./feeAdvanced.shared.js";
 
@@ -80,26 +79,45 @@ export const teacherSections = async (user) => {
     throw Object.assign(new Error("Teacher profile not found"), {
       status: 403,
     });
-  const assignments = await prisma.teacherAssignment.findMany({
+  const [canonicalAssignments, legacyAssignments] = await Promise.all([prisma.sectionClassTeacherAssignment.findMany({
+    where: {
+      schoolId: user.schoolId,
+      teacherId: teacher.id,
+      status: "ACTIVE",
+      isPrimary: true,
+      OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+    },
+    include: { section: { include: { class: true } } },
+  }), prisma.teacherAssignment.findMany({
     where: {
       schoolId: user.schoolId,
       teacherId: teacher.id,
       isActive: true,
+      roleType: { in: ["CLASS_TEACHER", "BOTH"] },
       OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date() } }],
     },
     include: { class: true, section: true },
     orderBy: [{ class: { classOrder: "asc" } }, { section: { sectionOrder: "asc" } }],
-  });
+  })]);
   const sections = new Map();
-  for (const assignment of assignments) {
-    const current = sections.get(assignment.sectionId);
+  for (const assignment of canonicalAssignments) {
+    sections.set(assignment.sectionId, {
+      classId: assignment.section.classId,
+      sectionId: assignment.sectionId,
+      className: assignment.section.class.className,
+      sectionName: assignment.section.sectionName,
+      canSendReminders: true,
+      assignmentRoles: ["CLASS_TEACHER"],
+    });
+  }
+  for (const assignment of legacyAssignments) {
     sections.set(assignment.sectionId, {
       classId: assignment.classId,
       sectionId: assignment.sectionId,
       className: assignment.class.className,
       sectionName: assignment.section.sectionName,
-      canSendReminders: Boolean(current?.canSendReminders || ["CLASS_TEACHER", "BOTH"].includes(assignment.roleType)),
-      assignmentRoles: [...new Set([...(current?.assignmentRoles || []), assignment.roleType])],
+      canSendReminders: true,
+      assignmentRoles: [...new Set([...(sections.get(assignment.sectionId)?.assignmentRoles || []), assignment.roleType])],
     });
   }
   return [...sections.values()];
@@ -110,7 +128,7 @@ export const teacherSectionFees = async (user, sectionId, academicSession) => {
   });
   if (!section)
     throw Object.assign(new Error("Section not found"), { status: 404 });
-  await requireSchoolAdminOrAssignedTeacherForSection(user, {
+  await assertTeacherIsClassTeacherForSection(user, {
     schoolId: user.schoolId,
     classId: section.classId,
     sectionId,
@@ -211,7 +229,7 @@ export const teacherStudentFees = async (user, studentId, academicSession) => {
   const classRow = await prisma.class.findFirst({ where: { schoolId: user.schoolId, className: student.className, deletedAt: null } });
   const section = await prisma.section.findFirst({ where: { schoolId: user.schoolId, classId: classRow?.id, sectionName: student.section, deletedAt: null } });
   if (!classRow || !section) throw Object.assign(new Error("Student section is not configured"), { status: 404 });
-  await requireSchoolAdminOrAssignedTeacherForSection(user, {
+  await assertTeacherIsClassTeacherForSection(user, {
     schoolId: user.schoolId,
     classId: classRow.id,
     sectionId: section.id,

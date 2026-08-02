@@ -44,10 +44,13 @@ test('students and parents have view-only fee permission', () => {
   }
 });
 
-test('teachers receive assigned fee view/reminder permission while general staff do not', () => {
-  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_VIEW), true);
-  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_REMIND), true);
+test('only class teachers receive assigned fee view/reminder permission', () => {
+  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_VIEW), false);
+  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_REMIND), false);
   assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_COLLECT), false);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.FEES_VIEW), true);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.FEES_REMIND), true);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.FEES_COLLECT), false);
   assert.equal(hasPermission('STAFF', PERMISSIONS.FEES_VIEW), false);
 });
 

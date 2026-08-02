@@ -5,6 +5,7 @@ import {
   assertAttendanceTransition, dateInTimezone, statusWeight, utcDate,
 } from './attendance.service.js';
 import { publishAttendanceEvent } from './attendanceEvents.service.js';
+import { findEligibleStudentsForSection } from './studentSectionEnrollment.service.js';
 
 const clean = (value) => String(value ?? '').trim();
 const dayKey = (value) => utcDate(value)?.toISOString().slice(0, 10);
@@ -12,7 +13,7 @@ const sessionNameFor = (date) => { const year = date.getUTCFullYear(); const sta
 const fail = (message, statusCode = 400) => { throw Object.assign(new Error(message), { statusCode }); };
 const requestIdFor = (request) => String(request?.res?.getHeader?.('X-Request-Id') || request?.get?.('x-request-id') || '').slice(0, 200) || null;
 const isAttendanceAdmin = (user) => user?.role === 'ADMIN';
-const isTeacher = (user) => ['TEACHER', 'CLASS_TEACHER'].includes(user?.role);
+const isClassTeacher = (user) => user?.role === 'CLASS_TEACHER';
 
 const rulesFor = async (schoolId) => ({ ...DEFAULT_RULES, ...(await prisma.attendanceRule.findUnique({ where: { schoolId } }) || {}) });
 
@@ -48,7 +49,7 @@ const sectionContext = async (schoolId, sectionId, date, requestedSession) => {
 const authorizeMarker = async (user, context) => {
   if (!user?.schoolId || user.schoolId !== context.section.schoolId || user.isActive === false) fail('Active school membership is required', 403);
   if (isAttendanceAdmin(user)) return { markerType: 'ADMIN', teacher: null };
-  if (!isTeacher(user)) fail('Only the assigned Class Teacher or School Admin may mark student attendance', 403);
+  if (!isClassTeacher(user)) fail('Open the Class Teacher workspace to mark student attendance', 403);
   const teacher = await getTeacherForUser(user);
   if (!teacher || teacher.id !== context.assignment?.teacherId) fail('Only the assigned Class Teacher may mark attendance for this section', 403);
   return { markerType: 'CLASS_TEACHER', teacher };
@@ -78,14 +79,9 @@ const validateAdminReason = (markerType, rules, reasonCode, reasonNote) => {
   if (reasonCode === 'OTHER' && !reasonNote) fail('An explanation is required when the Admin override reason is Other');
 };
 
-const eligibleStudents = (schoolId, context, date) => prisma.student.findMany({
-  where: {
-    schoolId, isActive: true,
-    OR: [
-      { className: context.section.class.className, section: context.section.sectionName, OR: [{ admissionDate: null }, { admissionDate: { lte: date } }] },
-      { enrollmentHistory: { some: { classId: context.section.classId, sectionId: context.section.id, effectiveFrom: { lte: date }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: date } }] } } },
-    ],
-  },
+const eligibleStudents = (_schoolId, context, date) => findEligibleStudentsForSection({
+  section: context.section,
+  effectiveDate: date,
   select: { id: true, studentFirstName: true, studentLastName: true, admissionNo: true },
 });
 
@@ -246,7 +242,7 @@ export const getAttendanceSessionHistory = async ({ user, attendanceSessionId })
   if (!register) fail('Attendance session not found', 404);
   if (!['ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'].includes(user.role)) fail('You cannot view attendance history', 403);
   const context = await sectionContext(user.schoolId, register.sectionId, register.attendanceDate, register.academicSession);
-  if (isTeacher(user)) await authorizeMarker(user, context);
+  if (['TEACHER', 'CLASS_TEACHER'].includes(user?.role)) await authorizeMarker(user, context);
   const [revisions, audit, students, users] = await Promise.all([
     prisma.attendanceRevision.findMany({ where: { schoolId: user.schoolId, attendanceSessionId }, include: { changes: true }, orderBy: { revisionNumber: 'asc' } }),
     prisma.attendanceAuditLog.findMany({ where: { schoolId: user.schoolId, attendanceSessionId }, orderBy: { createdAt: 'asc' } }),

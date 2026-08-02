@@ -85,14 +85,32 @@ export const getClassTeacherContext = async (user, assignment) => {
       },
     },
   });
-  return teacher ? {
+  if (!teacher) return null;
+  const canonicalAssignments = await prisma.sectionClassTeacherAssignment.findMany({
+    where: {
+      schoolId: user.schoolId,
+      teacherId: teacher.id,
+      status: 'ACTIVE',
+      isPrimary: true,
+      startDate: { lte: new Date() },
+      OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+    },
+    select: { sectionId: true, section: { select: { classId: true, sectionName: true, class: { select: { className: true } } } } },
+  });
+  const sections = new Map();
+  canonicalAssignments.forEach((row) => sections.set(row.sectionId, {
+    classId: row.section.classId, className: row.section.class.className,
+    sectionId: row.sectionId, sectionName: row.section.sectionName,
+  }));
+  teacher.teacherAssignments.forEach((row) => sections.set(row.sectionId, {
+    classId: row.classId, className: row.class.className,
+    sectionId: row.sectionId, sectionName: row.section.sectionName,
+  }));
+  return {
     teacherId: teacher.id,
     teacherName: teacher.teacherName,
-    sections: teacher.teacherAssignments.map((row) => ({
-      classId: row.classId, className: row.class.className,
-      sectionId: row.sectionId, sectionName: row.section.sectionName,
-    })),
-  } : null;
+    sections: [...sections.values()],
+  };
 };
 
 export const createSessionPayload = (user, assignment, existingSessionId) => ({

@@ -23,7 +23,7 @@ export default function TimetableBuilderPage() {
 
   const teachersQuery = useQuery({
     queryKey: ['teachers', 'all'],
-    queryFn: () => teacherService.list({ page: 1, limit: 1000 }),
+    queryFn: () => teacherService.listAll(),
   });
 
   const timetablesQuery = useQuery({

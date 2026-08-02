@@ -1,36 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-  BookOpen,
-  BookOpenCheck,
-  ClipboardCheck,
-  CalendarDays,
   ChevronDown,
-  Home,
-  Layers,
-  LayoutGrid,
   Menu,
   Monitor,
   Moon,
-  School,
-  Settings,
-  Shapes,
   Sun,
-  Image,
-  UserRound,
-  Users,
-  UsersRound,
-  MessageSquare,
-  KeyRound,
-  BadgeIndianRupee,
-  Plus,
-  BellRing,
-  Briefcase,
-  WalletCards,
-  Activity,
-  Compass,
-  GraduationCap,
-  ShieldCheck,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -41,10 +16,11 @@ import NotificationCenter from '../components/ui/NotificationCenter';
 import DateTimeTopBar from '../components/ui/DateTimeTopBar';
 import { useTheme } from '../contexts/ThemeContext';
 import ReportIssueButton from '../components/issue-report/ReportIssueButton';
-import { filterNavigation } from '../security/permissions';
 import GlobalNavigator from '../components/navigation/GlobalNavigator';
 import RoleSwitcher from '../components/workspace/RoleSwitcher';
 import { buildDashboardNavigation, profileRouteByRole } from '../config/navigation/dashboardNavigation';
+import { useNavigationMemory } from '../hooks/useNavigationMemory';
+import { buildWorkspaceNavigation, findWorkspaceForPath, mergeRoleWorkspaces } from '../config/navigation/workspaceNavigation';
 
 const themeOptions = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -108,17 +84,55 @@ const DashboardLayout = ({ children, role }) => {
   };
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const user = authService.getCurrentUser();
+  const user = useMemo(() => authService.getCurrentUser(), [role]);
   const { branding } = useBranding();
-  let groupedItems = buildDashboardNavigation(role, user);
-  const breadcrumb = useMemo(() => {
-    const tokens = location.pathname.split('/').filter(Boolean);
-    if (tokens.length < 2) {
-      return ['Dashboard'];
-    }
+  const groupedItems = useMemo(() => buildDashboardNavigation(role, user), [role, user]);
+  const workspaceStorageKey = `schoolos:active-workspace:${user?.id || 'anonymous'}:${user?.schoolId || 'platform'}:${role}`;
+  const [preferredWorkspaceId, setPreferredWorkspaceId] = useState(() => {
+    try { return localStorage.getItem(workspaceStorageKey) || 'home'; } catch { return 'home'; }
+  });
+  const workspaces = useMemo(() => buildWorkspaceNavigation(groupedItems, role), [groupedItems, role]);
+  const allItems = useMemo(() => workspaces.flatMap((workspace) => workspace.items.map((item) => ({ ...item, group: workspace.label }))), [workspaces]);
+  const memory = useNavigationMemory(allItems);
+  const availableWorkspaces = useMemo(() => {
+    const assignments = user?.availableRoles?.length ? user.availableRoles : [{ role, assignmentId: user?.activeRoleAssignmentId }];
+    return mergeRoleWorkspaces(assignments.map((assignment) => ({
+      assignment,
+      workspaces: assignment.role === role
+        ? workspaces
+        : buildWorkspaceNavigation(buildDashboardNavigation(assignment.role, user, { skipPermissionFilter: true }), assignment.role),
+    })), role);
+  }, [role, user, workspaces]);
+  const activeWorkspace = useMemo(() => findWorkspaceForPath(workspaces, location.pathname, preferredWorkspaceId), [workspaces, location.pathname, preferredWorkspaceId]);
+  const navigatorGroups = useMemo(() => activeWorkspace?.id === 'home'
+    ? workspaces.filter((workspace) => workspace.id !== 'home').map((workspace) => ({ group: workspace.label, items: workspace.items }))
+    : [{ group: activeWorkspace?.label || 'Workspace', items: activeWorkspace?.items || [] }], [activeWorkspace, workspaces]);
+  const navigatorWorkspaces = activeWorkspace?.id === 'home' ? availableWorkspaces : [];
+  useEffect(() => {
+    if (!activeWorkspace?.id) return;
+    setPreferredWorkspaceId(activeWorkspace.id);
+    try { localStorage.setItem(workspaceStorageKey, activeWorkspace.id); } catch { /* Local preference is optional. */ }
+  }, [activeWorkspace?.id, workspaceStorageKey]);
 
-    return tokens.slice(1).map((token) => token.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
-  }, [location.pathname]);
+  const selectWorkspace = async (workspace) => {
+    setPreferredWorkspaceId(workspace.id);
+    const activeAssignmentId = user?.activeRoleAssignmentId || user?.activeRole?.assignmentId;
+    const source = workspace.sources?.find((item) => item.role === role) || workspace.sources?.[0];
+    if (source?.assignmentId && source.assignmentId !== activeAssignmentId) {
+      try { await authService.switchRole(source.assignmentId); navigate(source.href); }
+      catch (error) { toast.error(error.message || 'Could not open this workspace'); }
+      return;
+    }
+    navigate(source?.href || workspace.href);
+  };
+  const breadcrumb = useMemo(() => {
+    const active = allItems.find((item) => item.href.split(/[?#]/)[0] === location.pathname)
+      || allItems.find((item) => location.pathname.startsWith(`${item.href.split(/[?#]/)[0]}/`));
+    const crumbs = [{ label: 'Home', href: '/workspace/home' }];
+    if (activeWorkspace?.id !== 'home') crumbs.push({ label: activeWorkspace.label, href: activeWorkspace.href });
+    if (active?.label && active.label !== 'Dashboard') crumbs.push({ label: active.label, href: active.href });
+    return crumbs;
+  }, [allItems, location.pathname, activeWorkspace]);
 
   const handleLogout = async () => {
     try {
@@ -160,12 +174,15 @@ const DashboardLayout = ({ children, role }) => {
           />
               <div className="absolute left-0 top-0 h-full w-[min(18rem,88vw)] shadow-xl transition-transform duration-300">
                 <Sidebar
-                  groupedItems={groupedItems}
+                  workspaces={availableWorkspaces}
+                  activeWorkspace={activeWorkspace}
+                  onSelectWorkspace={selectWorkspace}
                   desktopCollapsed={desktopCollapsed}
                   setDesktopCollapsed={setDesktopCollapsedState}
                   user={user}
                   branding={branding}
                   handleLogout={handleLogout}
+                  memory={memory}
                   mobile
                   onNavigate={() => setSidebarOpen(false)}
                 />
@@ -175,12 +192,15 @@ const DashboardLayout = ({ children, role }) => {
 
       <div className="hidden lg:block">
         <Sidebar
-          groupedItems={groupedItems}
+          workspaces={availableWorkspaces}
+          activeWorkspace={activeWorkspace}
+          onSelectWorkspace={selectWorkspace}
           desktopCollapsed={desktopCollapsed}
           setDesktopCollapsed={setDesktopCollapsedState}
           user={user}
           branding={branding}
           handleLogout={handleLogout}
+          memory={memory}
         />
       </div>
 
@@ -202,15 +222,15 @@ const DashboardLayout = ({ children, role }) => {
 
             <div className="hidden items-center gap-2 truncate text-sm text-[var(--text-muted)] md:flex">
               {breadcrumb.map((item, index) => (
-                <React.Fragment key={item + index}>
-                  <span className={index === breadcrumb.length - 1 ? 'font-semibold text-[var(--text-primary)]' : ''}>{item}</span>
-                  {index < breadcrumb.length - 1 && <span>/</span>}
+                <React.Fragment key={item.label + index}>
+                  <button type="button" disabled={!item.href || index === breadcrumb.length - 1} onClick={() => item.href && navigate(item.href)} className={index === breadcrumb.length - 1 ? 'font-semibold text-[var(--text-primary)]' : 'hover:text-[var(--school-primary)] disabled:cursor-default'}>{item.label}</button>
+                  {index < breadcrumb.length - 1 && <span aria-hidden="true">/</span>}
                 </React.Fragment>
               ))}
             </div>
 
             <div className="hidden sm:block">
-              <GlobalNavigator groups={groupedItems} />
+              <GlobalNavigator groups={navigatorGroups} workspaces={navigatorWorkspaces} workspaceId={activeWorkspace?.id} onSelectWorkspace={selectWorkspace} memory={memory} />
             </div>
 
           </div>
@@ -275,9 +295,9 @@ const DashboardLayout = ({ children, role }) => {
           <div className="mx-auto w-full max-w-7xl">
 
             <div className="mb-3 sm:hidden">
-              <p className="text-xs text-[var(--text-muted)]">{breadcrumb.join(' / ')}</p>
+              <p className="truncate text-xs text-[var(--text-muted)]">{breadcrumb.map((item) => item.label).join(' / ')}</p>
               <div className="mt-2">
-                <GlobalNavigator groups={groupedItems} compact />
+                <GlobalNavigator groups={navigatorGroups} workspaces={navigatorWorkspaces} workspaceId={activeWorkspace?.id} onSelectWorkspace={selectWorkspace} compact memory={memory} />
               </div>
             </div>
 

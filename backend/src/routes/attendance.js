@@ -46,7 +46,7 @@ router.get('/public/calendar', listPublicCalendarDays);
 router.use(authMiddleware);
 
 router.get('/students', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireAssignedClass(), getStudentAttendanceRoster);
-router.post('/students', requireRole('ADMIN', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), submitAttendance);
+router.post('/students', requireRole('ADMIN', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), submitAttendance);
 router.get('/teachers', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getTeacherAttendanceRoster);
 router.post('/teachers', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_EMPLOYEE), markTeacherAttendance);
 router.get('/class-month', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireAssignedClass(), getClassAttendanceMonth);
@@ -60,7 +60,7 @@ router.get('/teacher-register', requireRole('ADMIN', 'SCHOOL_OWNER'), requirePer
 router.get('/metadata', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getAttendanceMetadata);
 router.put('/settings', requirePermission(PERMISSIONS.ATTENDANCE_CONFIGURE), updateAttendanceSettings);
 router.put('/statuses', requirePermission(PERMISSIONS.ATTENDANCE_CONFIGURE), saveAttendanceStatus);
-router.post('/student-register', requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), saveStudentDailyRegister);
+router.post('/student-register', requireRole('ADMIN', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), requireAssignedClass(), saveStudentDailyRegister);
 router.get('/students/class/:classId/section/:sectionId/month/:month', requireRole('ADMIN', 'SCHOOL_OWNER', 'TEACHER', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireAssignedClass(), getStudentMonthlyReport);
 router.get('/students/:studentId/profile', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), requireStudentAccess(PERMISSIONS.STUDENTS_VIEW, { param: 'studentId' }), getStudentProfile);
 router.get('/employees/month/:month', requireRole('ADMIN', 'SCHOOL_OWNER', 'HR'), requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getEmployeeMonthlyReport);
@@ -76,8 +76,8 @@ router.get('/export.csv', requirePermission(PERMISSIONS.ATTENDANCE_EXPORT), expo
 
 // Versioned accountability workflow. schoolId always comes from req.user.
 router.get('/sections/:sectionId/dates/:date', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), getSectionAttendance);
-router.post('/sections/:sectionId/dates/:date/draft', requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), saveAttendanceDraft);
-router.post('/sections/:sectionId/dates/:date/submit', requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), submitAttendance);
+router.post('/sections/:sectionId/dates/:date/draft', requireRole('ADMIN', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), saveAttendanceDraft);
+router.post('/sections/:sectionId/dates/:date/submit', requireRole('ADMIN', 'CLASS_TEACHER'), requirePermission(PERMISSIONS.ATTENDANCE_MARK_STUDENT), submitAttendance);
 router.get('/sessions/:attendanceSessionId/history', requirePermission(PERMISSIONS.ATTENDANCE_VIEW), attendanceHistory);
 
 export default router;

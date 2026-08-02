@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import FeeStructurePreviewTable from '../../components/fees/FeeStructurePreviewTable';
 import { feeService } from '../../services/feeService';
+import { authService } from '../../services/authService';
 
 const card = 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900';
 const field = 'h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950';
@@ -38,6 +39,7 @@ function StudentFeeDetail({ studentId, academicSession, settings, onBack }) {
 }
 
 export default function TeacherFeePage() {
+  const user = authService.getCurrentUser();
   const [academicSession, setAcademicSession] = useState(currentSession());
   const [settings, setSettings] = useState({ locale: 'en-IN', currencyCode: 'INR' });
   const [sections, setSections] = useState([]);
@@ -57,8 +59,8 @@ export default function TeacherFeePage() {
   const collectionRate = useMemo(() => overview?.summary.expectedMinor ? Math.round(overview.summary.paidMinor / overview.summary.expectedMinor * 100) : 0, [overview]);
   const send = async () => { setBusy(true); try { const result = await feeService.teacherReminder({ sectionId: section.sectionId, academicSession, studentIds: selected, message }); toast.success(`${result.sent} in-app reminder${result.sent === 1 ? '' : 's'} sent and logged`); setMessage(''); } catch (error) { toast.error(error.response?.data?.message || 'Could not send reminders'); } finally { setBusy(false); } };
 
-  if (selectedStudentId) return <DashboardLayout role="TEACHER"><StudentFeeDetail studentId={selectedStudentId} academicSession={academicSession} settings={settings} onBack={() => setSelectedStudentId('')}/></DashboardLayout>;
-  return <DashboardLayout role="TEACHER"><div className="space-y-5">
+  if (selectedStudentId) return <DashboardLayout role={user?.role || 'CLASS_TEACHER'}><StudentFeeDetail studentId={selectedStudentId} academicSession={academicSession} settings={settings} onBack={() => setSelectedStudentId('')}/></DashboardLayout>;
+  return <DashboardLayout role={user?.role || 'CLASS_TEACHER'}><div className="space-y-5">
     <header className={card}><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-wide text-blue-600">Assigned-class finance</p><h1 className="mt-1 text-2xl font-black">Class fee status</h1><p className="text-sm text-slate-500">Published structures, section totals, and individual student fee records for your assigned sections.</p></div><label className="text-sm font-semibold">Academic session<input className={`${field} ml-2`} value={academicSession} onChange={(event) => setAcademicSession(event.target.value)}/></label></div><div className="mt-4 flex flex-wrap gap-2">{sections.map((row) => <button type="button" key={row.sectionId} onClick={() => setSection(row)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${section?.sectionId === row.sectionId ? 'bg-blue-600 text-white' : 'border dark:border-slate-700'}`}>{row.className} · {row.sectionName}</button>)}</div>{!sections.length && <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950">No active class or subject assignment is linked to your teacher account.</p>}</header>
     {section && !overview && <Loading/>}
     {overview && <>

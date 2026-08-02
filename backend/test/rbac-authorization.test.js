@@ -22,6 +22,12 @@ const response = () => {
 test('platform owner is strategic and has no routine attendance or fee collection grant', () => {
   assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.SCHOOL_STATUS_MANAGE, SCOPES.PLATFORM), true);
   assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.ATTENDANCE_MARK_STUDENT), false);
+  assert.equal(hasPermission('TEACHER', PERMISSIONS.ATTENDANCE_MARK_STUDENT), false);
+  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_VIEW), false);
+  assert.equal(hasPermission('TEACHER', PERMISSIONS.FEES_REMIND), false);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.ATTENDANCE_MARK_STUDENT), true);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.FEES_VIEW), true);
+  assert.equal(hasPermission('CLASS_TEACHER', PERMISSIONS.FEES_REMIND), true);
   assert.equal(hasPermission('PLATFORM_OWNER', PERMISSIONS.FEES_COLLECT), false);
 });
 

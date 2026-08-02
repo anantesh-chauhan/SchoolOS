@@ -18,7 +18,7 @@ export default function TeacherAssignmentSummaryPage() {
   const [subjectId, setSubjectId] = useState(() => searchParams.get('subjectId') || '');
   const academicStructure = useAcademicStructure();
 
-  const teachersQuery = useQuery({ queryKey: ['teachers', 'lookup'], queryFn: () => teacherService.list({ page: 1, limit: 1000 }) });
+  const teachersQuery = useQuery({ queryKey: ['teachers', 'lookup'], queryFn: () => teacherService.listAll() });
 
   const summaryQuery = useQuery({
     queryKey: ['teacher-assignment-summary', classId, sectionId, teacherId, subjectId],

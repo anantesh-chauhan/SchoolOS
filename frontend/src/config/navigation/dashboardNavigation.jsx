@@ -56,7 +56,7 @@ const organizeNavigation = (groups) => groups.map((group) => ({
   items: group.items.map((item) => ({ ...item, subgroup: item.subgroup || navigationSubgroup(group.group, item.label) })),
 }));
 
-export const buildDashboardNavigation = (role, user) => {
+export const buildDashboardNavigation = (role, user, { skipPermissionFilter = false } = {}) => {
   const roleMenuConfig = {
       PRINCIPAL: [
         { group: 'Examinations', icon: GraduationCap, items: [
@@ -72,10 +72,6 @@ export const buildDashboardNavigation = (role, user) => {
           { label: 'Grade & Rule Setup', icon: Settings, href: '/examinations?view=configuration' },
           { label: 'Result Registers', icon: BookOpenCheck, href: '/examinations?view=results' },
           { label: 'Examination Audit', icon: ShieldCheck, href: '/examinations?view=audit' },
-        ] },
-        { group: 'Academic setup', icon: BookOpen, items: [
-          { label: 'Subject Assignment', icon: BookOpenCheck, href: '/dashboard/admin/subject-assignment' },
-          { label: 'Teacher Summary', icon: UsersRound, href: '/dashboard/admin/teacher-assignment-summary' },
         ] },
       ],
       PLATFORM_OWNER: [
@@ -284,11 +280,6 @@ export const buildDashboardNavigation = (role, user) => {
             { label: 'Academic Analytics', icon: Activity, href: '/analytics/students' },
           ],
         },
-        { group: 'Class Management', icon: Users, items: [
-            { label: 'My Class', icon: UsersRound, href: '/teacher/my-class' },
-            { label: 'Class Fee Status', icon: BadgeIndianRupee, href: '/teacher/fees' },
-          ],
-        },
         { group: 'Polls & Feedback', icon: MessageSquare, items: [
             { label: 'Assigned Polls', icon: MessageSquare, href: '/teacher/polls?view=assigned' },
             { label: 'Pending & Drafts', icon: ClipboardCheck, href: '/teacher/polls?view=pending' },
@@ -296,7 +287,6 @@ export const buildDashboardNavigation = (role, user) => {
           ],
         },
         { group: 'Attendance & Calendar', icon: ClipboardCheck, items: [
-            { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
             { label: 'My Attendance', icon: ClipboardCheck, href: '/dashboard/teacher/my-attendance' },
             { label: 'Request Correction', icon: ClipboardCheck, href: '/attendance/request-correction' },
             { label: 'Academic Calendar', icon: CalendarDays, href: '/dashboard/calendar' },
@@ -399,6 +389,7 @@ export const buildDashboardNavigation = (role, user) => {
       { group: 'My Section', icon: UsersRound, items: [
         { label: 'Students', icon: Users, href: '/teacher/my-class' },
         { label: 'Class Attendance', icon: ClipboardCheck, href: '/teacher/attendance' },
+        { label: 'Class Fee Status', icon: BadgeIndianRupee, href: '/teacher/fees', permission: 'fees.view' },
         { label: 'Result Verification', icon: GraduationCap, href: '/examinations' },
       ] },
       { group: 'Account', icon: Settings, items: [
@@ -414,7 +405,7 @@ export const buildDashboardNavigation = (role, user) => {
     let groupedItems = organizeNavigation((roleMenuConfig[role] || []).map((group) => ({ ...group, items: [...group.items] })));
     if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Communication')) groupedItems.splice(1, 0, { group:'Communication', icon:MessageSquare, items: role === 'HR' ? [{label:'Notifications',icon:BellRing,href:'/notifications'}] : [{label:'Notifications',icon:BellRing,href:'/notifications'},{label:'Communication Hub',icon:MessageSquare,href:'/communication'}] });
     if (role !== 'PLATFORM_OWNER' && groupedItems.length && !groupedItems.some(g => g.group === 'Support')) groupedItems.push({ group:'Support', icon:MessageSquare, items:[{label:'My Reports',icon:MessageSquare,href:'/support/my-reports'}] });
-    groupedItems = filterNavigation(groupedItems, user);
+    if (!skipPermissionFilter) groupedItems = filterNavigation(groupedItems, user);
   return groupedItems;
 };
 
